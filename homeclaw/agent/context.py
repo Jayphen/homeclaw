@@ -16,8 +16,8 @@ async def build_context(
 ) -> str:
     parts: list[str] = []
 
-    # Current time
-    now = datetime.now(timezone.utc)
+    # Current time (local timezone so the LLM gives time-aware answers)
+    now = datetime.now().astimezone()
     parts.append(f"Current time: {now.strftime('%Y-%m-%d %H:%M %Z')}")
 
     # Layer 1 — structured facts (always injected in full)
