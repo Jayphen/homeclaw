@@ -116,7 +116,10 @@ class Scheduler:
     def shutdown(self) -> None:
         """Shutdown the scheduler gracefully."""
         if self._scheduler.running:
-            self._scheduler.shutdown(wait=False)
+            try:
+                self._scheduler.shutdown(wait=False)
+            except RuntimeError:
+                pass  # Event loop already closed
             logger.info("Scheduler shut down")
 
     @property

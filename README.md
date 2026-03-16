@@ -4,29 +4,120 @@ An open source AI assistant for households. It knows your home, your family, and
 the people in your lives. Not a personal assistant (one person) and not a home
 automation tool (one building) — it understands the household as a coherent unit.
 
-## Quick start (development)
+## Prerequisites
+
+- **Python 3.12+**
+- **[uv](https://docs.astral.sh/uv/)** (recommended) or pip
+- An LLM API key — one of:
+  - `ANTHROPIC_API_KEY` (direct Anthropic)
+  - `OPENAI_API_KEY` + optional `OPENAI_BASE_URL` (OpenAI or OpenRouter)
+
+## Installation
 
 ```bash
-# Install dependencies
+git clone https://github.com/yourorg/homeclaw.git
+cd homeclaw
+uv sync
+```
+
+For development (adds pyright, ruff, pytest):
+
+```bash
 uv sync --extra dev
-
-# Start a REPL as Alice against dev fixtures
-homeclaw chat --person alice --workspaces ./workspaces-dev
-
-# Preview the context builder output without calling the LLM
-homeclaw chat --person alice --workspaces ./workspaces-dev --dry-run
-
-# LLM-only mode (no tool execution)
-homeclaw chat --person alice --workspaces ./workspaces-dev --no-tools
 ```
 
-You'll need an API key in your environment:
+## Configuration
+
+Copy `.env.example` to `.env` and fill in your values:
 
 ```bash
-export ANTHROPIC_API_KEY=sk-...
-# or
-export OPENAI_API_KEY=sk-...
+cp .env.example .env
 ```
+
+Key settings:
+
+```bash
+# LLM provider — pick one:
+ANTHROPIC_API_KEY=sk-ant-...
+# or use OpenRouter:
+OPENAI_API_KEY=sk-or-...
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+MODEL=anthropic/claude-sonnet-4-6
+
+# Model routing (defaults shown):
+CONVERSATION_MODEL=anthropic/claude-sonnet-4-6
+ROUTINE_MODEL=anthropic/claude-haiku-4-5-20251001
+
+# Optional — Telegram bot:
+TELEGRAM_TOKEN=123456:ABC-...
+
+# Optional — Home Assistant integration:
+HA_URL=http://homeassistant.local:8123
+HA_TOKEN=eyJ...
+
+# Optional — web UI password:
+WEB_PASSWORD=changeme
+```
+
+All config is loaded via pydantic-settings from environment variables or `.env`.
+
+## Running
+
+### Interactive chat (REPL)
+
+```bash
+# Chat as a household member
+homeclaw chat --person alice
+
+# Use a specific workspaces directory
+homeclaw chat --person alice --workspaces ./workspaces
+
+# Skip tool execution (LLM-only mode)
+homeclaw chat --person alice --no-tools
+
+# Preview the system prompt and tools without calling the LLM
+homeclaw chat --person alice --dry-run
+```
+
+### Telegram bot
+
+```bash
+# Requires TELEGRAM_TOKEN in .env
+homeclaw telegram
+```
+
+Users register via `/register <name>` in Telegram to link their account to a
+household member.
+
+### Development shortcuts
+
+```bash
+make dev          # Chat as alice with dev fixtures
+make dev-bob      # Chat as bob with dev fixtures
+make dev-context  # Dry-run: print system prompt and tools
+make dev-setup    # Reset dev fixtures to a clean state
+make dev-serve    # Start API server against dev fixtures
+make dev-costs    # Show cumulative LLM cost from cost log
+```
+
+To set up the dev fixtures for the first time:
+
+```bash
+make dev-setup    # Creates workspaces-dev/ with sample household data
+```
+
+## Scheduler & routines
+
+homeclaw runs recurring tasks defined in `workspaces/household/ROUTINES.md`:
+
+```markdown
+## Morning briefing
+**Schedule:** Every weekday at 7:30am
+**Action:** Summarize today's calendar, reminders, and weather for each person.
+```
+
+The scheduler starts automatically alongside any channel (REPL, Telegram, web).
+Routines use the cheaper model by default to keep costs low.
 
 ## Architecture
 
@@ -40,6 +131,7 @@ homeclaw/           # Main Python package
   api/              # FastAPI app + routes
   plugins/          # Registry, loaders, MCP client
   cli.py            # CLI entry point
+workspaces/         # All user data (bind-mounted in Docker)
 workspaces-dev/     # Dev fixture household (fake data for testing)
 tests/              # pytest test suite
 ```
@@ -50,24 +142,30 @@ tests/              # pytest test suite
 - **Protocol classes** for interfaces (LLMProvider, Plugin) — structural typing, no inheritance
 - **Provider-agnostic agent loop** — never imports Anthropic/OpenAI SDK directly
 - **Two-layer memory**: structured facts (always on) + semantic recall (opt-in)
+- **Cost-aware routing**: conversations use a capable model, routines and tool-only calls use a cheaper one
+- **Prompt caching**: system prompts use Anthropic cache_control for 90% input token savings on cache hits
 
 ## Running tests
 
 ```bash
-# Unit tests (no LLM calls)
+make test         # Unit tests (no LLM calls)
+make typecheck    # Pyright strict type checking
+make lint         # Ruff linting + formatting check
+```
+
+Or directly:
+
+```bash
 pytest tests/ -m "not integration"
-
-# Type checking
-pyright homeclaw/
-
-# Lint
-ruff check homeclaw/ tests/
+pyright
+ruff check homeclaw tests
+ruff format --check homeclaw tests
 ```
 
 ## Status
 
-Early development. The core agent loop, context builder, built-in tools, and CLI
-REPL are working. See `bd list` for current issues and roadmap.
+Early development. The core agent loop, context builder, built-in tools,
+scheduler, cost tracking, and CLI REPL are working.
 
 ## License
 

@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class CallType(Enum):
@@ -12,7 +12,9 @@ class CallType(Enum):
     MEMORY_WRITE = "memory_write"  # saving a fact or note
 
 
-class RoutingConfig(BaseModel):
+class RoutingConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     # Primary: used for conversations requiring reasoning
     conversation_model: str = "anthropic/claude-sonnet-4-6"
 

@@ -81,16 +81,19 @@ class HomeclawApp:
 
         self._scheduler: Scheduler | None = None
 
-    def start_scheduler(self) -> None:
-        """Parse ROUTINES.md and start the scheduler if routines exist."""
+    def load_scheduler(self) -> None:
+        """Parse ROUTINES.md and register routines (does not start the event loop)."""
         from homeclaw.scheduler.scheduler import Scheduler
 
         self._scheduler = Scheduler(loop=self.loop, workspaces=self.workspaces)
         count = self._scheduler.load_routines_md()
-        if count > 0:
-            self._scheduler.start()
-        else:
+        if count == 0:
             self._scheduler = None
+
+    def start_scheduler(self) -> None:
+        """Start the scheduler. Must be called inside a running event loop."""
+        if self._scheduler:
+            self._scheduler.start()
 
     def shutdown(self) -> None:
         """Shut down background services."""
@@ -155,10 +158,14 @@ def _run_chat(workspaces: Path, args: argparse.Namespace) -> None:
     from homeclaw.channel.repl import run_repl
 
     app = HomeclawApp(workspaces=workspaces, register_tools=not args.no_tools)
-    app.start_scheduler()
+    app.load_scheduler()
+
+    async def _chat() -> None:
+        app.start_scheduler()
+        await run_repl(person=args.person, loop=app.loop, on_tool_call=_print_tool_call)
 
     try:
-        asyncio.run(run_repl(person=args.person, loop=app.loop, on_tool_call=_print_tool_call))
+        asyncio.run(_chat())
     finally:
         app.shutdown()
 
@@ -173,12 +180,13 @@ def _run_telegram() -> None:
         print("Error: TELEGRAM_TOKEN not set. Set it in .env or as an environment variable.")
         sys.exit(1)
 
-    app.start_scheduler()
+    app.load_scheduler()
 
     channel = TelegramChannel(
         token=app.config.telegram_token,
         loop=app.loop,
         workspaces=app.workspaces,
+        on_scheduler_start=app.start_scheduler,
     )
     try:
         channel.run()

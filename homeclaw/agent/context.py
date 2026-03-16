@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from homeclaw.contacts.store import list_contacts
 from homeclaw.memory.facts import load_memory
@@ -13,8 +13,10 @@ from homeclaw.memory.semantic import SemanticMemory
 logger = logging.getLogger(__name__)
 
 
-class ContextConfig(BaseModel):
+class ContextConfig(BaseSettings):
     """Token budget and limits for context injection."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     max_facts_per_person: int = 20
     max_contacts_in_context: int = 5

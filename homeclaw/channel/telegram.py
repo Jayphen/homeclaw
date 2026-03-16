@@ -4,6 +4,7 @@ import base64
 import json
 import logging
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 from telegram import Update
@@ -41,11 +42,13 @@ class TelegramChannel:
         loop: AgentLoop,
         workspaces: Path,
         on_tool_call: Any | None = None,
+        on_scheduler_start: Callable[[], None] | None = None,
     ) -> None:
         self._token = token
         self._loop = loop
         self._workspaces = workspaces
         self._on_tool_call = on_tool_call
+        self._on_scheduler_start = on_scheduler_start
         self._user_map = _load_user_map(workspaces)
 
     def _resolve_person(self, update: Update) -> str | None:
@@ -210,9 +213,19 @@ class TelegramChannel:
             for chunk in _split_message(response):
                 await update.message.reply_text(chunk)
 
+    async def _post_init(self, _app: Application) -> None:  # type: ignore[type-arg]
+        """Called by python-telegram-bot after the event loop is running."""
+        if self._on_scheduler_start:
+            self._on_scheduler_start()
+
     def run(self) -> None:
         """Build the Telegram application and start polling. Blocks forever."""
-        app = Application.builder().token(self._token).build()
+        app = (
+            Application.builder()
+            .token(self._token)
+            .post_init(self._post_init)
+            .build()
+        )
 
         app.add_handler(CommandHandler("start", self._handle_start))
         app.add_handler(CommandHandler("register", self._handle_register))
