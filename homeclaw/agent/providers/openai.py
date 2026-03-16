@@ -58,10 +58,23 @@ def _to_api_message(message: Message) -> dict[str, Any]:
             "content": message.content if isinstance(message.content, str) else "",
         }
     if message.role == "assistant":
-        return {
+        msg: dict[str, Any] = {
             "role": "assistant",
             "content": message.content if isinstance(message.content, str) else "",
         }
+        if message.tool_calls:
+            msg["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.name,
+                        "arguments": json.dumps(tc.arguments),
+                    },
+                }
+                for tc in message.tool_calls
+            ]
+        return msg
     return {
         "role": "user",
         "content": message.content if isinstance(message.content, str) else "",

@@ -62,8 +62,13 @@ class AgentLoop:
                 system=system,
             )
 
-            if response.content:
-                history.append(Message(role="assistant", content=response.content))
+            # Always append the assistant message — include tool_calls so the
+            # API can match subsequent tool result messages to their tool_use blocks.
+            history.append(Message(
+                role="assistant",
+                content=response.content or "",
+                tool_calls=response.tool_calls,
+            ))
 
             if response.stop_reason != "tool_use" or not response.tool_calls:
                 break

@@ -21,6 +21,7 @@ class Message(BaseModel):
     role: Literal["user", "assistant", "tool"]
     content: str | list[Any]
     tool_call_id: str | None = None
+    tool_calls: list["ToolCall"] = []
 
 
 class LLMResponse(BaseModel):
