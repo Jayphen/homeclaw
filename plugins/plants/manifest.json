@@ -1,0 +1,10 @@
+{
+  "name": "plants",
+  "version": "1.0.0",
+  "description": "Track plant watering schedules and get overdue reminders",
+  "type": "python",
+  "author": "homeclaw",
+  "has_ui_panel": true,
+  "tools": ["plant_log", "plant_status"],
+  "routines": ["nightly_overdue_check"]
+}
