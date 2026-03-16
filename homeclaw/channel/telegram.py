@@ -43,13 +43,23 @@ class TelegramChannel:
         workspaces: Path,
         on_tool_call: Any | None = None,
         on_scheduler_start: Callable[[], None] | None = None,
+        allowed_user_ids: set[int] | None = None,
     ) -> None:
         self._token = token
         self._loop = loop
         self._workspaces = workspaces
         self._on_tool_call = on_tool_call
         self._on_scheduler_start = on_scheduler_start
+        self._allowed_user_ids = allowed_user_ids
         self._user_map = _load_user_map(workspaces)
+
+    def _is_allowed(self, update: Update) -> bool:
+        """Check if the Telegram user is in the allowlist (if configured)."""
+        if self._allowed_user_ids is None:
+            return True
+        if update.effective_user is None:
+            return False
+        return update.effective_user.id in self._allowed_user_ids
 
     def _resolve_person(self, update: Update) -> str | None:
         """Map a Telegram user to a household member name, or None if unknown."""
@@ -61,6 +71,9 @@ class TelegramChannel:
     async def _handle_start(self, update: Update, _context: Any) -> None:
         """Handle /start — greet and show registration status."""
         if update.message is None:
+            return
+        if not self._is_allowed(update):
+            logger.warning("Rejected /start from unauthorized user %s", update.effective_user)
             return
         person = self._resolve_person(update)
         if person:
@@ -74,6 +87,9 @@ class TelegramChannel:
     async def _handle_register(self, update: Update, _context: Any) -> None:
         """Handle /register <name> — link this Telegram user to a household member."""
         if update.message is None or update.effective_user is None:
+            return
+        if not self._is_allowed(update):
+            logger.warning("Rejected /register from unauthorized user %s", update.effective_user)
             return
         text = (update.message.text or "").strip()
         parts = text.split(maxsplit=1)
@@ -112,6 +128,8 @@ class TelegramChannel:
         """Handle incoming text messages — route through the agent loop."""
         if update.message is None or not update.message.text:
             return
+        if not self._is_allowed(update):
+            return
 
         person = self._resolve_person(update)
         if person is None:
@@ -137,6 +155,8 @@ class TelegramChannel:
     async def _handle_photo(self, update: Update, _context: Any) -> None:
         """Handle incoming photos — download, base64-encode, send as multimodal."""
         if update.message is None or not update.message.photo:
+            return
+        if not self._is_allowed(update):
             return
 
         person = self._resolve_person(update)

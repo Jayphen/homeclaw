@@ -20,6 +20,19 @@ class HomeclawConfig(BaseSettings):
 
     # Telegram
     telegram_token: str | None = None
+    telegram_allowed_users: str | None = None  # Comma-separated Telegram user IDs
+
+    @property
+    def telegram_allowed_user_ids(self) -> set[int] | None:
+        """Parse allowed user IDs, or None if unrestricted."""
+        if not self.telegram_allowed_users:
+            return None
+        ids: set[int] = set()
+        for part in self.telegram_allowed_users.split(","):
+            part = part.strip()
+            if part:
+                ids.add(int(part))
+        return ids if ids else None
 
     # Home Assistant (optional)
     ha_url: str | None = None

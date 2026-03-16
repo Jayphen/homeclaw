@@ -187,6 +187,7 @@ def _run_telegram() -> None:
         loop=app.loop,
         workspaces=app.workspaces,
         on_scheduler_start=app.start_scheduler,
+        allowed_user_ids=app.config.telegram_allowed_user_ids,
     )
     try:
         channel.run()
