@@ -15,12 +15,24 @@
   };
 </script>
 
+<svelte:head>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+</svelte:head>
+
 <nav>
-  <a href="#/">Dashboard</a>
-  <a href="#/calendar">Calendar</a>
-  <a href="#/memory">Memory</a>
-  <a href="#/contacts">Contacts</a>
-  <a href="#/plugins">Plugins</a>
+  <span class="brand">homeclaw</span>
+  <div class="links">
+    <a href="#/">Dashboard</a>
+    <a href="#/calendar">Calendar</a>
+    <a href="#/memory">Memory</a>
+    <a href="#/contacts">Contacts</a>
+    <a href="#/plugins">Plugins</a>
+  </div>
 </nav>
 
 <main>
@@ -28,34 +40,69 @@
 </main>
 
 <style>
+  :global(*) {
+    box-sizing: border-box;
+  }
+
   :global(body) {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-      sans-serif;
-    background: #f8f9fa;
-    color: #1a1a1a;
+    font-family: "DM Sans", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :global(:root) {
+    --bg: #faf8f4;
+    --surface: #fff;
+    --text: #2d2926;
+    --text-muted: #8a7f78;
+    --border: #e8e2da;
+    --terracotta: #c4653a;
+    --sage: #6b8f71;
+    --amber: #d4a054;
+    --rose: #b5656b;
+    --font-serif: "Lora", Georgia, serif;
+    --font-sans: "DM Sans", sans-serif;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(45, 41, 38, 0.06), 0 4px 12px rgba(45, 41, 38, 0.04);
   }
 
   nav {
     display: flex;
-    gap: 1rem;
+    align-items: center;
+    gap: 1.5rem;
     padding: 0.75rem 1.5rem;
-    background: #fff;
-    border-bottom: 1px solid #e0e0e0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
   }
 
-  nav a {
-    color: #555;
+  .brand {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--terracotta);
+    letter-spacing: -0.01em;
+  }
+
+  .links {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .links a {
+    color: var(--text-muted);
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 500;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    transition: color 0.15s, background 0.15s;
   }
 
-  nav a:hover {
-    color: #1a1a1a;
-    background: #f0f0f0;
+  .links a:hover {
+    color: var(--text);
+    background: rgba(45, 41, 38, 0.04);
   }
 
   main {

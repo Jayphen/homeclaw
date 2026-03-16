@@ -50,6 +50,8 @@ ROUTINE_MODEL=anthropic/claude-haiku-4-5-20251001
 
 # Optional — Telegram bot:
 TELEGRAM_TOKEN=123456:ABC-...
+# Optional — restrict bot to specific Telegram user IDs:
+TELEGRAM_ALLOWED_USERS=123456789,987654321
 
 # Optional — Home Assistant integration:
 HA_URL=http://homeassistant.local:8123
@@ -131,6 +133,8 @@ homeclaw/           # Main Python package
   api/              # FastAPI app + routes
   plugins/          # Registry, loaders, MCP client
   cli.py            # CLI entry point
+ui/                 # Svelte web UI (built to ui/dist/)
+plugins/            # Built-in reference plugins (e.g., plants)
 workspaces/         # All user data (bind-mounted in Docker)
 workspaces-dev/     # Dev fixture household (fake data for testing)
 tests/              # pytest test suite
@@ -144,6 +148,29 @@ tests/              # pytest test suite
 - **Two-layer memory**: structured facts (always on) + semantic recall (opt-in)
 - **Cost-aware routing**: conversations use a capable model, routines and tool-only calls use a cheaper one
 - **Prompt caching**: system prompts use Anthropic cache_control for 90% input token savings on cache hits
+
+## Web UI
+
+The web UI is built with Svelte 5 and served as static files by FastAPI — no
+Node.js required at runtime.
+
+```bash
+cd ui && npm install && npm run build   # or: make ui-build
+```
+
+The build output lands in `ui/dist/` and is served automatically when running
+`homeclaw serve`.
+
+## Plugin system
+
+Three tiers of plugins, all conforming to the same Protocol:
+
+1. **Python plugins** — `plugins/{name}/plugin.py`, loaded via importlib
+2. **Skill plugins** — Markdown files in `workspaces/skills/`, use sandboxed HTTP
+3. **MCP sidecars** — Docker containers, communicate via HTTP/SSE
+
+See `plugins/plants/` for a reference implementation covering tools, routines,
+and persistent storage.
 
 ## Running tests
 
@@ -164,8 +191,8 @@ ruff format --check homeclaw tests
 
 ## Status
 
-Early development. The core agent loop, context builder, built-in tools,
-scheduler, cost tracking, and CLI REPL are working.
+Early development. Working: core agent loop, context builder, built-in tools,
+scheduler, cost tracking, CLI REPL, Telegram bot, plugin system, web UI scaffold.
 
 ## License
 

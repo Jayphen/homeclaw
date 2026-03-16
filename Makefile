@@ -1,4 +1,4 @@
-.PHONY: typecheck lint test test-integration test-record dev dev-bob dev-context dev-setup dev-serve dev-costs ui-build docker-build docker-push
+.PHONY: typecheck lint test test-integration test-record dev dev-bob dev-context dev-setup dev-serve dev-ui ui ui-build dev-costs docker-build docker-push
 
 typecheck:
 	pyright
@@ -30,6 +30,18 @@ dev-setup:
 
 dev-serve:
 	homeclaw serve --workspaces ./workspaces-dev --port 8081
+
+dev-ui:
+	@trap 'kill 0' EXIT; \
+	uv run homeclaw serve --workspaces ./workspaces-dev --port 8081 & \
+	cd ui && npm run dev & \
+	wait
+
+ui:
+	@trap 'kill 0' EXIT; \
+	uv run homeclaw serve --port 8081 & \
+	cd ui && npm run dev & \
+	wait
 
 dev-costs:
 	@python3 -c "import json; from pathlib import Path; \

@@ -33,7 +33,8 @@ def _today_notes(workspaces_path: str, members: list[str], today: str) -> list[d
     for person in members:
         path = ws / person / "notes" / f"{today}.md"
         if path.exists():
-            notes.append({"person": person, "content": path.read_text().strip()})
+            mtime = datetime.fromtimestamp(path.stat().st_mtime).isoformat()
+            notes.append({"person": person, "content": path.read_text().strip(), "updated_at": mtime})
     return notes
 
 

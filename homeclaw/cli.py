@@ -22,6 +22,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("telegram", help="Start the Telegram bot")
 
+    serve = sub.add_parser("serve", help="Start the web UI and API server")
+    serve.add_argument("--workspaces", default="./workspaces", help="Path to workspaces directory")
+    serve.add_argument("--port", type=int, default=8080, help="Port to listen on")
+
     chat = sub.add_parser("chat", help="Start an interactive chat session")
     chat.add_argument("--person", required=True, help="Household member name")
     chat.add_argument("--workspaces", default="./workspaces", help="Path to workspaces directory")
@@ -113,6 +117,10 @@ def main() -> None:
         _run_telegram()
         return
 
+    if args.command == "serve":
+        _run_serve(Path(args.workspaces).resolve(), args.port)
+        return
+
     if args.command != "chat":
         parser.print_help()
         sys.exit(1)
@@ -168,6 +176,21 @@ def _run_chat(workspaces: Path, args: argparse.Namespace) -> None:
         asyncio.run(_chat())
     finally:
         app.shutdown()
+
+
+def _run_serve(workspaces: Path, port: int) -> None:
+    """Start the FastAPI server for the web UI and REST API."""
+    import uvicorn
+
+    from homeclaw.api.app import app, set_config
+    from homeclaw.config import HomeclawConfig
+
+    config = HomeclawConfig(workspaces_path=str(workspaces))
+    set_config(config)
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logger.info("Starting web server on port %d (workspaces: %s)", port, workspaces)
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
 def _run_telegram() -> None:
