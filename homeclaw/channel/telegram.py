@@ -3,8 +3,8 @@
 import base64
 import json
 import logging
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from telegram import Update
@@ -211,7 +211,7 @@ class TelegramChannel:
         if response and update.message:
             # Telegram has a 4096 char limit per message — split if needed
             for chunk in _split_message(response):
-                await update.message.reply_text(chunk)
+                await _send_markdown(update.message, chunk)
 
     async def _post_init(self, _app: Application) -> None:  # type: ignore[type-arg]
         """Called by python-telegram-bot after the event loop is running."""
@@ -234,6 +234,17 @@ class TelegramChannel:
 
         logger.info("Starting Telegram polling...")
         app.run_polling()
+
+
+async def _send_markdown(message: Any, text: str) -> None:
+    """Send a message with Markdown formatting, falling back to plain text."""
+    from telegram.constants import ParseMode
+
+    try:
+        await message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+    except Exception:
+        # Telegram's Markdown parser is strict — fall back to plain text
+        await message.reply_text(text)
 
 
 def _split_message(text: str, max_len: int = 4096) -> list[str]:

@@ -44,6 +44,13 @@ class ToolRegistry:
     def has_tool(self, name: str) -> bool:
         return name in self._tools
 
+    def remove(self, name: str) -> bool:
+        if name not in self._tools:
+            return False
+        del self._tools[name]
+        del self._handlers[name]
+        return True
+
 
 def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
     """Register all built-in tools with the registry."""

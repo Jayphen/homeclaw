@@ -107,7 +107,11 @@ class TestMessageHandling:
         channel._loop.run.assert_awaited_once_with(  # type: ignore[union-attr]
             "what's for dinner?", "alice", channel=None,
         )
-        update.message.reply_text.assert_awaited_once_with("I'm homeclaw.")
+        from telegram.constants import ParseMode
+
+        update.message.reply_text.assert_awaited_once_with(
+            "I'm homeclaw.", parse_mode=ParseMode.MARKDOWN,
+        )
 
     @pytest.mark.asyncio
     async def test_unknown_user_gets_registration_prompt(self, tmp_path: Path) -> None:
