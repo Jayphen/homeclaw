@@ -48,7 +48,7 @@ def load_plugin(plugins_dir: Path, name: str) -> PluginProtocol:
     if not plugin_file.is_file():
         raise PluginLoadError(f"Plugin file not found: {plugin_file}")
 
-    module_name = f"homeclaw_plugin_{name}"
+    module_name = f"homeclaw.plugins.ext.{name}"
 
     spec = importlib.util.spec_from_file_location(module_name, plugin_file)
     if spec is None or spec.loader is None:
@@ -68,8 +68,18 @@ def load_plugin(plugins_dir: Path, name: str) -> PluginProtocol:
         sys.modules.pop(module_name, None)
         raise PluginLoadError(f"Plugin module '{name}' does not define a 'Plugin' class")
 
+    data_dir = plugins_dir / name
     try:
-        instance = plugin_cls()
+        instance = plugin_cls(data_dir=data_dir)
+    except TypeError:
+        # Plugin doesn't accept data_dir — instantiate without it
+        try:
+            instance = plugin_cls()
+        except Exception as exc:
+            sys.modules.pop(module_name, None)
+            raise PluginLoadError(
+                f"Failed to instantiate Plugin class from '{name}': {exc}"
+            ) from exc
     except Exception as exc:
         sys.modules.pop(module_name, None)
         raise PluginLoadError(f"Failed to instantiate Plugin class from '{name}': {exc}") from exc

@@ -8,6 +8,7 @@ from homeclaw.agent.providers.base import ToolDefinition
 
 
 class RoutineDefinition(BaseModel):
+    name: str  # unique within the plugin, namespaced by registry
     cron: str  # APScheduler cron expression
     description: str
 

@@ -43,9 +43,6 @@ class PlantStore(BaseModel):
 # Storage helpers
 # ---------------------------------------------------------------------------
 
-_DEFAULT_DATA_DIR = Path("workspaces/plugins/plants")
-
-
 def _data_path(data_dir: Path) -> Path:
     return data_dir / "plants.json"
 
@@ -78,7 +75,7 @@ class Plugin:
     name = "plants"
     description = "Track plant watering schedules and get overdue reminders"
 
-    def __init__(self, data_dir: Path = _DEFAULT_DATA_DIR) -> None:
+    def __init__(self, data_dir: Path) -> None:
         self._data_dir = data_dir
 
     def tools(self) -> list[ToolDefinition]:
@@ -126,6 +123,7 @@ class Plugin:
     def routines(self) -> list[RoutineDefinition]:
         return [
             RoutineDefinition(
+                name="overdue_check",
                 cron="0 20 * * *",
                 description="Check for plants that are overdue for watering",
             )
@@ -222,7 +220,7 @@ def _next_water_str(plant: Plant) -> str:
     return next_dt.strftime("%Y-%m-%d")
 
 
-def get_overdue_plants(data_dir: Path = _DEFAULT_DATA_DIR) -> list[Plant]:
+def get_overdue_plants(data_dir: Path) -> list[Plant]:
     """Return plants that are overdue for watering. Used by the nightly routine."""
     store = _load_store(data_dir)
     now = datetime.now(timezone.utc)

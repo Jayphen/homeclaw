@@ -67,7 +67,7 @@ class Plugin:
         return {}
 
     def routines(self) -> list[RoutineDefinition]:
-        return [RoutineDefinition(cron="0 9 * * *", description="Daily check")]
+        return [RoutineDefinition(name="daily_check", cron="0 9 * * *", description="Daily check")]
 """
 
 BROKEN_IMPORT_SRC = """\

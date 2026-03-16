@@ -139,12 +139,19 @@ class PluginRegistry:
         return list(self._entries.values())
 
     def get_routines(self, name: str) -> list[RoutineDefinition]:
-        """Get routine definitions for a specific plugin."""
+        """Get routine definitions for a specific plugin (namespaced)."""
         plugin = self._plugins.get(name)
         if plugin is None:
             return []
         try:
-            return plugin.routines()
+            return [
+                RoutineDefinition(
+                    name=f"{name}.{r.name}",
+                    cron=r.cron,
+                    description=f"[{name}] {r.description}",
+                )
+                for r in plugin.routines()
+            ]
         except Exception:
             logger.exception("Failed to get routines for plugin '%s'", name)
             return []

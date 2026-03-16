@@ -39,7 +39,7 @@ class FakePlugin:
 
 class FakePluginWithRoutines(FakePlugin):
     def routines(self) -> list[RoutineDefinition]:
-        return [RoutineDefinition(cron="0 8 * * *", description="Morning check")]
+        return [RoutineDefinition(name="morning_check", cron="0 8 * * *", description="Morning check")]
 
 
 def test_fake_plugin_satisfies_protocol() -> None:
