@@ -83,6 +83,7 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
         *,
         id: str,
         name: str | None = None,
+        nicknames: list[str] | None = None,
         relationship: RelationshipType | None = None,
         facts: list[str] | None = None,
         **_: Any,
@@ -92,6 +93,8 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
             contact = Contact(id=id, name=name or id, relationship=relationship or "other")
         if name:
             contact.name = name
+        if nicknames is not None:
+            contact.nicknames = nicknames
         if relationship:
             contact.relationship = relationship
         if facts is not None:
@@ -108,6 +111,11 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
                 "properties": {
                     "id": {"type": "string", "description": "Contact ID"},
                     "name": {"type": "string", "description": "Contact name"},
+                    "nicknames": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Nicknames or shortened names for this person",
+                    },
                     "relationship": {"type": "string", "description": "Relationship type"},
                     "facts": {
                         "type": "array",

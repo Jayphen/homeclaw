@@ -24,6 +24,7 @@ class Reminder(BaseModel):
 class Contact(BaseModel):
     id: str
     name: str
+    nicknames: list[str] = []
     relationship: RelationshipType
     birthday: date | None = None
     facts: list[str] = []

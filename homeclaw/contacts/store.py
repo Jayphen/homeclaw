@@ -33,6 +33,8 @@ def _match_score(query: str, contact: Contact) -> float:
         contact.id.lower(),
         contact.name.lower(),
     ]
+    # Nicknames get full weight — exact nickname match should be definitive
+    candidates.extend(n.lower() for n in contact.nicknames)
     # Add individual name parts (first name, last name, etc.)
     candidates.extend(part.lower() for part in contact.name.split())
     # Add ID parts split by hyphens (e.g. "grandma" from "grandma-eleanor")
