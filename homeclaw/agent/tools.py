@@ -543,6 +543,105 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
         bookmark_categories,
     )
 
+    # --- Web tools (via Jina) ---
+
+    import os
+
+    jina_api_key = os.environ.get("JINA_API_KEY")
+
+    def _jina_headers(accept: str = "text/markdown") -> dict[str, str]:
+        headers = {"Accept": accept}
+        if jina_api_key:
+            headers["Authorization"] = f"Bearer {jina_api_key}"
+        return headers
+
+    async def web_read(*, url: str, **_: Any) -> dict[str, Any]:
+        import httpx
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(
+                    f"https://r.jina.ai/{url}",
+                    headers=_jina_headers("text/markdown"),
+                )
+                resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            return {"error": f"HTTP {e.response.status_code}", "url": url}
+        except httpx.RequestError as e:
+            return {"error": str(e), "url": url}
+
+        content = resp.text
+        # Truncate to avoid blowing up the context window
+        max_chars = 12_000
+        if len(content) > max_chars:
+            content = content[:max_chars] + "\n\n[… truncated]"
+        return {"url": url, "content": content}
+
+    registry.register(
+        ToolDefinition(
+            name="web_read",
+            description=(
+                "Fetch a web page and return its content as clean markdown. "
+                "Use this when someone shares a URL or you need to look up "
+                "information from a specific page."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "The URL to fetch"},
+                },
+                "required": ["url"],
+            },
+        ),
+        web_read,
+    )
+
+    async def web_search(*, query: str, **_: Any) -> dict[str, Any]:
+        import httpx
+
+        if not jina_api_key:
+            return {"error": "Web search requires JINA_API_KEY to be set", "query": query}
+
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(
+                    f"https://s.jina.ai/{query}",
+                    headers=_jina_headers("application/json"),
+                )
+                resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            return {"error": f"HTTP {e.response.status_code}", "query": query}
+        except httpx.RequestError as e:
+            return {"error": str(e), "query": query}
+
+        content = resp.text
+        max_chars = 8_000
+        if len(content) > max_chars:
+            content = content[:max_chars] + "\n\n[… truncated]"
+        return {"query": query, "results": content}
+
+    registry.register(
+        ToolDefinition(
+            name="web_search",
+            description=(
+                "Search the web and return results. Use this when someone asks "
+                "a question that needs current information, wants to research "
+                "something, or needs to find a specific resource online."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query",
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
+        web_search,
+    )
+
     # --- Message tool (stub — channel adapters implement delivery) ---
 
     async def message_send(

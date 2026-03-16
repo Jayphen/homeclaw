@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 
 from homeclaw.agent.cost_tracker import CostTracker
-from homeclaw.api.app import AuthDep, get_config
+from homeclaw.api.deps import AuthDep, get_config
 
 router = APIRouter(prefix="/api/cost", tags=["cost"])
 

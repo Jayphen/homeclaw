@@ -2,16 +2,26 @@
 
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from homeclaw.api.deps import AuthDep as AuthDep  # noqa: F401
+from homeclaw.api.deps import get_config as get_config  # noqa: F401
+from homeclaw.api.deps import set_config as set_config  # noqa: F401
+from homeclaw.api.routes.calendar import router as calendar_router
+from homeclaw.api.routes.contacts import router as contacts_router
 from homeclaw.api.routes.cost import router as cost_router
-from homeclaw.config import HomeclawConfig
+from homeclaw.api.routes.dashboard import router as dashboard_router
+from homeclaw.api.routes.memory import router as memory_router
 
 app = FastAPI(title="homeclaw", version="0.1.0")
+app.include_router(calendar_router)
+app.include_router(contacts_router)
 app.include_router(cost_router)
+app.include_router(dashboard_router)
+app.include_router(memory_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -20,31 +30,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-_config: HomeclawConfig | None = None
-
-
-def set_config(config: HomeclawConfig) -> None:
-    global _config
-    _config = config
-
-
-def get_config() -> HomeclawConfig:
-    if _config is None:
-        raise RuntimeError("Config not initialized")
-    return _config
-
-
-async def require_auth(request: Request) -> None:
-    config = get_config()
-    if not config.web_password:
-        return
-    auth = request.headers.get("Authorization", "")
-    if auth != f"Bearer {config.web_password}":
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-
-AuthDep = Depends(require_auth)
 
 # Mount static files for web UI if dist/ exists
 _ui_dist = Path(__file__).parent.parent.parent / "ui" / "dist"
