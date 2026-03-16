@@ -129,12 +129,20 @@
   }
 
   function goToday() {
-    currentDate = new Date();
-    selectedDate = new Date();
+    const today = new Date();
+    currentDate = today;
+    selectedDate = today;
+    history.replaceState(null, "", `#/calendar?date=${format(today, "yyyy-MM-dd")}`);
   }
 
   function selectDay(day: Date) {
-    selectedDate = selectedDate && isSameDay(selectedDate, day) ? null : day;
+    if (selectedDate && isSameDay(selectedDate, day)) {
+      selectedDate = null;
+      history.replaceState(null, "", "#/calendar");
+    } else {
+      selectedDate = day;
+      history.replaceState(null, "", `#/calendar?date=${format(day, "yyyy-MM-dd")}`);
+    }
   }
 
   function formatSelectedDate(d: Date): string {
