@@ -1,4 +1,4 @@
-.PHONY: typecheck lint test test-integration test-record dev dev-bob dev-context dev-setup dev-serve ui-build docker-build docker-push
+.PHONY: typecheck lint test test-integration test-record dev dev-bob dev-context dev-setup dev-serve dev-costs ui-build docker-build docker-push
 
 typecheck:
 	pyright
@@ -30,6 +30,13 @@ dev-setup:
 
 dev-serve:
 	homeclaw serve --workspaces ./workspaces-dev --port 8081
+
+dev-costs:
+	@python3 -c "import json; from pathlib import Path; \
+	log = Path('workspaces-dev/cost_log.jsonl'); \
+	entries = [json.loads(l) for l in log.read_text().splitlines() if l] if log.exists() else []; \
+	total = sum(e.get('estimated_cost_usd', 0) for e in entries); \
+	print(f'Total logged cost: \$${total:.4f} ({len(entries)} calls)') if entries else print('No cost log yet.')"
 
 ui-build:
 	cd ui && npm install && npm run build

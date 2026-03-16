@@ -227,6 +227,41 @@ PLANTS_PLUGIN_PY = '''\
 # TODO: Implement once plugin loader is built (homeclaw-jzg)
 '''
 
+# Sample cost log entries — realistic mix of conversations and routines
+_HAIKU = "claude-haiku-4-5-20251001"
+_SONNET = "claude-sonnet-4-6"
+
+
+def _cost(
+    ts: str, ct: str, model: str, inp: int,
+    out: int, cached: int, cost: float, person: str,
+) -> dict:
+    return {
+        "ts": ts, "call_type": ct, "model": model,
+        "input_tokens": inp, "output_tokens": out,
+        "cached_tokens": cached, "estimated_cost_usd": cost,
+        "person": person,
+    }
+
+
+COST_LOG_ENTRIES = [
+    _cost("2026-03-10T08:00:00+00:00", "routine", _HAIKU, 820, 150, 600, 0.000824, "household"),
+    _cost("2026-03-10T09:15:00+00:00", "conversation", _SONNET, 1842, 203, 1200, 0.004986, "alice"),
+    _cost("2026-03-10T12:30:00+00:00", "conversation", _SONNET, 2100, 310, 1500, 0.006750, "bob"),
+    _cost("2026-03-10T20:00:00+00:00", "routine", _HAIKU, 750, 120, 500, 0.000720, "household"),
+    _cost("2026-03-11T07:30:00+00:00", "routine", _HAIKU, 830, 180, 600, 0.000952, "household"),
+    _cost("2026-03-11T10:00:00+00:00", "conversation", _SONNET, 1650, 250, 1100, 0.005550, "alice"),
+    _cost("2026-03-12T07:30:00+00:00", "routine", _HAIKU, 810, 160, 580, 0.000870, "household"),
+    _cost("2026-03-12T14:00:00+00:00", "conversation", _SONNET, 1920, 280, 1300, 0.006460, "alice"),
+    _cost("2026-03-13T07:30:00+00:00", "routine", _HAIKU, 840, 170, 610, 0.000912, "household"),
+    _cost("2026-03-13T18:00:00+00:00", "conversation", _SONNET, 2200, 350, 1600, 0.007350, "bob"),
+    _cost("2026-03-14T07:30:00+00:00", "routine", _HAIKU, 825, 155, 590, 0.000845, "household"),
+    _cost("2026-03-14T11:00:00+00:00", "conversation", _SONNET, 1780, 220, 1200, 0.005340, "alice"),
+    _cost("2026-03-15T07:30:00+00:00", "routine", _HAIKU, 835, 165, 600, 0.000882, "household"),
+    _cost("2026-03-15T16:00:00+00:00", "conversation", _SONNET, 1950, 290, 1350, 0.006450, "bob"),
+    _cost("2026-03-16T07:30:00+00:00", "routine", _HAIKU, 820, 150, 600, 0.000824, "household"),
+]
+
 
 # ===================================================================
 # Write files
@@ -257,6 +292,7 @@ def _build_manifest() -> list[tuple[Path, str]]:
         (Path("bob/history.jsonl"), _jsonl(BOB_HISTORY)),
         (Path("plugins/plants/plants.json"), _json(PLANTS)),
         (Path("plugins/plants/plugin.py"), PLANTS_PLUGIN_PY),
+        (Path("cost_log.jsonl"), _jsonl(COST_LOG_ENTRIES)),
     ]
 
 

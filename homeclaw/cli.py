@@ -1,11 +1,19 @@
-"""CLI entry point — ``homeclaw chat`` starts the REPL."""
+"""CLI entry point — ``homeclaw`` starts the household assistant."""
+
+from __future__ import annotations
 
 import argparse
 import asyncio
 import json
+import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from homeclaw.scheduler.scheduler import Scheduler
+
+logger = logging.getLogger(__name__)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -35,6 +43,65 @@ def _print_tool_call(name: str, args: dict[str, Any]) -> None:
     print(f"[tool] {name}: {json.dumps(args)}")
 
 
+class HomeclawApp:
+    """Shared application core — config, provider, agent loop, and scheduler.
+
+    Any channel (Telegram, REPL, web UI, Slack, etc.) uses this to get a
+    configured AgentLoop. The scheduler runs exactly once regardless of
+    which channels are active.
+    """
+
+    def __init__(
+        self,
+        workspaces: Path | None = None,
+        register_tools: bool = True,
+        on_tool_call: Any | None = _print_tool_call,
+    ) -> None:
+        from homeclaw.agent.loop import AgentLoop
+        from homeclaw.agent.providers.factory import create_provider
+        from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
+        from homeclaw.config import HomeclawConfig
+
+        self.config = HomeclawConfig()
+        self.workspaces = (workspaces or self.config.workspaces).resolve()
+
+        provider = create_provider(self.config)
+
+        self.registry = ToolRegistry()
+        if register_tools:
+            register_builtin_tools(self.registry, self.workspaces)
+
+        self.loop = AgentLoop(
+            provider=provider,
+            registry=self.registry,
+            workspaces=self.workspaces,
+            on_tool_call=on_tool_call,
+            routing=self.config.routing,
+        )
+
+        self._scheduler: Scheduler | None = None
+
+    def start_scheduler(self) -> None:
+        """Parse ROUTINES.md and start the scheduler if routines exist."""
+        from homeclaw.scheduler.scheduler import Scheduler
+
+        self._scheduler = Scheduler(loop=self.loop, workspaces=self.workspaces)
+        count = self._scheduler.load_routines_md()
+        if count > 0:
+            self._scheduler.start()
+        else:
+            self._scheduler = None
+
+    def shutdown(self) -> None:
+        """Shut down background services."""
+        if self._scheduler:
+            self._scheduler.shutdown()
+
+    @property
+    def scheduler(self) -> Scheduler | None:
+        return self._scheduler
+
+
 def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
@@ -58,7 +125,6 @@ def main() -> None:
 
 def _dry_run(workspaces: Path, args: argparse.Namespace) -> None:
     """Print the full system prompt and registered tools, then exit."""
-    # For dry-run we don't need a valid API key — build context without an LLM call.
     from homeclaw.agent.context import build_context
     from homeclaw.agent.loop import SYSTEM_PROMPT
     from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
@@ -86,59 +152,35 @@ def _dry_run(workspaces: Path, args: argparse.Namespace) -> None:
 
 def _run_chat(workspaces: Path, args: argparse.Namespace) -> None:
     """Load config, create provider + loop, and start the REPL."""
-    from homeclaw.agent.loop import AgentLoop
-    from homeclaw.agent.providers.factory import create_provider
-    from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
     from homeclaw.channel.repl import run_repl
-    from homeclaw.config import HomeclawConfig
 
-    config = HomeclawConfig()
-    provider = create_provider(config)
+    app = HomeclawApp(workspaces=workspaces, register_tools=not args.no_tools)
+    app.start_scheduler()
 
-    registry = ToolRegistry()
-    if not args.no_tools:
-        register_builtin_tools(registry, workspaces)
-
-    loop = AgentLoop(
-        provider=provider,
-        registry=registry,
-        workspaces=workspaces,
-        on_tool_call=_print_tool_call,
-    )
-
-    asyncio.run(run_repl(person=args.person, loop=loop, on_tool_call=_print_tool_call))
+    try:
+        asyncio.run(run_repl(person=args.person, loop=app.loop, on_tool_call=_print_tool_call))
+    finally:
+        app.shutdown()
 
 
 def _run_telegram() -> None:
     """Load config, create provider + loop, and start the Telegram bot."""
-    from homeclaw.agent.loop import AgentLoop
-    from homeclaw.agent.providers.factory import create_provider
-    from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
     from homeclaw.channel.telegram import TelegramChannel
-    from homeclaw.config import HomeclawConfig
 
-    config = HomeclawConfig()
+    app = HomeclawApp()
 
-    if not config.telegram_token:
+    if not app.config.telegram_token:
         print("Error: TELEGRAM_TOKEN not set. Set it in .env or as an environment variable.")
         sys.exit(1)
 
-    workspaces = config.workspaces.resolve()
-    provider = create_provider(config)
-
-    registry = ToolRegistry()
-    register_builtin_tools(registry, workspaces)
-
-    loop = AgentLoop(
-        provider=provider,
-        registry=registry,
-        workspaces=workspaces,
-        on_tool_call=_print_tool_call,
-    )
+    app.start_scheduler()
 
     channel = TelegramChannel(
-        token=config.telegram_token,
-        loop=loop,
-        workspaces=workspaces,
+        token=app.config.telegram_token,
+        loop=app.loop,
+        workspaces=app.workspaces,
     )
-    channel.run()
+    try:
+        channel.run()
+    finally:
+        app.shutdown()

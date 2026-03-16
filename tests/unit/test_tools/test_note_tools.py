@@ -68,10 +68,9 @@ async def test_note_save_creates_new_file(
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
         result = await handler(person="alice", content="Buy groceries")
     assert result["status"] == "saved"
-    # Verify file was created
     path = dev_workspaces / "alice" / "notes" / "2026-04-01.md"
     assert path.exists()
-    assert path.read_text() == "Buy groceries"
+    assert path.read_text() == "- [10:00] Buy groceries\n"
 
 
 @pytest.mark.asyncio
@@ -80,7 +79,6 @@ async def test_note_save_appends_to_existing(
 ) -> None:
     handler = registry.get_handler("note_save")
     assert handler is not None
-    # note_save uses today's date; patch it to 2026-03-12 so it hits the existing file
     fake_now = datetime(2026, 3, 12, 14, 0, 0, tzinfo=timezone.utc)
     with patch("homeclaw.agent.tools.datetime") as mock_dt:
         mock_dt.now.return_value = fake_now
@@ -89,7 +87,33 @@ async def test_note_save_appends_to_existing(
     assert result["status"] == "saved"
     path = dev_workspaces / "alice" / "notes" / "2026-03-12.md"
     content = path.read_text()
-    # Original content should still be there
+    # Original content preserved
     assert "call Mum about Easter" in content
-    # New content appended after double newline
-    assert "Also book flights" in content
+    # New entry appended as timestamped log line
+    assert "- [14:00] Also book flights" in content
+
+
+@pytest.mark.asyncio
+async def test_note_save_multiple_appends_no_duplication(
+    registry: ToolRegistry, dev_workspaces: Path
+) -> None:
+    handler = registry.get_handler("note_save")
+    assert handler is not None
+    path = dev_workspaces / "alice" / "notes" / "2026-04-02.md"
+
+    for hour, note in [(9, "Morning standup"), (11, "Call with client"), (15, "Review PR")]:
+        fake_now = datetime(2026, 4, 2, hour, 0, 0, tzinfo=timezone.utc)
+        with patch("homeclaw.agent.tools.datetime") as mock_dt:
+            mock_dt.now.return_value = fake_now
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            await handler(person="alice", content=note)
+
+    content = path.read_text()
+    # Each entry appears exactly once
+    assert content.count("Morning standup") == 1
+    assert content.count("Call with client") == 1
+    assert content.count("Review PR") == 1
+    # All three entries present with timestamps
+    assert "- [09:00] Morning standup" in content
+    assert "- [11:00] Call with client" in content
+    assert "- [15:00] Review PR" in content

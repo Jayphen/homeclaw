@@ -28,7 +28,7 @@ class OpenAIProvider:
         if base_url:
             kwargs["base_url"] = base_url
         self._client = AsyncOpenAI(**kwargs)
-        self._model = model
+        self.model = model
 
     async def complete(
         self,
@@ -40,7 +40,7 @@ class OpenAIProvider:
         api_messages.extend(_to_api_message(m) for m in messages)
 
         kwargs: dict[str, Any] = {
-            "model": self._model,
+            "model": self.model,
             "messages": api_messages,
         }
         if tools:

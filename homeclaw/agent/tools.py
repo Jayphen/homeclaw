@@ -283,25 +283,36 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
 
     async def note_save(*, person: str, content: str, **_: Any) -> dict[str, Any]:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        time_str = datetime.now(timezone.utc).strftime("%H:%M")
         notes_dir = workspaces / person / "notes"
         notes_dir.mkdir(parents=True, exist_ok=True)
         path = notes_dir / f"{today}.md"
+        entry = f"- [{time_str}] {content}"
         if path.exists():
-            existing = path.read_text()
-            path.write_text(f"{existing}\n\n{content}")
+            existing = path.read_text().rstrip("\n")
+            path.write_text(f"{existing}\n{entry}\n")
         else:
-            path.write_text(content)
+            path.write_text(f"{entry}\n")
         return {"status": "saved", "path": str(path)}
 
     registry.register(
         ToolDefinition(
             name="note_save",
-            description="Save a note for a household member. Appends to today's note file.",
+            description=(
+                "Append a single note entry to a household member's daily log. "
+                "Each call adds one timestamped entry — do NOT include previous "
+                "entries, only the new information to record."
+            ),
             parameters={
                 "type": "object",
                 "properties": {
                     "person": {"type": "string", "description": "Household member name"},
-                    "content": {"type": "string", "description": "Note content (markdown)"},
+                    "content": {
+                        "type": "string",
+                        "description": (
+                            "The new note to append (just the new info, not the full note)"
+                        ),
+                    },
                 },
                 "required": ["person", "content"],
             },

@@ -5,6 +5,9 @@ from pathlib import Path
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from homeclaw.agent.context import ContextConfig
+from homeclaw.agent.routing import RoutingConfig
+
 
 class HomeclawConfig(BaseSettings):
     # LLM provider — set one of these:
@@ -31,6 +34,12 @@ class HomeclawConfig(BaseSettings):
 
     # Memory mode
     enhanced_memory: bool = False
+
+    # Cost routing
+    routing: RoutingConfig = RoutingConfig()
+
+    # Context budget
+    context: ContextConfig = ContextConfig()
 
     model_config = SettingsConfigDict(
         env_file=".env",

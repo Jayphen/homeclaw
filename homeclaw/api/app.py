@@ -7,9 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from homeclaw.api.routes.cost import router as cost_router
 from homeclaw.config import HomeclawConfig
 
 app = FastAPI(title="homeclaw", version="0.1.0")
+app.include_router(cost_router)
 
 app.add_middleware(
     CORSMiddleware,

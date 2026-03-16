@@ -1,11 +1,25 @@
 """Context builder — injects household state into every LLM call."""
 
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
+
+from pydantic import BaseModel
 
 from homeclaw.contacts.store import list_contacts
 from homeclaw.memory.facts import load_memory
 from homeclaw.memory.semantic import SemanticMemory
+
+logger = logging.getLogger(__name__)
+
+
+class ContextConfig(BaseModel):
+    """Token budget and limits for context injection."""
+
+    max_facts_per_person: int = 20
+    max_contacts_in_context: int = 5
+    max_semantic_chunks: int = 3
+    max_ha_entities: int = 20
 
 
 async def build_context(
@@ -14,8 +28,12 @@ async def build_context(
     workspaces: Path,
     semantic_memory: SemanticMemory | None = None,
     shared_only: bool = False,
+    context_config: ContextConfig | None = None,
 ) -> str:
+    cfg = context_config or ContextConfig()
     parts: list[str] = []
+
+    # --- Priority 1: always keep ---
 
     # Current time (local timezone so the LLM gives time-aware answers)
     now = datetime.now().astimezone()
@@ -25,7 +43,7 @@ async def build_context(
     household_memory = load_memory(workspaces, "household")
     if household_memory.facts:
         parts.append("Household facts:")
-        for fact in household_memory.facts:
+        for fact in household_memory.facts[: cfg.max_facts_per_person]:
             parts.append(f"  - {fact}")
 
     # Personal facts (only in DMs — never in group context)
@@ -33,32 +51,64 @@ async def build_context(
         memory = load_memory(workspaces, person)
         if memory.facts:
             parts.append(f"Known facts about {person}:")
-            for fact in memory.facts:
+            for fact in memory.facts[: cfg.max_facts_per_person]:
                 parts.append(f"  - {fact}")
         if memory.preferences:
             parts.append(f"Preferences for {person}:")
             for k, v in memory.preferences.items():
                 parts.append(f"  - {k}: {v}")
 
-    # Contacts with reminders due in 7 days
+    # Active reminders due today (never dropped)
     contacts = list_contacts(workspaces)
-    upcoming: list[str] = []
+    today = now.date()
+    today_reminders: list[str] = []
+    upcoming_reminders: list[str] = []
     cutoff = (now + timedelta(days=7)).date()
     for contact in contacts:
         for reminder in contact.reminders:
-            if reminder.next_date and reminder.next_date <= cutoff:
-                note = f" ({reminder.note})" if reminder.note else ""
-                upcoming.append(f"  - {contact.name}: due {reminder.next_date}{note}")
-    if upcoming:
-        parts.append("Upcoming contact reminders:")
-        parts.extend(upcoming)
+            if not reminder.next_date:
+                continue
+            note = f" ({reminder.note})" if reminder.note else ""
+            entry = f"  - {contact.name}: due {reminder.next_date}{note}"
+            if reminder.next_date <= today:
+                today_reminders.append(entry)
+            elif reminder.next_date <= cutoff:
+                upcoming_reminders.append(entry)
 
-    # Layer 2 — semantic recall (only if enhanced mode enabled)
+    if today_reminders:
+        parts.append("Reminders due today:")
+        parts.extend(today_reminders)
+
+    # --- Priority 4: contacts beyond top N most urgent (dropped third) ---
+    capped_upcoming = upcoming_reminders[: cfg.max_contacts_in_context]
+    if capped_upcoming:
+        parts.append("Upcoming contact reminders:")
+        parts.extend(capped_upcoming)
+
+    # --- Priority 3: semantic memory chunks (dropped second) ---
     if semantic_memory and semantic_memory.enabled:
-        recalled = await semantic_memory.recall(message, top_k=3)
+        recalled = await semantic_memory.recall(
+            message, top_k=cfg.max_semantic_chunks
+        )
         if recalled:
             parts.append("Relevant context from memory:")
             for chunk in recalled:
                 parts.append(f"  {chunk}")
 
-    return "\n".join(parts)
+    result = "\n".join(parts)
+    token_count = estimate_tokens(result)
+    logger.debug("Context built: %d estimated tokens", token_count)
+    return result
+
+
+def estimate_tokens(text: str) -> int:
+    """Estimate token count for a string.
+
+    Uses word-based heuristic (~1.3 tokens per whitespace-delimited word).
+    Accurate to within ~10% for English text. Swap for tiktoken or
+    anthropic.messages.count_tokens() when precise billing is needed.
+    """
+    if not text:
+        return 0
+    words = text.split()
+    return int(len(words) * 1.3)

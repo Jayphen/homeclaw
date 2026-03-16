@@ -15,7 +15,7 @@ from homeclaw.agent.providers.base import (
 class AnthropicProvider:
     def __init__(self, api_key: str, model: str) -> None:
         self._client = anthropic.AsyncAnthropic(api_key=api_key)
-        self._model = model
+        self.model = model
 
     async def complete(
         self,
@@ -27,7 +27,7 @@ class AnthropicProvider:
         api_tools = [_to_api_tool(t) for t in tools] if tools else []
 
         kwargs: dict[str, Any] = {
-            "model": self._model,
+            "model": self.model,
             "max_tokens": 4096,
             "system": system,
             "messages": api_messages,

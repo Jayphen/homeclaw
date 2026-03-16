@@ -9,6 +9,7 @@ from typing import Any
 
 from homeclaw.agent.context import build_context
 from homeclaw.agent.providers.base import LLMProvider, LLMResponse, Message, ToolCall
+from homeclaw.agent.routing import CallType, RoutingConfig, route_model
 from homeclaw.agent.tools import ToolRegistry
 from homeclaw.memory.semantic import SemanticMemory
 
@@ -48,18 +49,21 @@ class AgentLoop:
         workspaces: Path,
         semantic_memory: SemanticMemory | None = None,
         on_tool_call: Callable[[str, dict[str, Any]], None] | None = None,
+        routing: RoutingConfig | None = None,
     ) -> None:
         self._provider = provider
         self._registry = registry
         self._workspaces = workspaces
         self._semantic_memory = semantic_memory
         self._on_tool_call = on_tool_call
+        self._routing = routing
 
     async def run(
         self,
         user_message: str | list[Any],
         person: str,
         channel: str | None = None,
+        call_type: CallType = CallType.CONVERSATION,
     ) -> str:
         """Run the agent loop for a message.
 
@@ -69,6 +73,7 @@ class AgentLoop:
             person: Household member name (for context/memory).
             channel: If set, use shared history keyed by this channel ID
                      and restrict context to household-level facts only.
+            call_type: The type of call for model routing.
         """
         # Extract text portion for context building
         if isinstance(user_message, str):
@@ -95,6 +100,13 @@ class AgentLoop:
 
         tools = self._registry.get_definitions()
         response: LLMResponse | None = None
+
+        # Apply model routing if configured
+        if self._routing:
+            model = route_model(call_type, self._routing)
+            if hasattr(self._provider, "model"):
+                self._provider.model = model  # type: ignore[attr-defined]
+            logger.debug("Routed %s → %s", call_type.value, model)
 
         for _ in range(MAX_TOOL_ROUNDS):
             response = await self._provider.complete(
