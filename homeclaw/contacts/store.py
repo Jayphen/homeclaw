@@ -20,10 +20,16 @@ def list_contacts(workspaces: Path) -> list[Contact]:
 
 
 def get_contact(workspaces: Path, contact_id: str) -> Contact | None:
+    # Exact match first
     path = _contacts_dir(workspaces) / f"{contact_id}.json"
-    if not path.exists():
-        return None
-    return Contact.model_validate_json(path.read_text())
+    if path.exists():
+        return Contact.model_validate_json(path.read_text())
+    # Fuzzy fallback: match by ID substring or case-insensitive name
+    query = contact_id.lower()
+    for contact in list_contacts(workspaces):
+        if query in contact.id.lower() or query in contact.name.lower():
+            return contact
+    return None
 
 
 def save_contact(workspaces: Path, contact: Contact) -> None:
