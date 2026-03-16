@@ -1,10 +1,10 @@
-{"role": "user", "content": "When did I last talk to Sarah?", "tool_call_id": null}
-{"role": "assistant", "content": "Your last contact with Sarah Chen was on January 20th -- you had brunch in Park Slope. That was about 8 weeks ago, and her monthly catch-up reminder was due February 19th. Want me to suggest a time to reach out?", "tool_call_id": null}
-{"role": "user", "content": "Can you remind me to pick up Mochi's flea medication tomorrow morning?", "tool_call_id": null}
-{"role": "assistant", "content": "Done! I'll remind you tomorrow before 8am to pick up Mochi's flea medication.", "tool_call_id": null}
-{"role": "user", "content": "How are the plants doing?", "tool_call_id": null}
-{"role": "assistant", "content": "Here's the plant status:\n- Monstera (living room): watered 2 days ago, next watering in about 5 days. Looking good.\n- Snake Plant (bedroom): watered last week, not due for another week.\n- Basil (kitchen): watered yesterday, needs water again tomorrow. Remember to harvest some leaves if it's getting bushy!", "tool_call_id": null}
-{"role": "user", "content": "What was the note from the 10th about?", "tool_call_id": null}
-{"role": "assistant", "content": "The note from March 10th was about the kitchen renovation discussion. Bob wants new countertops, and you'd prefer to keep the total cost under $3k.", "tool_call_id": null}
-{"role": "user", "content": "Is there anything I need to do this week?", "tool_call_id": null}
-{"role": "assistant", "content": "A few things for this week:\n1. You have a dentist appointment Thursday at 10am.\n2. Sarah Chen is overdue for a catch-up (last contact was 8 weeks ago).\n3. Grandma Eleanor is overdue for her bi-weekly call (last call was 3+ weeks ago).\n4. James Ko's birthday is on the 22nd -- you might want to plan something.\n5. The basil needs watering every couple of days, so keep an eye on it.", "tool_call_id": null}
+{"role": "user", "content": "What's on my plate today?"}
+{"role": "assistant", "content": "Good morning! Here's your Monday overview: You have work 9-5 as usual. Eleanor's bi-weekly check-in is overdue (was due March 6). Sarah Chen's monthly catch-up is also overdue. Mochi probably needs feeding. Want me to help you plan anything?"}
+{"role": "user", "content": "Can you remind me to buy cat food on Saturday?"}
+{"role": "assistant", "content": "Done! I've set a reminder for Saturday March 21 to buy cat food. You'll get it at 7:30am as usual."}
+{"role": "user", "content": "What do you know about James?"}
+{"role": "assistant", "content": "James Ko is a colleague — team lead on the backend team, and he's into rock climbing. You last caught up on March 1st over lunch after a sprint retro. His birthday is coming up on March 22nd, just 6 days away! Want me to set a reminder to get him something?"}
+{"role": "user", "content": "Yeah good idea, remind me the day before"}
+{"role": "assistant", "content": "Set! You'll get a reminder on March 21 to sort a birthday gift for James. Given he's into rock climbing, maybe a chalk bag or a day pass to a climbing gym?"}
+{"role": "user", "content": "What's the latest household note?"}
+{"role": "assistant", "content": "The most recent note is from March 14: \"Alice has dentist appointment Thursday 10am.\" Before that, on March 10: you and Bob discussed the kitchen renovation — he wants new countertops and you'd prefer to keep costs under $3k."}

@@ -1,4 +1,4 @@
-.PHONY: typecheck lint test ui-build docker-build docker-push
+.PHONY: typecheck lint test dev-setup ui-build docker-build docker-push
 
 typecheck:
 	pyright
@@ -9,6 +9,9 @@ lint:
 
 test:
 	pytest
+
+dev-setup:
+	python scripts/setup_dev_fixtures.py
 
 ui-build:
 	cd ui && npm install && npm run build

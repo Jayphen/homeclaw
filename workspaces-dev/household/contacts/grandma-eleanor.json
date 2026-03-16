@@ -1,7 +1,11 @@
 {
   "id": "grandma-eleanor",
   "name": "Eleanor",
-  "nicknames": ["Grandma", "Nana", "Gran"],
+  "nicknames": [
+    "Grandma",
+    "Nana",
+    "Gran"
+  ],
   "relationship": "family",
   "birthday": "1948-06-15",
   "facts": [

@@ -1,6 +1,6 @@
-{"role": "user", "content": "What's the latest on the kitchen renovation?", "tool_call_id": null}
-{"role": "assistant", "content": "Based on the household note from March 10th: you and Alice discussed countertops. You'd like new ones, and Alice wants to keep the total budget under $3k. No contractor quotes logged yet -- want me to create a task to research countertop options and pricing?", "tool_call_id": null}
-{"role": "user", "content": "What should I cook for dinner tonight? Something Italian.", "tool_call_id": null}
-{"role": "assistant", "content": "How about a classic cacio e pepe? You probably have pasta, pecorino, and black pepper on hand. It's quick (20 minutes) and pairs well with a simple side salad. Just remember Alice is vegetarian, so no pancetta additions -- but cacio e pepe is naturally veggie-friendly.", "tool_call_id": null}
-{"role": "user", "content": "Any birthdays coming up I should know about?", "tool_call_id": null}
-{"role": "assistant", "content": "Yes -- James Ko's birthday is March 22nd, that's 6 days away. He's into rock climbing, so maybe a gift card to a climbing gym? Grandma Eleanor's birthday isn't until June 15th, so you have time there.", "tool_call_id": null}
+{"role": "user", "content": "What's the latest on the kitchen renovation?"}
+{"role": "assistant", "content": "Based on the household note from March 10th: you and Alice discussed countertops. You'd like new ones, and Alice wants to keep the total budget under $3k. No contractor quotes logged yet — want me to create a task to research countertop options and pricing?"}
+{"role": "user", "content": "What should I cook for dinner tonight? Something Italian."}
+{"role": "assistant", "content": "How about a classic cacio e pepe? You probably have pasta, pecorino, and black pepper on hand. It's quick (20 minutes) and pairs well with a simple side salad. Just remember Alice is vegetarian, so no pancetta additions — cacio e pepe is naturally veggie-friendly."}
+{"role": "user", "content": "Any birthdays coming up I should know about?"}
+{"role": "assistant", "content": "Yes — James Ko's birthday is March 22nd, that's 6 days away. He's into rock climbing, so maybe a gift card to a climbing gym? Grandma Eleanor's birthday isn't until June 15th, so you have time there."}
