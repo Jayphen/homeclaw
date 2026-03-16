@@ -115,11 +115,18 @@ def _load_history(workspaces: Path, person: str, max_messages: int = 50) -> list
     messages: list[Message] = []
     for line in path.read_text().strip().splitlines():
         if line:
-            messages.append(Message.model_validate_json(line))
+            msg = Message.model_validate_json(line)
+            # Only persist user/assistant turns — tool messages reference IDs
+            # that are only valid within a single run() call.
+            if msg.role in ("user", "assistant"):
+                messages.append(msg)
     return messages[-max_messages:]
 
 
 def _save_history(workspaces: Path, person: str, messages: list[Message]) -> None:
     path = _history_path(workspaces, person)
-    lines = [m.model_dump_json() for m in messages[-100:]]
+    # Strip tool messages before persisting — they contain ephemeral tool_call_ids
+    # that will be rejected by the API if replayed in a later session.
+    persistent = [m for m in messages if m.role in ("user", "assistant")]
+    lines = [m.model_dump_json() for m in persistent[-100:]]
     path.write_text("\n".join(lines) + "\n")
