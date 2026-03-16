@@ -28,6 +28,9 @@ dev = [
     "pytest-asyncio>=0.24",
 ]
 
+[project.scripts]
+homeclaw = "homeclaw.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -48,3 +51,6 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "integration: tests that make real LLM API calls (deselect with '-m \"not integration\"')",
+]

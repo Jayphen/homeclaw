@@ -1,0 +1,6 @@
+{
+  "anthropic_api_key": "SET_ANTHROPIC_API_KEY_ENV_VAR",
+  "telegram_token": "SET_TELEGRAM_TOKEN_ENV_VAR",
+  "web_password": "devpassword",
+  "workspaces_path": "./workspaces-dev"
+}

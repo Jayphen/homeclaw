@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Monstera",
+    "location": "Living room",
+    "water_interval_days": 7,
+    "last_watered": "2026-03-10",
+    "notes": "Likes indirect light"
+  },
+  {
+    "name": "Snake Plant",
+    "location": "Bedroom",
+    "water_interval_days": 14,
+    "last_watered": "2026-03-05",
+    "notes": "Very low maintenance"
+  },
+  {
+    "name": "Basil",
+    "location": "Kitchen windowsill",
+    "water_interval_days": 2,
+    "last_watered": "2026-03-13",
+    "notes": "Needs frequent watering, harvest leaves regularly"
+  }
+]

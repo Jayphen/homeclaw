@@ -1,0 +1,13 @@
+{
+  "facts": [
+    "Runs on weekends, usually Saturday morning",
+    "Enjoys cooking, especially Italian food",
+    "Managing the kitchen renovation project",
+    "Works from home as a software engineer"
+  ],
+  "preferences": {
+    "reminder_time": "8:00am",
+    "communication_style": "detailed and thorough"
+  },
+  "last_updated": "2026-03-14T16:00:00Z"
+}

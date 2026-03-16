@@ -1,0 +1,10 @@
+{"role": "user", "content": "When did I last talk to Sarah?", "tool_call_id": null}
+{"role": "assistant", "content": "Your last contact with Sarah Chen was on January 20th -- you had brunch in Park Slope. That was about 8 weeks ago, and her monthly catch-up reminder was due February 19th. Want me to suggest a time to reach out?", "tool_call_id": null}
+{"role": "user", "content": "Can you remind me to pick up Mochi's flea medication tomorrow morning?", "tool_call_id": null}
+{"role": "assistant", "content": "Done! I'll remind you tomorrow before 8am to pick up Mochi's flea medication.", "tool_call_id": null}
+{"role": "user", "content": "How are the plants doing?", "tool_call_id": null}
+{"role": "assistant", "content": "Here's the plant status:\n- Monstera (living room): watered 2 days ago, next watering in about 5 days. Looking good.\n- Snake Plant (bedroom): watered last week, not due for another week.\n- Basil (kitchen): watered yesterday, needs water again tomorrow. Remember to harvest some leaves if it's getting bushy!", "tool_call_id": null}
+{"role": "user", "content": "What was the note from the 10th about?", "tool_call_id": null}
+{"role": "assistant", "content": "The note from March 10th was about the kitchen renovation discussion. Bob wants new countertops, and you'd prefer to keep the total cost under $3k.", "tool_call_id": null}
+{"role": "user", "content": "Is there anything I need to do this week?", "tool_call_id": null}
+{"role": "assistant", "content": "A few things for this week:\n1. You have a dentist appointment Thursday at 10am.\n2. Sarah Chen is overdue for a catch-up (last contact was 8 weeks ago).\n3. Grandma Eleanor is overdue for her bi-weekly call (last call was 3+ weeks ago).\n4. James Ko's birthday is on the 22nd -- you might want to plan something.\n5. The basil needs watering every couple of days, so keep an eye on it.", "tool_call_id": null}

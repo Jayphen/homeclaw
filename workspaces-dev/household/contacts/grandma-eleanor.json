@@ -1,0 +1,32 @@
+{
+  "id": "grandma-eleanor",
+  "name": "Eleanor",
+  "relationship": "family",
+  "birthday": "1948-06-15",
+  "facts": [
+    "Lives in Portland",
+    "Loves gardening",
+    "Has a cat named Whiskers",
+    "Takes medication at 8am and 8pm"
+  ],
+  "interactions": [
+    {
+      "date": "2026-02-20T14:00:00Z",
+      "type": "call",
+      "notes": "Weekly check-in, she mentioned her tomato seedlings are sprouting"
+    },
+    {
+      "date": "2026-01-10T11:00:00Z",
+      "type": "call",
+      "notes": "New Year catch-up, talked about her book club pick for January"
+    }
+  ],
+  "reminders": [
+    {
+      "interval_days": 14,
+      "next_date": "2026-03-06",
+      "note": "Bi-weekly check-in call"
+    }
+  ],
+  "last_contact": "2026-02-20T14:00:00Z"
+}

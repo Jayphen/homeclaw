@@ -1,0 +1,14 @@
+{
+  "facts": [
+    "Vegetarian",
+    "Works Monday-Friday 9-5 at a marketing agency",
+    "Prefers morning reminders before 8am",
+    "Has a cat named Mochi"
+  ],
+  "preferences": {
+    "reminder_time": "7:30am",
+    "communication_style": "brief and friendly",
+    "dietary": "vegetarian"
+  },
+  "last_updated": "2026-03-15T10:00:00Z"
+}

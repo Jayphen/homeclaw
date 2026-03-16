@@ -2,6 +2,7 @@
 
 import json
 import logging
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -31,11 +32,13 @@ class AgentLoop:
         registry: ToolRegistry,
         workspaces: Path,
         semantic_memory: SemanticMemory | None = None,
+        on_tool_call: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
         self._provider = provider
         self._registry = registry
         self._workspaces = workspaces
         self._semantic_memory = semantic_memory
+        self._on_tool_call = on_tool_call
 
     async def run(self, user_message: str, person: str) -> str:
         context = await build_context(
@@ -84,6 +87,8 @@ class AgentLoop:
     ) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
         for tc in tool_calls:
+            if self._on_tool_call is not None:
+                self._on_tool_call(tc.name, tc.arguments)
             handler = self._registry.get_handler(tc.name)
             if handler is None:
                 results.append({"error": f"Unknown tool: {tc.name}"})

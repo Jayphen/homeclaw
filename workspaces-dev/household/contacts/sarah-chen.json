@@ -1,0 +1,37 @@
+{
+  "id": "sarah-chen",
+  "name": "Sarah Chen",
+  "relationship": "friend",
+  "birthday": null,
+  "facts": [
+    "Lives in Brooklyn",
+    "Works as a UX designer at Figma",
+    "Has a golden retriever named Pixel",
+    "Allergic to shellfish"
+  ],
+  "interactions": [
+    {
+      "date": "2026-01-20T15:30:00Z",
+      "type": "meetup",
+      "notes": "Brunch in Park Slope, talked about her new design system project"
+    },
+    {
+      "date": "2025-12-15T18:00:00Z",
+      "type": "call",
+      "notes": "Caught up on holiday plans, she's visiting family in Vancouver"
+    },
+    {
+      "date": "2025-11-08T12:00:00Z",
+      "type": "message",
+      "notes": "Shared article about design tools, she recommended a podcast"
+    }
+  ],
+  "reminders": [
+    {
+      "interval_days": 30,
+      "next_date": "2026-02-19",
+      "note": "Monthly catch-up"
+    }
+  ],
+  "last_contact": "2026-01-20T15:30:00Z"
+}
