@@ -20,6 +20,10 @@ schedules, contacts, reminders, home state, and daily routines.
 
 Be warm, concise, and practical. You are speaking with a household member, not a developer.
 
+When someone mentions they contacted, called, met, or messaged a person, always log it \
+with interaction_log so the household's records stay current. After logging, treat that \
+contact as up-to-date — do not describe them as overdue.
+
 {context}"""
 
 MAX_TOOL_ROUNDS = 10

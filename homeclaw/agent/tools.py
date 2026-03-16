@@ -1,7 +1,7 @@
 """Tool registry, built-in tool definitions, and handlers."""
 
 from collections.abc import Callable, Coroutine
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -132,6 +132,14 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
         )
         contact.interactions.append(interaction)
         contact.last_contact = interaction.date
+        # Advance recurring reminders based on the new interaction date
+        for reminder in contact.reminders:
+            if reminder.interval_days and reminder.next_date:
+                today = interaction.date.date()
+                while reminder.next_date <= today:
+                    reminder.next_date = reminder.next_date + timedelta(
+                        days=reminder.interval_days
+                    )
         save_contact(workspaces, contact)
         return {"status": "logged", "contact": contact_id}
 
