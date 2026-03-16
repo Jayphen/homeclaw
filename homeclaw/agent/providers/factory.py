@@ -11,6 +11,7 @@ def create_provider(config: HomeclawConfig) -> LLMProvider:
         return AnthropicProvider(
             api_key=config.anthropic_api_key,
             model=config.model,
+            enable_prompt_caching=config.routing.enable_prompt_caching,
         )
 
     from homeclaw.agent.providers.openai import OpenAIProvider
