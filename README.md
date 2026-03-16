@@ -8,10 +8,7 @@ automation tool (one building) — it understands the household as a coherent un
 
 ```bash
 # Install dependencies
-pip install -e ".[dev]"
-
-# Set up dev fixtures (fake household data)
-# Already committed — no setup script needed yet
+uv sync --extra dev
 
 # Start a REPL as Alice against dev fixtures
 homeclaw chat --person alice --workspaces ./workspaces-dev
