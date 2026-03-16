@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from homeclaw.agent.providers.base import ToolDefinition
-from homeclaw.contacts.models import Contact, Interaction
+from homeclaw.contacts.models import Contact, Interaction, InteractionType, RelationshipType
 from homeclaw.contacts.store import (
     delete_contact,
     get_contact,
@@ -83,7 +83,7 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
         *,
         id: str,
         name: str | None = None,
-        relationship: str | None = None,
+        relationship: RelationshipType | None = None,
         facts: list[str] | None = None,
         **_: Any,
     ) -> dict[str, Any]:
@@ -122,7 +122,7 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
     )
 
     async def interaction_log(
-        *, contact_id: str, type: str, notes: str, **_: Any
+        *, contact_id: str, type: InteractionType, notes: str, **_: Any
     ) -> dict[str, Any]:
         contact = get_contact(workspaces, contact_id)
         if not contact:

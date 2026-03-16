@@ -1,6 +1,6 @@
 """LLM provider abstraction — the agent loop never imports a specific SDK."""
 
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
 
@@ -18,7 +18,7 @@ class ToolCall(BaseModel):
 
 
 class Message(BaseModel):
-    role: str  # "user" | "assistant" | "tool"
+    role: Literal["user", "assistant", "tool"]
     content: str | list[Any]
     tool_call_id: str | None = None
 
@@ -26,7 +26,7 @@ class Message(BaseModel):
 class LLMResponse(BaseModel):
     content: str
     tool_calls: list[ToolCall] = []
-    stop_reason: str  # "end_turn" | "tool_use" | "max_tokens"
+    stop_reason: Literal["end_turn", "tool_use", "max_tokens"]
 
 
 class LLMProvider(Protocol):

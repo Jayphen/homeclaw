@@ -1,13 +1,17 @@
 """Pydantic models for contacts, interactions, and reminders."""
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel
+
+InteractionType = Literal["call", "message", "meetup", "other"]
+RelationshipType = Literal["friend", "family", "colleague", "other"]
 
 
 class Interaction(BaseModel):
     date: datetime
-    type: str  # "call" | "message" | "meetup" | "other"
+    type: InteractionType
     notes: str
 
 
@@ -20,7 +24,7 @@ class Reminder(BaseModel):
 class Contact(BaseModel):
     id: str
     name: str
-    relationship: str  # "friend" | "family" | "colleague" | "other"
+    relationship: RelationshipType
     birthday: date | None = None
     facts: list[str] = []
     interactions: list[Interaction] = []

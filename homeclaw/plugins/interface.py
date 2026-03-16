@@ -4,11 +4,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel
 
-
-class PluginToolDefinition(BaseModel):
-    name: str
-    description: str
-    parameters: dict[str, Any]
+from homeclaw.agent.providers.base import ToolDefinition
 
 
 class RoutineDefinition(BaseModel):
@@ -21,6 +17,6 @@ class Plugin(Protocol):
     name: str
     description: str
 
-    def tools(self) -> list[PluginToolDefinition]: ...
+    def tools(self) -> list[ToolDefinition]: ...
     async def handle_tool(self, name: str, args: dict[str, Any]) -> dict[str, Any]: ...
     def routines(self) -> list[RoutineDefinition]: ...

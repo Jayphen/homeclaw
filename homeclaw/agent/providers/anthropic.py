@@ -1,6 +1,6 @@
 """Anthropic SDK implementation of LLMProvider."""
 
-from typing import Any
+from typing import Any, Literal
 
 import anthropic
 
@@ -82,10 +82,11 @@ def _parse_response(response: anthropic.types.Message) -> LLMResponse:
                 )
             )
 
-    stop_reason_map = {
+    stop_reason_map: dict[str, Literal["end_turn", "tool_use", "max_tokens"]] = {
         "end_turn": "end_turn",
         "tool_use": "tool_use",
         "max_tokens": "max_tokens",
+        "pause_turn": "end_turn",
     }
 
     return LLMResponse(

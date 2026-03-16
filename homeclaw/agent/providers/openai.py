@@ -1,7 +1,7 @@
 """OpenAI-compatible LLM provider — covers OpenAI, Ollama, OpenRouter, Groq, etc."""
 
 import json
-from typing import Any
+from typing import Any, Literal
 
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
@@ -102,7 +102,7 @@ def _parse_response(response: ChatCompletion) -> LLMResponse:
                 )
             )
 
-    finish_reason_map = {
+    finish_reason_map: dict[str, Literal["end_turn", "tool_use", "max_tokens"]] = {
         "stop": "end_turn",
         "tool_calls": "tool_use",
         "length": "max_tokens",
