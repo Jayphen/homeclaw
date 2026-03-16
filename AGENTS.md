@@ -1,5 +1,14 @@
 # Agent Instructions
 
+Use `bd` for all task tracking. Run `bd quickstart` at the start of each session.
+This project is called homeclaw. Read HOMECLAW.md before starting any work.
+All Python code must pass Pyright (standard mode): run `make typecheck`.
+All data models use Pydantic BaseModel. All interfaces use Protocol classes.
+Memory has two layers: structured facts (memory.json) and semantic recall (memsearch).
+Do not conflate them. Layer 1 is always on. Layer 2 requires enhanced memory mode.
+When ending a session, land the plane: file remaining work, close completed
+issues, push.
+
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
 ## Quick Reference
