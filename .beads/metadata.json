@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "homeclaw",
+  "project_id": "5ff0b0aa-eed8-498a-932b-aca38d5dea46"
+}
