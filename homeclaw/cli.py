@@ -12,6 +12,8 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="homeclaw", description="homeclaw household AI assistant")
     sub = parser.add_subparsers(dest="command")
 
+    sub.add_parser("telegram", help="Start the Telegram bot")
+
     chat = sub.add_parser("chat", help="Start an interactive chat session")
     chat.add_argument("--person", required=True, help="Household member name")
     chat.add_argument("--workspaces", default="./workspaces", help="Path to workspaces directory")
@@ -36,6 +38,10 @@ def _print_tool_call(name: str, args: dict[str, Any]) -> None:
 def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
+
+    if args.command == "telegram":
+        _run_telegram()
+        return
 
     if args.command != "chat":
         parser.print_help()
@@ -101,3 +107,38 @@ def _run_chat(workspaces: Path, args: argparse.Namespace) -> None:
     )
 
     asyncio.run(run_repl(person=args.person, loop=loop, on_tool_call=_print_tool_call))
+
+
+def _run_telegram() -> None:
+    """Load config, create provider + loop, and start the Telegram bot."""
+    from homeclaw.agent.loop import AgentLoop
+    from homeclaw.agent.providers.factory import create_provider
+    from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
+    from homeclaw.channel.telegram import TelegramChannel
+    from homeclaw.config import HomeclawConfig
+
+    config = HomeclawConfig()
+
+    if not config.telegram_token:
+        print("Error: TELEGRAM_TOKEN not set. Set it in .env or as an environment variable.")
+        sys.exit(1)
+
+    workspaces = config.workspaces.resolve()
+    provider = create_provider(config)
+
+    registry = ToolRegistry()
+    register_builtin_tools(registry, workspaces)
+
+    loop = AgentLoop(
+        provider=provider,
+        registry=registry,
+        workspaces=workspaces,
+        on_tool_call=_print_tool_call,
+    )
+
+    channel = TelegramChannel(
+        token=config.telegram_token,
+        loop=loop,
+        workspaces=workspaces,
+    )
+    channel.run()

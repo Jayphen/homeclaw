@@ -24,6 +24,17 @@ When someone mentions they contacted, called, met, or messaged a person, always 
 with interaction_log so the household's records stay current. After logging, treat that \
 contact as up-to-date — do not describe them as overdue.
 
+When someone shares a link (Instagram, website, etc.) or mentions a place (restaurant, bar, \
+cafe) or recipe they want to remember, save it with bookmark_save. Extract as much structure \
+as you can from the message — name, category, tags, neighborhood, city. If the link has no \
+context, ask briefly what it is before saving. Before categorizing, call bookmark_categories \
+to see what categories already exist and prefer an existing one. If none fits, suggest the \
+new category name to the user and confirm before saving.
+
+When someone asks for suggestions — what to do, where to eat, what to cook — search saved \
+bookmarks with bookmark_search before answering. The household has been collecting these \
+recommendations for a reason.
+
 {context}"""
 
 MAX_TOOL_ROUNDS = 10
@@ -44,16 +55,42 @@ class AgentLoop:
         self._semantic_memory = semantic_memory
         self._on_tool_call = on_tool_call
 
-    async def run(self, user_message: str, person: str) -> str:
+    async def run(
+        self,
+        user_message: str | list[Any],
+        person: str,
+        channel: str | None = None,
+    ) -> str:
+        """Run the agent loop for a message.
+
+        Args:
+            user_message: The user's message — either a plain string or a list
+                of content blocks (text + images) for multimodal input.
+            person: Household member name (for context/memory).
+            channel: If set, use shared history keyed by this channel ID
+                     and restrict context to household-level facts only.
+        """
+        # Extract text portion for context building
+        if isinstance(user_message, str):
+            text_for_context = user_message
+        else:
+            text_for_context = " ".join(
+                block["text"] for block in user_message
+                if isinstance(block, dict) and block.get("type") == "text"
+            )
+
+        shared_only = channel is not None
         context = await build_context(
-            message=user_message,
+            message=text_for_context,
             person=person,
             workspaces=self._workspaces,
             semantic_memory=self._semantic_memory,
+            shared_only=shared_only,
         )
         system = SYSTEM_PROMPT.format(context=context)
 
-        history = _load_history(self._workspaces, person)
+        history_key = channel or person
+        history = _load_history(self._workspaces, history_key)
         history.append(Message(role="user", content=user_message))
 
         tools = self._registry.get_definitions()
@@ -88,7 +125,7 @@ class AgentLoop:
                     )
                 )
 
-        _save_history(self._workspaces, person, history)
+        _save_history(self._workspaces, history_key, history)
         return response.content if response else ""
 
     async def _dispatch_tools(
@@ -132,10 +169,28 @@ def _load_history(workspaces: Path, person: str, max_messages: int = 50) -> list
     return messages[-max_messages:]
 
 
+def _strip_images(content: str | list[Any]) -> str:
+    """Replace image content blocks with a text placeholder for history persistence."""
+    if isinstance(content, str):
+        return content
+    parts: list[str] = []
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "text":
+            parts.append(block["text"])
+        elif isinstance(block, dict) and block.get("type") == "image":
+            parts.append("[image]")
+    return " ".join(parts) if parts else ""
+
+
 def _save_history(workspaces: Path, person: str, messages: list[Message]) -> None:
     path = _history_path(workspaces, person)
     # Strip tool messages before persisting — they contain ephemeral tool_call_ids
     # that will be rejected by the API if replayed in a later session.
-    persistent = [m for m in messages if m.role in ("user", "assistant")]
+    persistent: list[Message] = []
+    for m in messages:
+        if m.role not in ("user", "assistant"):
+            continue
+        # Replace image blocks with text placeholders to avoid storing large base64
+        persistent.append(m.model_copy(update={"content": _strip_images(m.content)}))
     lines = [m.model_dump_json() for m in persistent[-100:]]
     path.write_text("\n".join(lines) + "\n")

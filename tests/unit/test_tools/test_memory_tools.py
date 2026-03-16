@@ -93,3 +93,37 @@ async def test_memory_update_persists_to_disk(
     data = json.loads(path.read_text())
     assert data["facts"] == ["Only fact"]
     assert data["last_updated"] is not None
+
+
+# ── household_share ──────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_household_share_appends_fact(
+    registry: ToolRegistry, dev_workspaces: Path,
+) -> None:
+    handler = registry.get_handler("household_share")
+    assert handler is not None
+    result = await handler(fact="We adopted a cat named Miso")
+    assert result["status"] == "shared"
+    assert result["fact"] == "We adopted a cat named Miso"
+
+    # Verify it's in household memory
+    path = dev_workspaces / "household" / "memory.json"
+    data = json.loads(path.read_text())
+    assert "We adopted a cat named Miso" in data["facts"]
+
+
+@pytest.mark.asyncio
+async def test_household_share_does_not_touch_personal_memory(
+    registry: ToolRegistry, dev_workspaces: Path,
+) -> None:
+    handler = registry.get_handler("household_share")
+    assert handler is not None
+    await handler(fact="Shared fact")
+
+    # Alice's personal memory should be unchanged
+    read_handler = registry.get_handler("memory_read")
+    assert read_handler is not None
+    alice_mem = await read_handler(person="alice")
+    assert "Shared fact" not in alice_mem["facts"]

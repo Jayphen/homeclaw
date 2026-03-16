@@ -75,10 +75,24 @@ def _to_api_message(message: Message) -> dict[str, Any]:
                 for tc in message.tool_calls
             ]
         return msg
-    return {
-        "role": "user",
-        "content": message.content if isinstance(message.content, str) else "",
-    }
+    if isinstance(message.content, str):
+        return {"role": "user", "content": message.content}
+    # Multimodal: convert content blocks to OpenAI format
+    parts: list[dict[str, Any]] = []
+    for block in message.content:
+        if isinstance(block, dict) and block.get("type") == "text":
+            parts.append({"type": "text", "text": block["text"]})
+        elif isinstance(block, dict) and block.get("type") == "image":
+            source = block.get("source", {})
+            media_type = source.get("media_type", "image/jpeg")
+            data = source.get("data", "")
+            parts.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{media_type};base64,{data}",
+                },
+            })
+    return {"role": "user", "content": parts if parts else ""}
 
 
 def _to_api_tool(tool: ToolDefinition) -> dict[str, Any]:

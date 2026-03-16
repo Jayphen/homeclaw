@@ -6,7 +6,6 @@ from typing import Literal
 from pydantic import BaseModel
 
 InteractionType = Literal["call", "message", "meetup", "other"]
-RelationshipType = Literal["friend", "family", "colleague", "other"]
 
 
 class Interaction(BaseModel):
@@ -25,9 +24,10 @@ class Contact(BaseModel):
     id: str
     name: str
     nicknames: list[str] = []
-    relationship: RelationshipType
+    relationship: str
     birthday: date | None = None
     facts: list[str] = []
     interactions: list[Interaction] = []
     reminders: list[Reminder] = []
     last_contact: datetime | None = None
+    member: str | None = None  # workspace name if this contact is also a household member

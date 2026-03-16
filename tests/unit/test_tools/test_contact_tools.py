@@ -101,7 +101,11 @@ async def test_contact_update_modifies_facts(
     assert result["status"] == "updated"
     contact = get_contact(dev_workspaces, "james-ko")
     assert contact is not None
-    assert contact.facts == new_facts
+    # facts are appended, not replaced
+    assert "Team lead on the backend team" in contact.facts
+    assert "Into rock climbing" in contact.facts
+    assert "Loves hiking" in contact.facts
+    assert "Has two dogs" in contact.facts
 
 
 @pytest.mark.asyncio

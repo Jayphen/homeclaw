@@ -6,7 +6,15 @@ from pathlib import Path
 from typing import Any
 
 from homeclaw.agent.providers.base import ToolDefinition
-from homeclaw.contacts.models import Contact, Interaction, InteractionType, RelationshipType
+from homeclaw.bookmarks.models import Bookmark
+from homeclaw.bookmarks.store import (
+    delete_bookmark,
+    get_categories,
+    list_bookmarks,
+    save_bookmark,
+    search_bookmarks,
+)
+from homeclaw.contacts.models import Contact, Interaction, InteractionType
 from homeclaw.contacts.store import (
     delete_contact,
     get_contact,
@@ -84,7 +92,7 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
         id: str,
         name: str | None = None,
         nicknames: list[str] | None = None,
-        relationship: RelationshipType | None = None,
+        relationship: str | None = None,
         facts: list[str] | None = None,
         **_: Any,
     ) -> dict[str, Any]:
@@ -98,7 +106,12 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
         if relationship:
             contact.relationship = relationship
         if facts is not None:
-            contact.facts = facts
+            # Append new facts, deduplicating against existing ones
+            existing = {f.lower() for f in contact.facts}
+            for f in facts:
+                if f.lower() not in existing:
+                    contact.facts.append(f)
+                    existing.add(f.lower())
         save_contact(workspaces, contact)
         return {"status": "updated", "id": id}
 
@@ -116,11 +129,16 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
                         "items": {"type": "string"},
                         "description": "Nicknames or shortened names for this person",
                     },
-                    "relationship": {"type": "string", "description": "Relationship type"},
+                    "relationship": {
+                        "type": "string",
+                        "description": (
+                            "Relationship (e.g. 'wife', 'mother', 'friend', 'pet')"
+                        ),
+                    },
                     "facts": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Known facts about this person",
+                        "description": "New facts to add (appended to existing, not replaced)",
                     },
                 },
                 "required": ["id"],
@@ -232,6 +250,35 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
         memory_update,
     )
 
+    async def household_share(*, fact: str, **_: Any) -> dict[str, Any]:
+        """Share a fact with the entire household."""
+        memory = load_memory(workspaces, "household")
+        memory.facts.append(fact)
+        save_memory(workspaces, "household", memory)
+        return {"status": "shared", "fact": fact}
+
+    registry.register(
+        ToolDefinition(
+            name="household_share",
+            description=(
+                "Share a fact with the entire household. Use this when a member "
+                "explicitly asks to share something with everyone. The fact will "
+                "be visible to all members in both private and group chats."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "fact": {
+                        "type": "string",
+                        "description": "The fact to share with the household",
+                    },
+                },
+                "required": ["fact"],
+            },
+        ),
+        household_share,
+    )
+
     # --- Note tools ---
 
     async def note_save(*, person: str, content: str, **_: Any) -> dict[str, Any]:
@@ -326,6 +373,163 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
             },
         ),
         reminder_set,
+    )
+
+    # --- Bookmark tools ---
+
+    async def bookmark_save(
+        *,
+        title: str,
+        category: str = "other",
+        url: str | None = None,
+        tags: list[str] | None = None,
+        notes: str = "",
+        neighborhood: str = "",
+        city: str = "",
+        person: str = "",
+        **_: Any,
+    ) -> dict[str, Any]:
+        from uuid import uuid4
+
+        bookmark = Bookmark(
+            id=uuid4().hex[:8],
+            url=url,
+            title=title,
+            category=category,
+            tags=tags or [],
+            notes=notes,
+            saved_by=person,
+            saved_at=datetime.now(timezone.utc),
+            neighborhood=neighborhood,
+            city=city,
+        )
+        saved = save_bookmark(workspaces, bookmark)
+        return {"status": "saved", "id": saved.id, "title": saved.title}
+
+    registry.register(
+        ToolDefinition(
+            name="bookmark_save",
+            description=(
+                "Save a link or recommendation (restaurant, bar, cafe, recipe, etc.) "
+                "to the household's shared bookmarks. Use this when someone shares a "
+                "link or mentions a place/recipe they want to remember."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Name of the place or recipe"},
+                    "category": {
+                        "type": "string",
+                        "description": (
+                            "Category (e.g. 'place', 'recipe', 'book', 'article')"
+                        ),
+                    },
+                    "url": {"type": "string", "description": "URL if one was shared"},
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Tags (e.g. 'italian', 'rooftop', 'brunch', 'vegan')",
+                    },
+                    "notes": {"type": "string", "description": "Extra context or description"},
+                    "neighborhood": {"type": "string", "description": "Neighborhood or area"},
+                    "city": {"type": "string", "description": "City"},
+                    "person": {"type": "string", "description": "Who saved this"},
+                },
+                "required": ["title"],
+            },
+        ),
+        bookmark_save,
+    )
+
+    async def bookmark_list(
+        *,
+        category: str | None = None,
+        tag: str | None = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        results = list_bookmarks(workspaces, category=category, tag=tag)
+        return {
+            "bookmarks": [b.model_dump(mode="json") for b in results],
+            "count": len(results),
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="bookmark_list",
+            description="List saved bookmarks, optionally filtered by category or tag.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "description": "Filter by category (e.g. 'place', 'recipe', 'book')",
+                    },
+                    "tag": {"type": "string", "description": "Filter by tag"},
+                },
+            },
+        ),
+        bookmark_list,
+    )
+
+    async def bookmark_search(*, query: str, **_: Any) -> dict[str, Any]:
+        results = search_bookmarks(workspaces, query)
+        return {
+            "bookmarks": [b.model_dump(mode="json") for b in results],
+            "count": len(results),
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="bookmark_search",
+            description=(
+                "Search the household's saved bookmarks by keyword. Use this when someone "
+                "asks for recommendations, wants to find a saved place or recipe, or is "
+                "planning an outing or meal."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query (name, tag, neighborhood, cuisine, etc.)",
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
+        bookmark_search,
+    )
+
+    async def bookmark_delete(*, id: str, **_: Any) -> dict[str, Any]:
+        if delete_bookmark(workspaces, id):
+            return {"status": "deleted", "id": id}
+        return {"error": f"Bookmark '{id}' not found"}
+
+    registry.register(
+        ToolDefinition(
+            name="bookmark_delete",
+            description="Delete a saved bookmark by ID.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "Bookmark ID"},
+                },
+                "required": ["id"],
+            },
+        ),
+        bookmark_delete,
+    )
+
+    async def bookmark_categories(**_: Any) -> dict[str, Any]:
+        return {"categories": get_categories(workspaces)}
+
+    registry.register(
+        ToolDefinition(
+            name="bookmark_categories",
+            description="List all bookmark categories currently in use.",
+            parameters={"type": "object", "properties": {}},
+        ),
+        bookmark_categories,
     )
 
     # --- Message tool (stub — channel adapters implement delivery) ---

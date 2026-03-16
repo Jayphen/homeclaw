@@ -80,6 +80,11 @@ def save_contact(workspaces: Path, contact: Contact) -> None:
     path.write_text(contact.model_dump_json(indent=2))
 
 
+def get_members(workspaces: Path) -> list[Contact]:
+    """Return contacts that are also household members (have a linked workspace)."""
+    return [c for c in list_contacts(workspaces) if c.member is not None]
+
+
 def delete_contact(workspaces: Path, contact_id: str) -> bool:
     path = _contacts_dir(workspaces) / f"{contact_id}.json"
     if not path.exists():
