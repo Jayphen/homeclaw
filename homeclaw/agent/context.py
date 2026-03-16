@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from homeclaw.contacts.store import list_contacts
 from homeclaw.memory.facts import load_memory
 from homeclaw.memory.semantic import SemanticMemory
+from homeclaw.reminders.store import load_reminders
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,7 @@ async def build_context(
                 upcoming_reminders.append(entry)
 
     if today_reminders:
-        parts.append("Reminders due today:")
+        parts.append("Contact reminders due today:")
         parts.extend(today_reminders)
 
     # --- Priority 4: contacts beyond top N most urgent (dropped third) ---
@@ -86,6 +87,31 @@ async def build_context(
     if capped_upcoming:
         parts.append("Upcoming contact reminders:")
         parts.extend(capped_upcoming)
+
+    # Personal reminders (one-shot and recurring)
+    if not shared_only:
+        member_reminders = load_reminders(workspaces, person)
+        due_now: list[str] = []
+        due_soon: list[str] = []
+        for r in member_reminders:
+            if r.done:
+                continue
+            nd = r.next_due
+            if nd is None:
+                continue
+            label = f"  - {r.note} (id: {r.id})"
+            if r.interval_days:
+                label += f" [every {r.interval_days}d]"
+            if nd <= today:
+                due_now.append(label)
+            elif nd <= cutoff:
+                due_soon.append(label)
+        if due_now:
+            parts.append("Your reminders due now:")
+            parts.extend(due_now)
+        if due_soon:
+            parts.append("Your upcoming reminders:")
+            parts.extend(due_soon)
 
     # --- Priority 3: semantic memory chunks (dropped second) ---
     if semantic_memory and semantic_memory.enabled:

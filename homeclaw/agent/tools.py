@@ -349,41 +349,164 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
         note_get,
     )
 
-    # --- Reminder tool ---
+    # --- Reminder tools ---
 
-    async def reminder_set(
-        *, person: str, note: str, date: str, **_: Any
+    from homeclaw.reminders.store import add_reminder as _add_reminder
+    from homeclaw.reminders.store import complete_reminder as _complete_reminder
+    from homeclaw.reminders.store import delete_reminder as _delete_reminder
+    from homeclaw.reminders.store import load_reminders as _load_reminders
+
+    async def reminder_add(
+        *,
+        person: str,
+        note: str,
+        date: str | None = None,
+        interval_days: int | None = None,
+        **_: Any,
     ) -> dict[str, Any]:
         from datetime import date as date_type
+        from uuid import uuid4
 
-        parts = date.split("-")
-        reminder_date = date_type(int(parts[0]), int(parts[1]), int(parts[2]))
-        notes_dir = workspaces / person / "notes"
-        notes_dir.mkdir(parents=True, exist_ok=True)
-        reminders_path = notes_dir / "reminders.md"
-        line = f"- [ ] {reminder_date}: {note}\n"
-        if reminders_path.exists():
-            existing = reminders_path.read_text()
-            reminders_path.write_text(f"{existing}{line}")
-        else:
-            reminders_path.write_text(f"# Reminders\n\n{line}")
-        return {"status": "set", "date": str(reminder_date), "note": note}
+        from homeclaw.reminders.models import Reminder
+
+        due_date = None
+        if date:
+            parts = date.split("-")
+            due_date = date_type(int(parts[0]), int(parts[1]), int(parts[2]))
+
+        reminder = Reminder(
+            id=uuid4().hex[:8],
+            person=person,
+            note=note,
+            due_date=due_date,
+            interval_days=interval_days,
+            created_at=datetime.now(datetime.now().astimezone().tzinfo),
+        )
+        _add_reminder(workspaces, reminder)
+        return {
+            "status": "set",
+            "id": reminder.id,
+            "note": note,
+            "due_date": str(due_date) if due_date else None,
+            "interval_days": interval_days,
+            "next_due": str(reminder.next_due),
+        }
 
     registry.register(
         ToolDefinition(
-            name="reminder_set",
-            description="Set a reminder for a household member on a specific date.",
+            name="reminder_add",
+            description=(
+                "Set a reminder for a household member. Supports one-shot "
+                "(provide date) or recurring (provide interval_days, e.g. 7 for "
+                "weekly). Can provide both date + interval for 'starting on X, "
+                "repeat every N days'."
+            ),
             parameters={
                 "type": "object",
                 "properties": {
                     "person": {"type": "string", "description": "Household member name"},
                     "note": {"type": "string", "description": "Reminder text"},
-                    "date": {"type": "string", "description": "Date in YYYY-MM-DD format"},
+                    "date": {
+                        "type": "string",
+                        "description": "Due date in YYYY-MM-DD (for one-shot or start date)",
+                    },
+                    "interval_days": {
+                        "type": "integer",
+                        "description": "Repeat every N days (e.g. 7 for weekly, 14 for biweekly)",
+                    },
                 },
-                "required": ["person", "note", "date"],
+                "required": ["person", "note"],
             },
         ),
-        reminder_set,
+        reminder_add,
+    )
+
+    async def reminder_list(*, person: str, **_: Any) -> dict[str, Any]:
+        reminders = _load_reminders(workspaces, person)
+        active = [r for r in reminders if not r.done]
+        return {
+            "reminders": [
+                {
+                    "id": r.id,
+                    "note": r.note,
+                    "next_due": str(r.next_due) if r.next_due else None,
+                    "interval_days": r.interval_days,
+                    "recurring": r.interval_days is not None,
+                }
+                for r in active
+            ],
+            "count": len(active),
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="reminder_list",
+            description="List active reminders for a household member.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member name"},
+                },
+                "required": ["person"],
+            },
+        ),
+        reminder_list,
+    )
+
+    async def reminder_complete(
+        *, person: str, reminder_id: str, **_: Any
+    ) -> dict[str, Any]:
+        result = _complete_reminder(workspaces, person, reminder_id)
+        if not result:
+            return {"error": f"Reminder '{reminder_id}' not found"}
+        return {
+            "status": "completed",
+            "id": result.id,
+            "note": result.note,
+            "recurring": result.interval_days is not None,
+            "next_due": str(result.next_due) if result.next_due else None,
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="reminder_complete",
+            description=(
+                "Mark a reminder as done. For recurring reminders, this advances "
+                "to the next occurrence. For one-shot reminders, marks it complete."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member name"},
+                    "reminder_id": {"type": "string", "description": "Reminder ID"},
+                },
+                "required": ["person", "reminder_id"],
+            },
+        ),
+        reminder_complete,
+    )
+
+    async def reminder_delete(
+        *, person: str, reminder_id: str, **_: Any
+    ) -> dict[str, Any]:
+        if _delete_reminder(workspaces, person, reminder_id):
+            return {"status": "deleted", "id": reminder_id}
+        return {"error": f"Reminder '{reminder_id}' not found"}
+
+    registry.register(
+        ToolDefinition(
+            name="reminder_delete",
+            description="Permanently delete a reminder.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member name"},
+                    "reminder_id": {"type": "string", "description": "Reminder ID"},
+                },
+                "required": ["person", "reminder_id"],
+            },
+        ),
+        reminder_delete,
     )
 
     # --- Bookmark tools ---
