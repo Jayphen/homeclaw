@@ -36,6 +36,29 @@ class RoutingConfig(BaseSettings):
     routine_max_output_tokens: int = 512
 
 
+# Tools that require reasoning to synthesize results — keep Sonnet.
+_REASONING_TOOLS = frozenset({"web_read", "web_search"})
+
+# Tools that write to memory/household state — Haiku is fine for follow-up.
+_MEMORY_WRITE_TOOLS = frozenset({
+    "memory_update", "household_share", "note_save",
+})
+
+
+def classify_tool_round(tool_names: list[str]) -> CallType:
+    """Classify a set of dispatched tool calls to pick the model for the next round.
+
+    After the first LLM call (always CONVERSATION), subsequent rounds can use
+    a cheaper model if the tools are simple read/write operations.
+    """
+    names = set(tool_names)
+    if names & _REASONING_TOOLS:
+        return CallType.CONVERSATION
+    if names and names <= _MEMORY_WRITE_TOOLS:
+        return CallType.MEMORY_WRITE
+    return CallType.TOOL_ONLY
+
+
 def route_model(call_type: CallType, config: RoutingConfig) -> str:
     """Return the model name to use for a given call type."""
     if call_type in (CallType.ROUTINE, CallType.TOOL_ONLY, CallType.MEMORY_WRITE):

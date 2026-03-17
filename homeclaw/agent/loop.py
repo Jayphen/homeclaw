@@ -9,7 +9,7 @@ from typing import Any
 
 from homeclaw.agent.context import build_context
 from homeclaw.agent.providers.base import LLMProvider, LLMResponse, Message, ToolCall
-from homeclaw.agent.routing import CallType, RoutingConfig, route_model
+from homeclaw.agent.routing import CallType, RoutingConfig, classify_tool_round, route_model
 from homeclaw.agent.tools import ToolRegistry
 from homeclaw.memory.semantic import SemanticMemory
 
@@ -136,6 +136,15 @@ class AgentLoop:
                         tool_call_id=tc.id,
                     )
                 )
+
+            # Re-route: use cheaper model for follow-up if tools were simple
+            if self._routing:
+                tool_names = [tc.name for tc in response.tool_calls]
+                next_type = classify_tool_round(tool_names)
+                model = route_model(next_type, self._routing)
+                if hasattr(self._provider, "model"):
+                    self._provider.model = model  # type: ignore[attr-defined]
+                    logger.debug("Re-routed after tools %s → %s (%s)", tool_names, model, next_type.value)
 
         _save_history(self._workspaces, history_key, history)
         return response.content if response else ""
