@@ -12,7 +12,7 @@ WORKDIR /app
 
 COPY pyproject.toml .
 COPY homeclaw/ homeclaw/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[semantic]"
 
 COPY --from=ui-build /build/dist/ ui/dist/
 ENV HOMECLAW_UI_DIST=/app/ui/dist

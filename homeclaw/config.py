@@ -85,7 +85,7 @@ class HomeclawConfig(BaseSettings):
     workspaces_path: str = "./workspaces"
 
     # Memory mode
-    enhanced_memory: bool = False
+    enhanced_memory: bool = True
 
     # Cost routing
     routing: RoutingConfig = RoutingConfig()
