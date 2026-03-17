@@ -27,9 +27,12 @@ async def contacts_list() -> list[dict[str, Any]]:
         {
             "id": c.id,
             "name": c.name,
+            "nicknames": c.nicknames,
             "relationship": c.relationship,
+            "birthday": c.birthday.isoformat() if c.birthday else None,
             "last_contact": c.last_contact.isoformat() if c.last_contact else None,
             "reminder_count": len(c.reminders),
+            "member": c.member,
         }
         for c in contacts
     ]
