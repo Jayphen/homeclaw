@@ -8,6 +8,7 @@
   import Plugins from "./views/Plugins.svelte";
   import Settings from "./views/Settings.svelte";
   import Setup from "./views/Setup.svelte";
+  import { api, getToken, setToken } from "$lib/api";
 
   const routes = {
     "/": Dashboard,
@@ -21,24 +22,60 @@
     "/settings": Settings,
   };
 
-  let needsSetup: boolean | null = $state(null);
+  type AppState = "loading" | "setup" | "login" | "ready";
+  let state: AppState = $state("loading");
+  let loginPassword: string = $state("");
+  let loginError: string | null = $state(null);
+  let loggingIn: boolean = $state(false);
 
   async function checkSetup() {
     try {
       const r = await fetch("/api/setup/status");
-      if (r.ok) {
-        const data = await r.json();
-        needsSetup = !data.provider_configured || !data.has_password;
-      } else {
-        needsSetup = false;
+      if (!r.ok) { state = "ready"; return; }
+      const data = await r.json();
+
+      if (!data.provider_configured || !data.has_password) {
+        state = "setup";
+        return;
       }
+
+      // Provider + password configured. Check if we have a valid token.
+      if (getToken()) {
+        const check = await api("/api/settings");
+        if (check.ok) {
+          state = "ready";
+          return;
+        }
+        // Token invalid/expired — fall through to login.
+      }
+
+      state = "login";
     } catch {
-      needsSetup = false;
+      state = "ready";
     }
   }
 
+  async function handleLogin() {
+    loginError = null;
+    loggingIn = true;
+    setToken(loginPassword);
+    try {
+      const r = await api("/api/settings");
+      if (r.ok) {
+        state = "ready";
+      } else {
+        loginError = "Wrong password.";
+        setToken("");
+      }
+    } catch {
+      loginError = "Couldn't reach the server.";
+      setToken("");
+    }
+    loggingIn = false;
+  }
+
   function onSetupComplete() {
-    needsSetup = false;
+    state = "ready";
   }
 
   $effect(() => {
@@ -55,10 +92,26 @@
   />
 </svelte:head>
 
-{#if needsSetup === null}
+{#if state === "loading"}
   <!-- Loading -->
-{:else if needsSetup}
+{:else if state === "setup"}
   <Setup oncomplete={onSetupComplete} />
+{:else if state === "login"}
+  <div class="login">
+    <div class="login-card">
+      <h1>homeclaw</h1>
+      {#if loginError}
+        <div class="login-error">{loginError}</div>
+      {/if}
+      <form onsubmit={(e) => { e.preventDefault(); handleLogin(); }}>
+        <label for="login-pw">Password</label>
+        <input id="login-pw" type="password" bind:value={loginPassword} placeholder="Enter password" autofocus />
+        <button type="submit" disabled={loggingIn}>
+          {loggingIn ? "Signing in..." : "Sign in"}
+        </button>
+      </form>
+    </div>
+  </div>
 {:else}
   <nav>
     <span class="brand">homeclaw</span>
@@ -148,5 +201,95 @@
     max-width: 960px;
     margin: 2rem auto;
     padding: 0 1.5rem;
+  }
+
+  /* ---- Login ---- */
+  .login {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2.5rem;
+    max-width: 360px;
+    width: 100%;
+    box-shadow: var(--shadow);
+    animation: fadeUp 0.35s ease-out;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .login-card h1 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: 1.6rem;
+    color: var(--terracotta);
+    margin: 0 0 1.5rem;
+    text-align: center;
+    letter-spacing: -0.02em;
+  }
+
+  .login-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .login-card label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .login-card input {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-family: var(--font-sans);
+    background: #fdfcfa;
+    color: var(--text);
+  }
+
+  .login-card input:focus {
+    outline: none;
+    border-color: var(--terracotta);
+  }
+
+  .login-card button {
+    margin-top: 0.5rem;
+    padding: 0.6rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--terracotta);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: filter 0.15s;
+  }
+
+  .login-card button:hover { filter: brightness(1.08); }
+  .login-card button:disabled { opacity: 0.5; cursor: default; }
+
+  .login-error {
+    background: #fef2f0;
+    border: 1px solid #f0c4bc;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.82rem;
+    color: var(--terracotta);
+    margin-bottom: 1rem;
+    text-align: center;
   }
 </style>

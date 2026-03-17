@@ -1,5 +1,6 @@
 <script lang="ts">
   import { marked } from "marked";
+  import { api } from "$lib/api";
 
   marked.setOptions({ breaks: true, gfm: true });
 
@@ -99,7 +100,7 @@
   }
 
   $effect(() => {
-    fetch("/api/dashboard")
+    api("/api/dashboard")
       .then((r) => {
         if (!r.ok) throw new Error(`${r.status}`);
         return r.json();

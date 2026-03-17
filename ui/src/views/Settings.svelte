@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { api } from "$lib/api";
+
   interface SettingsData {
     enhanced_memory: boolean;
     memsearch_installed: boolean;
@@ -15,7 +17,7 @@
     loading = true;
     error = null;
     try {
-      const r = await fetch("/api/settings");
+      const r = await api("/api/settings");
       if (!r.ok) throw new Error(`${r.status}`);
       settings = await r.json();
       loading = false;
@@ -29,7 +31,7 @@
     if (!settings) return;
     saving = true;
     try {
-      const r = await fetch("/api/settings", {
+      const r = await api("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enhanced_memory: !settings.enhanced_memory }),

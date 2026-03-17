@@ -16,6 +16,7 @@
     parseISO,
   } from "date-fns";
   import { querystring } from "svelte-spa-router";
+  import { api } from "$lib/api";
 
   type ViewMode = "month" | "schedule";
 
@@ -152,7 +153,7 @@
   function fetchMonth(month: string) {
     loading = true;
     error = null;
-    fetch(`/api/calendar?month=${month}`)
+    api(`/api/calendar?month=${month}`)
       .then((r) => {
         if (!r.ok) throw new Error(`${r.status}`);
         return r.json();
@@ -181,7 +182,7 @@
 
       const results = await Promise.all(
         months.map((m) =>
-          fetch(`/api/calendar?month=${m}`).then((r) => {
+          api(`/api/calendar?month=${m}`).then((r) => {
             if (!r.ok) throw new Error(`${r.status}`);
             return r.json() as Promise<CalendarData>;
           }),

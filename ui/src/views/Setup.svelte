@@ -12,6 +12,8 @@
     ha_configured: boolean;
   }
 
+  import { setToken } from "$lib/api";
+
   let { oncomplete }: { oncomplete: () => void } = $props();
 
   let step: number = $state(0);
@@ -99,6 +101,7 @@
           saving = false;
           return;
         }
+        setToken(webPassword);
         oncomplete();
       } catch (e: any) {
         error = e.message;
@@ -152,7 +155,7 @@
 
     {:else if step === 1}
       <div class="field-group">
-        <label>LLM provider</label>
+        <span class="field-label">LLM provider</span>
         <div class="provider-toggle">
           <button class:selected={provider === "openai"} onclick={() => { provider = "openai"; }}>
             OpenAI / OpenRouter
@@ -304,7 +307,7 @@
     min-height: 200px;
   }
 
-  label {
+  label, .field-label {
     font-size: 0.82rem;
     font-weight: 600;
     color: var(--text);

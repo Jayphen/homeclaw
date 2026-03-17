@@ -1,6 +1,7 @@
 <script lang="ts">
   import { marked } from "marked";
   import { format, parseISO } from "date-fns";
+  import { api } from "$lib/api";
 
   marked.setOptions({ breaks: true, gfm: true });
 
@@ -73,7 +74,7 @@
     loading = true;
     error = null;
     try {
-      const r = await fetch("/api/notes");
+      const r = await api("/api/notes");
       if (!r.ok) throw new Error(`${r.status}`);
       index = await r.json();
       loading = false;
@@ -87,7 +88,7 @@
     loading = true;
     error = null;
     try {
-      const r = await fetch(`/api/notes/${person}`);
+      const r = await api(`/api/notes/${person}`);
       if (!r.ok) throw new Error(`${r.status}`);
       const notes: Array<{ date: string; preview: string; updated_at: string }> = await r.json();
       index = notes.map((n) => ({ ...n, person }));
@@ -102,7 +103,7 @@
     loading = true;
     error = null;
     try {
-      const r = await fetch(`/api/notes/${person}/${date}`);
+      const r = await api(`/api/notes/${person}/${date}`);
       if (!r.ok) throw new Error(`${r.status}`);
       detail = await r.json();
       loading = false;

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { api } from "$lib/api";
+
   interface MemberSummary {
     person: string;
     fact_count: number;
@@ -55,7 +57,7 @@
     loading = true;
     error = null;
     try {
-      const r = await fetch("/api/memory");
+      const r = await api("/api/memory");
       if (!r.ok) throw new Error(`${r.status}`);
       const data = await r.json();
       members = data.members;
@@ -81,7 +83,7 @@
     searchResults = null;
     searchQuery = "";
     try {
-      const r = await fetch(`/api/memory/${person}`);
+      const r = await api(`/api/memory/${person}`);
       if (!r.ok) throw new Error(`${r.status}`);
       detail = await r.json();
       detailLoading = false;
@@ -119,7 +121,7 @@
       if (p.key.trim()) preferences[p.key.trim()] = p.value.trim();
     }
     try {
-      const r = await fetch(`/api/memory/${selectedPerson}/facts`, {
+      const r = await api(`/api/memory/${selectedPerson}/facts`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ facts, preferences }),
@@ -138,7 +140,7 @@
     if (!selectedPerson || !searchQuery.trim()) return;
     searching = true;
     try {
-      const r = await fetch(
+      const r = await api(
         `/api/memory/${selectedPerson}/recall?q=${encodeURIComponent(searchQuery.trim())}`,
       );
       if (!r.ok) throw new Error(`${r.status}`);
