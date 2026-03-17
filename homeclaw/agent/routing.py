@@ -2,6 +2,7 @@
 
 from enum import Enum
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,6 +35,14 @@ class RoutingConfig(BaseSettings):
     # Output token limits
     max_output_tokens: int = 4096
     routine_max_output_tokens: int = 2048
+
+    @model_validator(mode="after")
+    def _disable_anthropic_features_on_openrouter(self) -> "RoutingConfig":
+        """Prompt caching and batch routines require Anthropic direct — disable on OpenRouter."""
+        if self.use_openrouter:
+            self.enable_prompt_caching = False
+            self.enable_batch_routines = False
+        return self
 
 
 # Tools that require reasoning to synthesize results — keep Sonnet.

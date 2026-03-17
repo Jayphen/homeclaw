@@ -22,16 +22,21 @@
     "/settings": Settings,
   };
 
-  type AppState = "loading" | "setup" | "login" | "ready";
+  type AppState = "loading" | "setup" | "login" | "ready" | "error";
   let state: AppState = $state("loading");
   let loginPassword: string = $state("");
   let loginError: string | null = $state(null);
   let loggingIn: boolean = $state(false);
+  let setupError: string | null = $state(null);
 
   async function checkSetup() {
     try {
       const r = await fetch("/api/setup/status");
-      if (!r.ok) { state = "ready"; return; }
+      if (!r.ok) {
+        state = "error";
+        setupError = `Server returned ${r.status}`;
+        return;
+      }
       const data = await r.json();
 
       if (!data.provider_configured || !data.has_password) {
@@ -50,8 +55,9 @@
       }
 
       state = "login";
-    } catch {
-      state = "ready";
+    } catch (e) {
+      state = "error";
+      setupError = e instanceof Error ? e.message : "Could not reach server";
     }
   }
 
@@ -94,6 +100,14 @@
 
 {#if state === "loading"}
   <!-- Loading -->
+{:else if state === "error"}
+  <div class="login">
+    <div class="login-card">
+      <h1>homeclaw</h1>
+      <div class="login-error">{setupError ?? "Could not connect to server"}</div>
+      <button class="retry-btn" onclick={() => { state = "loading"; checkSetup(); }}>Retry</button>
+    </div>
+  </div>
 {:else if state === "setup"}
   <Setup oncomplete={onSetupComplete} />
 {:else if state === "login"}
@@ -281,6 +295,23 @@
 
   .login-card button:hover { filter: brightness(1.08); }
   .login-card button:disabled { opacity: 0.5; cursor: default; }
+
+  .retry-btn {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.6rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--terracotta);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    transition: filter 0.15s;
+  }
+
+  .retry-btn:hover { filter: brightness(1.08); }
 
   .login-error {
     background: #fef2f0;

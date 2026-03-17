@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from telegram import Update
+from telegram.constants import ChatType
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from homeclaw.agent.loop import AgentLoop
@@ -122,7 +123,7 @@ class TelegramChannel:
     def _is_group_chat(self, update: Update) -> bool:
         """Return True if the message is from a group or supergroup."""
         chat = update.effective_chat
-        return chat is not None and chat.type in ("group", "supergroup")
+        return chat is not None and chat.type in (ChatType.GROUP, ChatType.SUPERGROUP)
 
     async def _handle_message(self, update: Update, _context: Any) -> None:
         """Handle incoming text messages — route through the agent loop."""
