@@ -73,10 +73,32 @@ plugins/            # Built-in reference plugins (e.g., plants)
 tests/              # pytest test suite
 ```
 
+## Releasing
+
+Releases are automated via [release-please](https://github.com/googleapis/release-please).
+
+- Every push to `main` updates a release PR that tracks pending changes
+- Merging the release PR creates a GitHub release and `v*` tag
+- The `v*` tag triggers the Docker build workflow (`.github/workflows/docker.yml`)
+
+**Commit messages matter.** release-please uses [Conventional Commits](https://www.conventionalcommits.org/) to determine the version bump:
+
+```
+feat: add data export API          → minor bump (0.1.0 → 0.2.0)
+fix: handle empty contacts list    → patch bump (0.1.0 → 0.1.1)
+feat!: redesign plugin protocol    → breaking (0.1.0 → 0.2.0, pre-1.0)
+chore: update dev dependencies     → no release
+```
+
+Use `feat:` for new features, `fix:` for bug fixes, `chore:` / `docs:` / `refactor:` / `test:` for
+non-release changes. Add `!` after the type for breaking changes.
+
+The version in `pyproject.toml` is managed by release-please — do not bump it manually.
+
 ## Landing the plane
 
 When ending a session:
 1. File remaining work as beads issues
 2. Run `make typecheck` and `make lint`
 3. Close completed issues with `bd close`
-4. Commit and push
+4. Commit and push (use conventional commit prefixes)
