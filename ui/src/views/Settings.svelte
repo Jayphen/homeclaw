@@ -2,6 +2,7 @@
   interface SettingsData {
     enhanced_memory: boolean;
     memsearch_installed: boolean;
+    index_exists: boolean;
     semantic_ready: boolean;
   }
 
@@ -79,6 +80,18 @@
             <span class="status-badge not-installed">Not installed</span>
           {/if}
         </div>
+        {#if settings.memsearch_installed}
+          <div class="status-item">
+            <span class="status-label">Embedding index</span>
+            {#if settings.index_exists}
+              <span class="status-badge installed">Ready</span>
+            {:else if settings.enhanced_memory}
+              <span class="status-badge indexing">Pending first run</span>
+            {:else}
+              <span class="status-badge not-installed">Not built</span>
+            {/if}
+          </div>
+        {/if}
         <div class="status-item">
           <span class="status-label">Enhanced memory</span>
           <button
@@ -105,6 +118,16 @@
       {:else if !settings.enhanced_memory}
         <div class="hint">
           <p>memsearch is installed. Toggle "Enhanced memory" above to activate semantic recall.</p>
+        </div>
+      {:else if !settings.index_exists}
+        <div class="hint first-run-hint">
+          <h3>First run</h3>
+          <p>
+            The embedding model (~30–90 MB) will be downloaded automatically on first use.
+            After that, your notes and contacts will be indexed locally. This is a one-time
+            setup — subsequent starts are fast.
+          </p>
+          <p>The index will be built the next time you chat or search memories.</p>
         </div>
       {:else}
         <div class="hint active-hint">
@@ -197,6 +220,11 @@
   .status-badge.not-installed {
     background: #f0ebe5;
     color: var(--text-muted);
+  }
+
+  .status-badge.indexing {
+    background: #fff3e0;
+    color: #e65100;
   }
 
   /* ---- Toggle ---- */
@@ -300,6 +328,26 @@
 
   .active-hint p {
     color: var(--sage);
+  }
+
+  .first-run-hint {
+    border-left-color: var(--amber);
+  }
+
+  .first-run-hint h3 {
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--amber);
+    margin: 0 0 0.4rem;
+  }
+
+  .first-run-hint p {
+    margin: 0 0 0.4rem;
+  }
+
+  .first-run-hint p:last-child {
+    margin-bottom: 0;
   }
 
   /* ---- Loading ---- */

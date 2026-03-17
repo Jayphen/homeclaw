@@ -909,10 +909,16 @@ def register_builtin_tools(
                 memsearch_installed = True
             except ImportError:
                 pass
+            index_exists = (
+                workspaces / ".index" / "milvus.db"
+            ).exists()
             return {
                 "enhanced_memory": config.enhanced_memory,
                 "memsearch_installed": memsearch_installed,
-                "semantic_ready": config.enhanced_memory and memsearch_installed,
+                "index_exists": index_exists,
+                "semantic_ready": (
+                    config.enhanced_memory and memsearch_installed
+                ),
             }
 
         registry.register(
@@ -939,22 +945,48 @@ def register_builtin_tools(
                 memsearch_installed = True
             except ImportError:
                 pass
+            index_exists = (
+                workspaces / ".index" / "milvus.db"
+            ).exists()
             status = "enabled" if config.enhanced_memory else "disabled"
             if config.enhanced_memory and not memsearch_installed:
                 return {
                     "status": status,
                     "enhanced_memory": config.enhanced_memory,
                     "memsearch_installed": False,
+                    "index_exists": False,
                     "note": (
-                        "Enhanced memory is toggled on but the memsearch package is not installed. "
+                        "Enhanced memory is toggled on but the "
+                        "memsearch package is not installed. "
                         "Install it with: pip install homeclaw[semantic]"
+                    ),
+                }
+            if (
+                config.enhanced_memory
+                and memsearch_installed
+                and not index_exists
+            ):
+                return {
+                    "status": status,
+                    "enhanced_memory": True,
+                    "memsearch_installed": True,
+                    "index_exists": False,
+                    "note": (
+                        "Semantic memory is now enabled. On the next "
+                        "message, the embedding model (~30-90 MB) will "
+                        "be downloaded and the index built. This is a "
+                        "one-time setup. Tell the user it's enabled and "
+                        "you'll let them know once the index is ready."
                     ),
                 }
             return {
                 "status": status,
                 "enhanced_memory": config.enhanced_memory,
                 "memsearch_installed": memsearch_installed,
-                "semantic_ready": config.enhanced_memory and memsearch_installed,
+                "index_exists": index_exists,
+                "semantic_ready": (
+                    config.enhanced_memory and memsearch_installed
+                ),
             }
 
         registry.register(
