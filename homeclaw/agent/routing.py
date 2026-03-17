@@ -19,7 +19,7 @@ class RoutingConfig(BaseSettings):
     conversation_model: str = "anthropic/claude-sonnet-4-6"
 
     # Cheap: used for scheduled routines and simple tool calls
-    routine_model: str = "anthropic/claude-haiku-4-5-20251001"
+    routine_model: str = "anthropic/claude-haiku-4-5"
 
     # Whether to use OpenRouter (dev) or direct providers (hosted)
     use_openrouter: bool = True
