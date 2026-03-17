@@ -47,6 +47,37 @@ def _print_tool_call(name: str, args: dict[str, Any]) -> None:
     print(f"[tool] {name}: {json.dumps(args)}")
 
 
+_DEFAULT_ROUTINES_MD = """\
+# Household Routines
+
+## Morning briefing
+- **Schedule**: Every weekday at 7:30am
+- **Action**: Send each household member their daily summary
+
+## Weekly grocery check
+- **Schedule**: Every Sunday at 10:00am
+- **Action**: Review pantry notes and suggest a grocery list
+
+## Plant watering check
+- **Schedule**: Every 3 days
+- **Action**: Check plant watering schedule and remind if any are overdue
+
+## Contact check-in
+- **Schedule**: Every Monday at 9:00am
+- **Action**: Review contacts for overdue check-ins and suggest reaching out
+"""
+
+
+def _ensure_default_files(workspaces: Path) -> None:
+    """Seed default files into a fresh workspaces directory."""
+    household = workspaces / "household"
+    household.mkdir(parents=True, exist_ok=True)
+    routines = household / "ROUTINES.md"
+    if not routines.exists():
+        routines.write_text(_DEFAULT_ROUTINES_MD)
+        logger.info("Seeded default %s", routines)
+
+
 class HomeclawApp:
     """Shared application core — config, provider, agent loop, and scheduler.
 
@@ -68,6 +99,7 @@ class HomeclawApp:
 
         self.config = HomeclawConfig()
         self.workspaces = (workspaces or self.config.workspaces).resolve()
+        _ensure_default_files(self.workspaces)
 
         provider = create_provider(self.config)
 
