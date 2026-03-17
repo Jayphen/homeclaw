@@ -693,7 +693,8 @@ def register_builtin_tools(
         import httpx
 
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            transport = httpx.AsyncHTTPTransport(retries=2)
+            async with httpx.AsyncClient(timeout=30, transport=transport) as client:
                 resp = await client.get(
                     f"https://r.jina.ai/{url}",
                     headers=_jina_headers("text/markdown"),
@@ -737,7 +738,8 @@ def register_builtin_tools(
             return {"error": "Web search requires JINA_API_KEY to be set", "query": query}
 
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            transport = httpx.AsyncHTTPTransport(retries=2)
+            async with httpx.AsyncClient(timeout=30, transport=transport) as client:
                 resp = await client.get(
                     f"https://s.jina.ai/{query}",
                     headers=_jina_headers("application/json"),

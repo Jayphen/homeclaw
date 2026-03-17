@@ -131,7 +131,8 @@ async def http_call(
     # --- Make the request ---
     status: int | None = None
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
+        transport = httpx.AsyncHTTPTransport(retries=2)
+        async with httpx.AsyncClient(timeout=30, transport=transport) as client:
             resp = await client.request(
                 method,
                 url,
