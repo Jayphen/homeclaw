@@ -1,9 +1,13 @@
 """Tool registry, built-in tool definitions, and handlers."""
 
+import asyncio
+import logging
 from collections.abc import Callable, Coroutine
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 from homeclaw.agent.providers.base import ToolDefinition
 from homeclaw.bookmarks.models import Bookmark
@@ -52,11 +56,41 @@ class ToolRegistry:
         return True
 
 
+async def _watch_for_index(
+    workspaces: Path,
+    on_ready: Callable[[str], Coroutine[Any, Any, None]],
+    poll_interval: float = 5.0,
+    timeout: float = 300.0,
+) -> None:
+    """Poll for the Milvus index file and notify when it appears."""
+    index_path = workspaces / ".index" / "milvus.db"
+    elapsed = 0.0
+    while elapsed < timeout:
+        await asyncio.sleep(poll_interval)
+        elapsed += poll_interval
+        if index_path.exists():
+            _logger.info("Semantic index ready at %s", index_path)
+            try:
+                await on_ready(
+                    "Semantic memory is now fully set up — the "
+                    "embedding model has been downloaded and your "
+                    "notes and contacts are indexed. Recall search "
+                    "is ready to use."
+                )
+            except Exception:
+                _logger.exception("Failed to send semantic ready notification")
+            return
+    _logger.warning(
+        "Timed out waiting for semantic index after %.0fs", timeout
+    )
+
+
 def register_builtin_tools(
     registry: ToolRegistry,
     workspaces: Path,
     on_routines_changed: Callable[[], None] | None = None,
     config: Any = None,
+    on_semantic_ready: Callable[[str], Coroutine[Any, Any, None]] | None = None,
 ) -> None:
     """Register all built-in tools with the registry."""
 
@@ -899,6 +933,8 @@ def register_builtin_tools(
 
     # --- Settings tools ---
 
+    _index_watcher_running = False
+
     if config is not None:
 
         async def settings_get(**_: Any) -> dict[str, Any]:
@@ -966,6 +1002,12 @@ def register_builtin_tools(
                 and memsearch_installed
                 and not index_exists
             ):
+                nonlocal _index_watcher_running
+                if not _index_watcher_running and on_semantic_ready:
+                    _index_watcher_running = True
+                    asyncio.create_task(
+                        _watch_for_index(workspaces, on_semantic_ready)
+                    )
                 return {
                     "status": status,
                     "enhanced_memory": True,
