@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from homeclaw.api.deps import (
@@ -63,16 +63,19 @@ class SetupBody(BaseModel):
 
 
 @router.post("")
-async def setup(body: SetupBody) -> dict[str, Any]:
+async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
     config = get_config()
 
-    # If no password is set, require the setup token.
+    # If no password is set, require the setup token (first-run onboarding).
     if not config.web_password:
         if not body.setup_token or not verify_setup_token(body.setup_token):
             raise HTTPException(status_code=403, detail="Invalid setup token")
     else:
-        # After initial setup, this endpoint requires the existing password.
-        if not body.setup_token or body.setup_token != config.web_password:
+        # After initial setup, accept Bearer auth OR the password in setup_token.
+        auth = request.headers.get("Authorization", "")
+        bearer_ok = auth == f"Bearer {config.web_password}"
+        token_ok = body.setup_token is not None and body.setup_token == config.web_password
+        if not bearer_ok and not token_ok:
             raise HTTPException(status_code=401, detail="Unauthorized")
 
     # Apply changes to the in-memory config.
