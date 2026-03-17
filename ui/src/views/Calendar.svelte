@@ -311,6 +311,9 @@
                 <div class="ev-header">
                   <span class="ev-type">{TYPE_LABELS[ev.type]}</span>
                   <span class="ev-person">{ev.person}</span>
+                  {#if ev.type === "note"}
+                    <a class="ev-link" href="#/notes/{ev.person}/{ev.date}">View note</a>
+                  {/if}
                 </div>
                 <p class="ev-summary">{ev.summary}</p>
               </div>
@@ -347,6 +350,9 @@
                     <div class="ev-header">
                       <span class="ev-type">{TYPE_LABELS[ev.type]}</span>
                       <span class="ev-person">{ev.person}</span>
+                      {#if ev.type === "note"}
+                        <a class="ev-link" href="#/notes/{ev.person}/{ev.date}">View note</a>
+                      {/if}
                     </div>
                     <p class="ev-summary">{ev.summary}</p>
                   </div>
@@ -630,6 +636,17 @@
     font-size: 0.72rem;
     color: var(--text-muted);
     text-transform: capitalize;
+  }
+
+  .ev-link {
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: var(--terracotta);
+    text-decoration: none;
+  }
+
+  .ev-link:hover {
+    text-decoration: underline;
   }
 
   .ev-summary {

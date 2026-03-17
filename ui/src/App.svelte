@@ -3,6 +3,7 @@
   import Dashboard from "./views/Dashboard.svelte";
   import Calendar from "./views/Calendar.svelte";
   import Memory from "./views/Memory.svelte";
+  import Notes from "./views/Notes.svelte";
   import Contacts from "./views/Contacts.svelte";
   import Plugins from "./views/Plugins.svelte";
 
@@ -10,6 +11,9 @@
     "/": Dashboard,
     "/calendar": Calendar,
     "/memory": Memory,
+    "/notes": Notes,
+    "/notes/:person": Notes,
+    "/notes/:person/:date": Notes,
     "/contacts": Contacts,
     "/plugins": Plugins,
   };
@@ -29,6 +33,7 @@
   <div class="links">
     <a href="#/">Dashboard</a>
     <a href="#/calendar">Calendar</a>
+    <a href="#/notes">Notes</a>
     <a href="#/memory">Memory</a>
     <a href="#/contacts">Contacts</a>
     <a href="#/plugins">Plugins</a>
