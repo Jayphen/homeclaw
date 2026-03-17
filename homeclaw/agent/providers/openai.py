@@ -21,6 +21,7 @@ class OpenAIProvider:
         api_key: str | None = None,
         base_url: str | None = None,
         model: str = "gpt-4o",
+        use_max_completion_tokens: bool = False,
     ) -> None:
         kwargs: dict[str, Any] = {}
         if api_key:
@@ -29,12 +30,16 @@ class OpenAIProvider:
             kwargs["base_url"] = base_url
         self._client = AsyncOpenAI(**kwargs)
         self.model = model
+        # Direct OpenAI reasoning models (o1/o3/o4-mini) need max_completion_tokens.
+        # OpenRouter and other proxies expect max_tokens.
+        self._use_max_completion_tokens = use_max_completion_tokens
 
     async def complete(
         self,
         messages: list[Message],
         tools: list[ToolDefinition],
         system: str,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         api_messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
         api_messages.extend(_to_api_message(m) for m in messages)
@@ -43,6 +48,13 @@ class OpenAIProvider:
             "model": self.model,
             "messages": api_messages,
         }
+
+        tokens = max_tokens or 4096
+        if self._use_max_completion_tokens:
+            kwargs["max_completion_tokens"] = tokens
+        else:
+            kwargs["max_tokens"] = tokens
+
         if tools:
             kwargs["tools"] = [_to_api_tool(t) for t in tools]
 

@@ -32,8 +32,8 @@ class RoutingConfig(BaseSettings):
     enable_batch_routines: bool = True
 
     # Output token limits
-    max_output_tokens: int = 1024
-    routine_max_output_tokens: int = 512
+    max_output_tokens: int = 4096
+    routine_max_output_tokens: int = 2048
 
 
 # Tools that require reasoning to synthesize results — keep Sonnet.

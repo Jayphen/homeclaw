@@ -31,6 +31,7 @@ class AnthropicProvider:
         messages: list[Message],
         tools: list[ToolDefinition],
         system: str,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         api_messages = [_to_api_message(m) for m in messages]
         api_tools = [_to_api_tool(t) for t in tools] if tools else []
@@ -42,7 +43,7 @@ class AnthropicProvider:
 
         kwargs: dict[str, Any] = {
             "model": self.model,
-            "max_tokens": 4096,
+            "max_tokens": max_tokens or 4096,
             "system": system_param,
             "messages": api_messages,
         }

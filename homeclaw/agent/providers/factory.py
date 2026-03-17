@@ -16,8 +16,12 @@ def create_provider(config: HomeclawConfig) -> LLMProvider:
 
     from homeclaw.agent.providers.openai import OpenAIProvider
 
+    # Direct OpenAI (no base_url) needs max_completion_tokens for reasoning models.
+    # Proxies like OpenRouter expect max_tokens.
+    direct_openai = not config.openai_base_url
     return OpenAIProvider(
         api_key=config.openai_api_key,
         base_url=config.openai_base_url,
         model=config.model,
+        use_max_completion_tokens=direct_openai,
     )

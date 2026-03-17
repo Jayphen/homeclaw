@@ -220,11 +220,16 @@ class TelegramChannel:
         """Send content through the agent loop and reply with the response."""
         try:
             response = await self._loop.run(content, person, channel=channel)
-        except Exception:
+        except Exception as exc:
             logger.exception("Agent loop failed for message from %s", person)
+            # Surface a useful error message to the user
+            error_msg = str(exc)
+            # Truncate very long error messages
+            if len(error_msg) > 300:
+                error_msg = error_msg[:300] + "..."
             if update.message:
                 await update.message.reply_text(
-                    "Sorry, something went wrong. Please try again."
+                    f"Sorry, something went wrong:\n\n{error_msg}"
                 )
             return
 

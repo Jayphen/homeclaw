@@ -9,7 +9,7 @@ from typing import Any
 
 from homeclaw.agent.context import build_context
 from homeclaw.agent.providers.base import LLMProvider, LLMResponse, Message, ToolCall
-from homeclaw.agent.routing import CallType, RoutingConfig, classify_tool_round, route_model
+from homeclaw.agent.routing import CallType, RoutingConfig, classify_tool_round, max_tokens_for, route_model
 from homeclaw.agent.tools import ToolRegistry
 from homeclaw.memory.semantic import SemanticMemory
 
@@ -102,6 +102,7 @@ class AgentLoop:
         response: LLMResponse | None = None
 
         # Apply model routing if configured
+        current_call_type = call_type
         if self._routing:
             model = route_model(call_type, self._routing)
             if hasattr(self._provider, "model"):
@@ -109,10 +110,12 @@ class AgentLoop:
             logger.debug("Routed %s → %s", call_type.value, model)
 
         for _ in range(MAX_TOOL_ROUNDS):
+            token_limit = max_tokens_for(current_call_type, self._routing) if self._routing else None
             response = await self._provider.complete(
                 messages=history,
                 tools=tools,
                 system=system,
+                max_tokens=token_limit,
             )
 
             # Always append the assistant message — include tool_calls so the
@@ -140,11 +143,11 @@ class AgentLoop:
             # Re-route: use cheaper model for follow-up if tools were simple
             if self._routing:
                 tool_names = [tc.name for tc in response.tool_calls]
-                next_type = classify_tool_round(tool_names)
-                model = route_model(next_type, self._routing)
+                current_call_type = classify_tool_round(tool_names)
+                model = route_model(current_call_type, self._routing)
                 if hasattr(self._provider, "model"):
                     self._provider.model = model  # type: ignore[attr-defined]
-                    logger.debug("Re-routed after tools %s → %s (%s)", tool_names, model, next_type.value)
+                    logger.debug("Re-routed after tools %s → %s (%s)", tool_names, model, current_call_type.value)
 
         _save_history(self._workspaces, history_key, history)
         return response.content if response else ""

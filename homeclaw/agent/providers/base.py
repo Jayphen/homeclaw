@@ -36,4 +36,5 @@ class LLMProvider(Protocol):
         messages: list[Message],
         tools: list[ToolDefinition],
         system: str,
+        max_tokens: int | None = None,
     ) -> LLMResponse: ...
