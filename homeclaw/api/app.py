@@ -13,6 +13,7 @@ from homeclaw.api.deps import get_config as get_config  # noqa: F401
 from homeclaw.api.deps import set_config as set_config  # noqa: F401
 from homeclaw.api.routes.calendar import router as calendar_router
 from homeclaw.api.routes.contacts import router as contacts_router
+from homeclaw.api.routes.data import router as data_router
 from homeclaw.api.routes.cost import router as cost_router
 from homeclaw.api.routes.dashboard import router as dashboard_router
 from homeclaw.api.routes.memory import router as memory_router
@@ -24,6 +25,7 @@ app = FastAPI(title="homeclaw", version="0.1.0")
 app.include_router(calendar_router)
 app.include_router(contacts_router)
 app.include_router(cost_router)
+app.include_router(data_router)
 app.include_router(dashboard_router)
 app.include_router(memory_router)
 app.include_router(notes_router)
