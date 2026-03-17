@@ -2,6 +2,7 @@
 
 import logging
 import secrets
+from pathlib import Path
 
 from fastapi import Depends, HTTPException, Request
 
@@ -53,6 +54,20 @@ def clear_setup_token() -> None:
 
 def verify_setup_token(token: str) -> bool:
     return _setup_token is not None and secrets.compare_digest(token, _setup_token)
+
+
+def list_member_workspaces(workspaces: Path) -> list[str]:
+    """List household member workspace directories.
+
+    This is the single source of truth for enumerating members.
+    """
+    ws = workspaces if isinstance(workspaces, Path) else Path(workspaces)
+    skip = {"household", "plugins", "config.json", "cost_log.jsonl", ".index"}
+    return sorted(
+        d.name
+        for d in ws.iterdir()
+        if d.is_dir() and d.name not in skip and not d.name.startswith(".")
+    )
 
 
 async def require_auth(request: Request) -> None:

@@ -149,6 +149,11 @@ class AgentLoop:
                     self._provider.model = model  # type: ignore[attr-defined]
                     logger.debug("Re-routed after tools %s → %s (%s)", tool_names, model, current_call_type.value)
 
+        if response and response.stop_reason == "tool_use":
+            logger.warning(
+                "Agent loop exhausted %d tool rounds without completing", MAX_TOOL_ROUNDS
+            )
+
         _save_history(self._workspaces, history_key, history)
         return response.content if response else ""
 

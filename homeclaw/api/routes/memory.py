@@ -4,31 +4,18 @@ from typing import Any
 
 from fastapi import APIRouter, Query
 
-from homeclaw.api.deps import AuthDep, get_config
+from homeclaw.api.deps import AuthDep, get_config, list_member_workspaces
 from homeclaw.memory.facts import HouseholdMemory, load_memory, save_memory
 from homeclaw.memory.semantic import SemanticMemory
 
 router = APIRouter(prefix="/api/memory", tags=["memory"])
 
 
-def _list_members(workspaces_path: str) -> list[str]:
-    """List member workspace directories (excludes household, plugins, config)."""
-    from pathlib import Path
-
-    ws = Path(workspaces_path)
-    skip = {"household", "plugins", "config.json", "cost_log.jsonl", ".index"}
-    return sorted(
-        d.name
-        for d in ws.iterdir()
-        if d.is_dir() and d.name not in skip and not d.name.startswith(".")
-    )
-
-
 @router.get("", dependencies=[AuthDep])
 async def memory_list() -> dict[str, Any]:
     config = get_config()
     workspaces = config.workspaces.resolve()
-    members = _list_members(str(workspaces))
+    members = list_member_workspaces(workspaces)
     result: list[dict[str, Any]] = []
     for person in members:
         mem = load_memory(workspaces, person)

@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
-from homeclaw.api.deps import AuthDep, get_config
+from homeclaw.api.deps import AuthDep, get_config, list_member_workspaces
 
 logger = logging.getLogger(__name__)
 
@@ -24,22 +24,10 @@ _SKIP_NAMES = {".index", "__pycache__", "config.json", "cost_log.jsonl"}
 _MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 
 
-def _list_members(workspaces: Path) -> list[str]:
-    skip = {"household", "plugins", ".index"}
-    return sorted(
-        d.name
-        for d in workspaces.iterdir()
-        if d.is_dir()
-        and d.name not in skip
-        and not d.name.startswith(".")
-        and d.name != "config.json"
-    )
-
-
 def _build_zip(workspaces: Path) -> io.BytesIO:
     """Walk the workspaces directory and pack exportable files into a ZIP."""
     buf = io.BytesIO()
-    members = _list_members(workspaces)
+    members = list_member_workspaces(workspaces)
 
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         # Metadata

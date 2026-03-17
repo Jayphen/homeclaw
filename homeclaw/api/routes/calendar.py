@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Query
 
-from homeclaw.api.deps import AuthDep, get_config
+from homeclaw.api.deps import AuthDep, get_config, list_member_workspaces
 from homeclaw.contacts.store import list_contacts
 
 router = APIRouter(prefix="/api/calendar", tags=["calendar"])
@@ -125,19 +125,6 @@ def _collect_interactions(workspaces_path: str, start: date, end: date) -> list[
     return events
 
 
-def _list_members(workspaces_path: str) -> list[str]:
-    """List member workspace directories."""
-    from pathlib import Path
-
-    ws = Path(workspaces_path)
-    skip = {"household", "plugins", "config.json", "cost_log.jsonl", ".index"}
-    return sorted(
-        d.name
-        for d in ws.iterdir()
-        if d.is_dir() and d.name not in skip and not d.name.startswith(".")
-    )
-
-
 @router.get("", dependencies=[AuthDep])
 async def calendar_month(
     month: str = Query(
@@ -152,7 +139,7 @@ async def calendar_month(
         month = datetime.now().strftime("%Y-%m")
 
     start, end = _parse_month(month)
-    members = _list_members(ws_str)
+    members = list_member_workspaces(workspaces)
 
     events: list[dict[str, Any]] = []
     events.extend(_collect_notes(ws_str, members, start, end))

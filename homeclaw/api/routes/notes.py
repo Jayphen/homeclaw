@@ -1,30 +1,20 @@
 """Notes API routes — per-person, per-date markdown notes."""
 
 from datetime import date, datetime
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from homeclaw.api.deps import AuthDep, get_config
+from homeclaw.api.deps import AuthDep, get_config, list_member_workspaces
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
-
-
-def _list_members(workspaces: Path) -> list[str]:
-    skip = {"household", "plugins", "config.json", "cost_log.jsonl", ".index"}
-    return sorted(
-        d.name
-        for d in workspaces.iterdir()
-        if d.is_dir() and d.name not in skip and not d.name.startswith(".")
-    )
 
 
 @router.get("", dependencies=[AuthDep])
 async def notes_index() -> list[dict[str, Any]]:
     """List all notes across all members, newest first."""
     workspaces = get_config().workspaces.resolve()
-    members = _list_members(workspaces)
+    members = list_member_workspaces(workspaces)
     notes: list[dict[str, Any]] = []
 
     for person in members:

@@ -1,27 +1,16 @@
 """Dashboard API route — today's overview for the whole household."""
 
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
 
-from homeclaw.api.deps import AuthDep, get_config
+from homeclaw.api.deps import AuthDep, get_config, list_member_workspaces
 from homeclaw.contacts.store import list_contacts
+from homeclaw.reminders.store import load_reminders
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
-
-
-def _list_members(workspaces_path: str) -> list[str]:
-    """List member workspace directories."""
-    from pathlib import Path
-
-    ws = Path(workspaces_path)
-    skip = {"household", "plugins", "config.json", "cost_log.jsonl", ".index"}
-    return sorted(
-        d.name
-        for d in ws.iterdir()
-        if d.is_dir() and d.name not in skip and not d.name.startswith(".")
-    )
 
 
 def _today_notes(workspaces_path: str, members: list[str], today: str) -> list[dict[str, Any]]:
@@ -39,37 +28,21 @@ def _today_notes(workspaces_path: str, members: list[str], today: str) -> list[d
 
 
 def _upcoming_reminders(
-    workspaces_path: str, members: list[str], days: int = 7,
+    workspaces: Path, members: list[str], days: int = 7,
 ) -> list[dict[str, Any]]:
-    """Get reminders due within the next N days."""
-    from pathlib import Path
-
-    ws = Path(workspaces_path)
+    """Get reminders due within the next N days from the JSON reminder store."""
     today = date.today()
     end = today + timedelta(days=days)
     reminders: list[dict[str, Any]] = []
 
     for person in members:
-        path = ws / person / "notes" / "reminders.md"
-        if not path.exists():
-            continue
-        for line in path.read_text().splitlines():
-            line = line.strip()
-            if not line.startswith("- [ ]"):
-                continue
-            rest = line[6:].strip()
-            if ":" not in rest:
-                continue
-            date_part, note = rest.split(":", 1)
-            try:
-                reminder_date = date.fromisoformat(date_part.strip())
-            except ValueError:
-                continue
-            if today <= reminder_date <= end:
+        for r in load_reminders(workspaces, person):
+            due = r.next_due
+            if due and today <= due <= end:
                 reminders.append({
-                    "date": reminder_date.isoformat(),
+                    "date": due.isoformat(),
                     "person": person,
-                    "note": note.strip(),
+                    "note": r.note,
                 })
 
     reminders.sort(key=lambda r: r["date"])
@@ -152,14 +125,14 @@ def _overdue_checkins(workspaces_path: str) -> list[dict[str, Any]]:
 async def dashboard() -> dict[str, Any]:
     workspaces = get_config().workspaces.resolve()
     ws_str = str(workspaces)
-    members = _list_members(ws_str)
+    members = list_member_workspaces(workspaces)
     today = date.today().isoformat()
 
     return {
         "date": today,
         "members": members,
         "today_notes": _today_notes(ws_str, members, today),
-        "upcoming_reminders": _upcoming_reminders(ws_str, members),
+        "upcoming_reminders": _upcoming_reminders(workspaces, members),
         "upcoming_birthdays": _upcoming_birthdays(ws_str),
         "recent_interactions": _recent_interactions(ws_str),
         "overdue_checkins": _overdue_checkins(ws_str),
