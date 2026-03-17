@@ -714,14 +714,11 @@ def register_builtin_tools(
 
     # --- Web tools (via Jina) ---
 
-    import os
-
-    jina_api_key = os.environ.get("JINA_API_KEY")
-
     def _jina_headers(accept: str = "text/markdown") -> dict[str, str]:
         headers = {"Accept": accept}
-        if jina_api_key:
-            headers["Authorization"] = f"Bearer {jina_api_key}"
+        key = config.jina_api_key if config else None
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
         return headers
 
     async def web_read(*, url: str, **_: Any) -> dict[str, Any]:
@@ -769,7 +766,7 @@ def register_builtin_tools(
     async def web_search(*, query: str, **_: Any) -> dict[str, Any]:
         import httpx
 
-        if not jina_api_key:
+        if not (config and config.jina_api_key):
             return {"error": "Web search requires JINA_API_KEY to be set", "query": query}
 
         try:

@@ -10,6 +10,7 @@
     openai_base_url: string | null;
     telegram_configured: boolean;
     telegram_allowed_users: string | null;
+    jina_api_key: string | null;
     ha_configured: boolean;
     conversation_model: string;
     routine_model: string;
@@ -27,6 +28,7 @@
   let anthropicKey: string = $state("");
   let openaiKey: string = $state("");
   let openaiBaseUrl: string = $state("");
+  let jinaKey: string = $state("");
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
   let newPassword: string = $state("");
@@ -65,6 +67,7 @@
     if (routineModel !== setup?.routine_model) body.routine_model = routineModel;
     if (anthropicKey) body.anthropic_api_key = anthropicKey;
     if (openaiKey) body.openai_api_key = openaiKey;
+    if (jinaKey) body.jina_api_key = jinaKey;
     if (openaiBaseUrl !== (setup?.openai_base_url || "")) body.openai_base_url = openaiBaseUrl || null;
     if (telegramToken) body.telegram_token = telegramToken;
     if (telegramAllowedUsers !== (setup?.telegram_allowed_users || "")) {
@@ -96,6 +99,7 @@
       // Clear secret inputs after save
       anthropicKey = "";
       openaiKey = "";
+      jinaKey = "";
       telegramToken = "";
 
       if (newPassword) {
@@ -181,6 +185,16 @@
             </button>
           {/each}
         </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Web search</h2>
+      <div class="field">
+        <label for="jina-key">Jina API key</label>
+        <input id="jina-key" type="password" bind:value={jinaKey}
+          placeholder={setup.jina_api_key ? `Current: ${setup.jina_api_key}` : "Not set"} />
+        <small class="field-hint">Powers web_read and web_search tools. Get a key at <a href="https://jina.ai" target="_blank" rel="noopener">jina.ai</a>.</small>
       </div>
     </section>
 

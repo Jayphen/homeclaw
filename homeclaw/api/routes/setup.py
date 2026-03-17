@@ -37,6 +37,7 @@ async def setup_status() -> dict[str, Any]:
         "openai_base_url": config.openai_base_url,
         "telegram_configured": config.telegram_token is not None,
         "telegram_allowed_users": config.telegram_allowed_users,
+        "jina_api_key": _mask(config.jina_api_key),
         "ha_configured": config.ha_url is not None,
         "conversation_model": config.routing.conversation_model,
         "routine_model": config.routing.routine_model,
@@ -55,6 +56,9 @@ class SetupBody(BaseModel):
     # Telegram
     telegram_token: str | None = None
     telegram_allowed_users: str | None = None
+
+    # Web search
+    jina_api_key: str | None = None
 
     # Home Assistant
     ha_url: str | None = None
@@ -101,6 +105,8 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         config.ha_url = body.ha_url or None
     if body.ha_token is not None:
         config.ha_token = body.ha_token or None
+    if body.jina_api_key is not None:
+        config.jina_api_key = body.jina_api_key or None
     if body.conversation_model is not None:
         config.routing.conversation_model = body.conversation_model
     if body.routine_model is not None:

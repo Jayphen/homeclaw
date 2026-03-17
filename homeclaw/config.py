@@ -21,6 +21,7 @@ _SAVEABLE_FIELDS = {
     "model",
     "telegram_token",
     "telegram_allowed_users",
+    "jina_api_key",
     "ha_url",
     "ha_token",
     "web_password",
@@ -72,6 +73,9 @@ class HomeclawConfig(BaseSettings):
             if part:
                 ids.add(int(part))
         return ids if ids else None
+
+    # Web search (Jina)
+    jina_api_key: str | None = None
 
     # Home Assistant (optional)
     ha_url: str | None = None
