@@ -122,6 +122,18 @@ class Scheduler:
                 pass  # Event loop already closed
             logger.info("Scheduler shut down")
 
+    def reload_routines(self) -> int:
+        """Re-parse ROUTINES.md and replace all routine jobs. Returns new count."""
+        # Remove existing routine jobs (keep plugin jobs)
+        for job in self._scheduler.get_jobs():
+            if job.id.startswith("routine:"):
+                job.remove()
+        old_count = self._job_count
+        self._job_count = 0
+        count = self.load_routines_md()
+        logger.info("Reloaded routines: %d (was %d)", count, old_count)
+        return count
+
     @property
     def job_count(self) -> int:
         return self._job_count

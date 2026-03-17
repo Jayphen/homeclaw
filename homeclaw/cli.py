@@ -95,9 +95,15 @@ class HomeclawApp:
 
         provider = create_provider(self.config)
 
+        self._scheduler: Scheduler | None = None
+
         self.registry = ToolRegistry()
         if register_tools:
-            register_builtin_tools(self.registry, self.workspaces)
+            register_builtin_tools(
+                self.registry,
+                self.workspaces,
+                on_routines_changed=self._reload_routines,
+            )
 
         self.loop = AgentLoop(
             provider=provider,
@@ -107,7 +113,10 @@ class HomeclawApp:
             routing=self.config.routing,
         )
 
-        self._scheduler: Scheduler | None = None
+    def _reload_routines(self) -> None:
+        """Called by routine tools when ROUTINES.md changes."""
+        if self._scheduler:
+            self._scheduler.reload_routines()
 
     def load_scheduler(self) -> None:
         """Parse ROUTINES.md and register routines (does not start the event loop)."""

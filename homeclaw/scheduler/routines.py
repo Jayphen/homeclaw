@@ -1,4 +1,4 @@
-"""Parse ROUTINES.md into structured routine definitions."""
+"""Parse and manage ROUTINES.md — structured routine definitions."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _ROUTINES_FILE = "household/ROUTINES.md"
+ROUTINES_FILE = _ROUTINES_FILE  # public alias for tools
 
 # Day name → APScheduler day_of_week value
 _DAYS = {
@@ -158,3 +159,51 @@ def parse_routines_md(workspaces: Path) -> list[ParsedRoutine]:
         )
 
     return routines
+
+
+def _routines_path(workspaces: Path) -> Path:
+    return workspaces / _ROUTINES_FILE
+
+
+def add_routine(workspaces: Path, title: str, schedule: str, action: str) -> None:
+    """Append a routine section to ROUTINES.md.
+
+    Validates the schedule string before writing.
+    """
+    _parse_schedule(schedule)  # raises ValueError if invalid
+    path = _routines_path(workspaces)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_text("# Household Routines\n")
+    text = path.read_text(encoding="utf-8")
+    if not text.endswith("\n"):
+        text += "\n"
+    text += f"\n## {title}\n- **Schedule**: {schedule}\n- **Action**: {action}\n"
+    path.write_text(text, encoding="utf-8")
+
+
+def remove_routine(workspaces: Path, name: str) -> bool:
+    """Remove a routine by slug name. Returns True if found and removed."""
+    path = _routines_path(workspaces)
+    if not path.exists():
+        return False
+    text = path.read_text(encoding="utf-8")
+    sections = re.split(r"(^## .+)", text, flags=re.MULTILINE)
+    # sections: [preamble, "## heading1", body1, "## heading2", body2, ...]
+    new_parts: list[str] = []
+    found = False
+    i = 0
+    while i < len(sections):
+        part = sections[i]
+        if part.startswith("## "):
+            heading = part[3:].strip()
+            slug = re.sub(r"[^a-z0-9]+", "_", heading.lower()).strip("_")
+            if slug == name:
+                found = True
+                i += 2  # skip heading + body
+                continue
+        new_parts.append(part)
+        i += 1
+    if found:
+        path.write_text("".join(new_parts).rstrip() + "\n", encoding="utf-8")
+    return found

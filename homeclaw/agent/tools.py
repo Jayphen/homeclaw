@@ -52,7 +52,11 @@ class ToolRegistry:
         return True
 
 
-def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
+def register_builtin_tools(
+    registry: ToolRegistry,
+    workspaces: Path,
+    on_routines_changed: Callable[[], None] | None = None,
+) -> None:
     """Register all built-in tools with the registry."""
 
     # --- Contact tools ---
@@ -793,4 +797,99 @@ def register_builtin_tools(registry: ToolRegistry, workspaces: Path) -> None:
             },
         ),
         message_send,
+    )
+
+    # --- Routine management tools ---
+
+    from homeclaw.scheduler.routines import add_routine, parse_routines_md, remove_routine
+
+    async def routine_list(**_: Any) -> dict[str, Any]:
+        routines = parse_routines_md(workspaces)
+        return {
+            "routines": [
+                {"name": r.name, "description": r.description}
+                for r in routines
+            ]
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="routine_list",
+            description="List all scheduled household routines.",
+            parameters={"type": "object", "properties": {}},
+        ),
+        routine_list,
+    )
+
+    async def routine_add(
+        *, title: str, schedule: str, action: str, **_: Any
+    ) -> dict[str, Any]:
+        try:
+            add_routine(workspaces, title, schedule, action)
+        except ValueError as e:
+            return {"error": str(e)}
+        if on_routines_changed:
+            on_routines_changed()
+        return {"status": "added", "title": title, "schedule": schedule}
+
+    registry.register(
+        ToolDefinition(
+            name="routine_add",
+            description=(
+                "Add a new scheduled routine for the household. "
+                "Schedule must be natural language like 'Every weekday at 7:30am', "
+                "'Every Sunday at 10:00am', or 'Every 3 days'."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "Short name for the routine (e.g. 'Weekly grocery check')",
+                    },
+                    "schedule": {
+                        "type": "string",
+                        "description": (
+                            "When to run. Examples: 'Every weekday at 7:30am', "
+                            "'Every Sunday at 10:00am', 'Every 3 days', 'Every Monday at 9:00am'"
+                        ),
+                    },
+                    "action": {
+                        "type": "string",
+                        "description": "What the routine should do",
+                    },
+                },
+                "required": ["title", "schedule", "action"],
+            },
+        ),
+        routine_add,
+    )
+
+    async def routine_remove(*, name: str, **_: Any) -> dict[str, Any]:
+        removed = remove_routine(workspaces, name)
+        if not removed:
+            return {"error": f"Routine '{name}' not found"}
+        if on_routines_changed:
+            on_routines_changed()
+        return {"status": "removed", "name": name}
+
+    registry.register(
+        ToolDefinition(
+            name="routine_remove",
+            description=(
+                "Remove a scheduled routine by its slug name. "
+                "Use routine_list first to see available routine names."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The routine slug name (e.g. 'morning_briefing')",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        routine_remove,
     )
