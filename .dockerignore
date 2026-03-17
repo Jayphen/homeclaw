@@ -1,0 +1,13 @@
+__pycache__
+*.pyc
+.venv
+.env
+.git
+.beads
+node_modules
+ui/dist
+ui/node_modules
+workspaces
+tests
+.ruff_cache
+.pyright

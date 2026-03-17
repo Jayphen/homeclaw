@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>homeclaw</Name>
+  <Repository>ghcr.io/jayphen/homeclaw:latest</Repository>
+  <Registry>https://ghcr.io</Registry>
+  <Branch>
+    <Tag>latest</Tag>
+    <TagDescription>Latest stable release</TagDescription>
+  </Branch>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/jayphen/homeclaw/issues</Support>
+  <Project>https://github.com/jayphen/homeclaw</Project>
+  <Overview>An AI assistant that knows your whole household — your home, your family, and the people in your lives.</Overview>
+  <Category>HomeAutomation: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:7399]</WebUI>
+  <Icon>https://raw.githubusercontent.com/jayphen/homeclaw/main/docs/icon.png</Icon>
+  <ExtraParams>--restart unless-stopped</ExtraParams>
+
+  <Config Name="Web UI Port" Target="8080" Default="7399" Mode="tcp" Description="Port for the web interface" Type="Port" Display="always" Required="true">7399</Config>
+
+  <Config Name="Workspaces" Target="/data/workspaces" Default="/mnt/user/appdata/homeclaw/workspaces" Mode="rw" Description="Persistent data — household memory, contacts, routines" Type="Path" Display="always" Required="true">/mnt/user/appdata/homeclaw/workspaces</Config>
+
+  <Config Name="Docker Socket" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="ro" Description="Required for MCP sidecar plugin management" Type="Path" Display="advanced" Required="false">/var/run/docker.sock</Config>
+
+  <Config Name="Anthropic API Key" Target="ANTHROPIC_API_KEY" Default="" Description="API key for Claude (set this OR OpenAI key)" Type="Variable" Display="always" Required="false"></Config>
+
+  <Config Name="OpenAI API Key" Target="OPENAI_API_KEY" Default="" Description="API key for OpenAI-compatible provider" Type="Variable" Display="always" Required="false"></Config>
+
+  <Config Name="OpenAI Base URL" Target="OPENAI_BASE_URL" Default="" Description="Custom base URL for OpenAI-compatible providers (Ollama, OpenRouter, etc.)" Type="Variable" Display="always" Required="false"></Config>
+
+  <Config Name="Model" Target="MODEL" Default="claude-sonnet-4-6" Description="LLM model name" Type="Variable" Display="always" Required="false"></Config>
+
+  <Config Name="Telegram Bot Token" Target="TELEGRAM_TOKEN" Default="" Description="Telegram bot token (optional)" Type="Variable" Display="advanced" Required="false"></Config>
+
+  <Config Name="Telegram Allowed Users" Target="TELEGRAM_ALLOWED_USERS" Default="" Description="Comma-separated Telegram user IDs (blank = unrestricted)" Type="Variable" Display="advanced" Required="false"></Config>
+
+  <Config Name="Web Password" Target="WEB_PASSWORD" Default="" Description="Password for the web UI (blank = no auth)" Type="Variable" Display="always" Required="false"></Config>
+</Container>

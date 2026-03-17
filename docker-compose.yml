@@ -1,0 +1,10 @@
+services:
+  homeclaw:
+    build: .
+    env_file: .env
+    ports:
+      - "7399:8080"
+    volumes:
+      - ./workspaces:/data/workspaces
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped

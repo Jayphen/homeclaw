@@ -1,5 +1,6 @@
 """FastAPI application — serves REST API and static web UI."""
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -35,8 +36,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for web UI if dist/ exists
-_ui_dist = Path(__file__).parent.parent.parent / "ui" / "dist"
+# Mount static files for web UI if dist/ exists.
+# In Docker the package is installed to site-packages, so __file__-relative
+# resolution won't find ui/dist. HOMECLAW_UI_DIST overrides the path.
+_ui_dist_env = os.environ.get("HOMECLAW_UI_DIST")
+_ui_dist = Path(_ui_dist_env) if _ui_dist_env else Path(__file__).parent.parent.parent / "ui" / "dist"
 if _ui_dist.is_dir():
     app.mount("/assets", StaticFiles(directory=str(_ui_dist / "assets")), name="assets")
 
