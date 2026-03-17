@@ -25,8 +25,9 @@ def _list_members(workspaces_path: str) -> list[str]:
 
 
 @router.get("", dependencies=[AuthDep])
-async def memory_list() -> list[dict[str, Any]]:
-    workspaces = get_config().workspaces.resolve()
+async def memory_list() -> dict[str, Any]:
+    config = get_config()
+    workspaces = config.workspaces.resolve()
     members = _list_members(str(workspaces))
     result: list[dict[str, Any]] = []
     for person in members:
@@ -37,7 +38,12 @@ async def memory_list() -> list[dict[str, Any]]:
             "preference_count": len(mem.preferences),
             "last_updated": mem.last_updated.isoformat() if mem.last_updated else None,
         })
-    return result
+    semantic = SemanticMemory(str(workspaces))
+    await semantic.initialize()
+    return {
+        "members": result,
+        "semantic_ready": config.enhanced_memory and semantic.enabled,
+    }
 
 
 @router.get("/{person}", dependencies=[AuthDep])

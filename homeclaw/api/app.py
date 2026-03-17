@@ -16,6 +16,7 @@ from homeclaw.api.routes.cost import router as cost_router
 from homeclaw.api.routes.dashboard import router as dashboard_router
 from homeclaw.api.routes.memory import router as memory_router
 from homeclaw.api.routes.notes import router as notes_router
+from homeclaw.api.routes.settings import router as settings_router
 
 app = FastAPI(title="homeclaw", version="0.1.0")
 app.include_router(calendar_router)
@@ -24,6 +25,7 @@ app.include_router(cost_router)
 app.include_router(dashboard_router)
 app.include_router(memory_router)
 app.include_router(notes_router)
+app.include_router(settings_router)
 
 app.add_middleware(
     CORSMiddleware,

@@ -21,6 +21,7 @@
   }
 
   let members: MemberSummary[] = $state([]);
+  let semanticReady: boolean = $state(false);
   let loading: boolean = $state(true);
   let error: string | null = $state(null);
 
@@ -56,7 +57,9 @@
     try {
       const r = await fetch("/api/memory");
       if (!r.ok) throw new Error(`${r.status}`);
-      members = await r.json();
+      const data = await r.json();
+      members = data.members;
+      semanticReady = data.semantic_ready;
       loading = false;
     } catch (e: any) {
       error = e.message;
@@ -284,37 +287,39 @@
             {/if}
 
             <!-- Semantic search -->
-            <div class="search-section">
-              <h3>Recall</h3>
-              <form class="search-form" onsubmit={(e) => { e.preventDefault(); doSearch(); }}>
-                <input
-                  class="search-input"
-                  type="text"
-                  placeholder="Search memories…"
-                  bind:value={searchQuery}
-                />
-                <button class="search-btn" type="submit" disabled={searching || !searchQuery.trim()}>
-                  {searching ? "…" : "Search"}
-                </button>
-              </form>
+            {#if semanticReady}
+              <div class="search-section">
+                <h3>Recall</h3>
+                <form class="search-form" onsubmit={(e) => { e.preventDefault(); doSearch(); }}>
+                  <input
+                    class="search-input"
+                    type="text"
+                    placeholder="Search memories…"
+                    bind:value={searchQuery}
+                  />
+                  <button class="search-btn" type="submit" disabled={searching || !searchQuery.trim()}>
+                    {searching ? "…" : "Search"}
+                  </button>
+                </form>
 
-              {#if searchResults}
-                {#if searchResults.note}
-                  <p class="search-note">{searchResults.note}</p>
-                {:else if searchResults.results.length === 0}
-                  <p class="search-note">No results for "{searchResults.query}"</p>
-                {:else}
-                  <ul class="recall-results">
-                    {#each searchResults.results as result}
-                      <li>
-                        <p class="recall-text">{result.text}</p>
-                        <span class="recall-score">{(result.score * 100).toFixed(0)}%</span>
-                      </li>
-                    {/each}
-                  </ul>
+                {#if searchResults}
+                  {#if searchResults.note}
+                    <p class="search-note">{searchResults.note}</p>
+                  {:else if searchResults.results.length === 0}
+                    <p class="search-note">No results for "{searchResults.query}"</p>
+                  {:else}
+                    <ul class="recall-results">
+                      {#each searchResults.results as result}
+                        <li>
+                          <p class="recall-text">{result.text}</p>
+                          <span class="recall-score">{(result.score * 100).toFixed(0)}%</span>
+                        </li>
+                      {/each}
+                    </ul>
+                  {/if}
                 {/if}
-              {/if}
-            </div>
+              </div>
+            {/if}
           {/if}
         {/if}
       </div>

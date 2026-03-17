@@ -6,6 +6,7 @@
   import Notes from "./views/Notes.svelte";
   import Contacts from "./views/Contacts.svelte";
   import Plugins from "./views/Plugins.svelte";
+  import Settings from "./views/Settings.svelte";
 
   const routes = {
     "/": Dashboard,
@@ -16,6 +17,7 @@
     "/notes/:person/:date": Notes,
     "/contacts": Contacts,
     "/plugins": Plugins,
+    "/settings": Settings,
   };
 </script>
 
@@ -37,6 +39,7 @@
     <a href="#/memory">Memory</a>
     <a href="#/contacts">Contacts</a>
     <a href="#/plugins">Plugins</a>
+    <a href="#/settings">Settings</a>
   </div>
 </nav>
 
