@@ -103,6 +103,7 @@ class HomeclawApp:
                 self.registry,
                 self.workspaces,
                 on_routines_changed=self._reload_routines,
+                config=self.config,
             )
 
         self.loop = AgentLoop(

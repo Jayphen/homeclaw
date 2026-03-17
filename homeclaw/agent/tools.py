@@ -56,6 +56,7 @@ def register_builtin_tools(
     registry: ToolRegistry,
     workspaces: Path,
     on_routines_changed: Callable[[], None] | None = None,
+    config: Any = None,
 ) -> None:
     """Register all built-in tools with the registry."""
 
@@ -895,3 +896,84 @@ def register_builtin_tools(
         ),
         routine_remove,
     )
+
+    # --- Settings tools ---
+
+    if config is not None:
+
+        async def settings_get(**_: Any) -> dict[str, Any]:
+            memsearch_installed = False
+            try:
+                import memsearch  # type: ignore[import-not-found]  # noqa: F401
+
+                memsearch_installed = True
+            except ImportError:
+                pass
+            return {
+                "enhanced_memory": config.enhanced_memory,
+                "memsearch_installed": memsearch_installed,
+                "semantic_ready": config.enhanced_memory and memsearch_installed,
+            }
+
+        registry.register(
+            ToolDefinition(
+                name="settings_get",
+                description=(
+                    "Check current homeclaw settings, including whether "
+                    "semantic memory is enabled."
+                ),
+                parameters={"type": "object", "properties": {}},
+            ),
+            settings_get,
+        )
+
+        async def settings_update(
+            *, enhanced_memory: bool | None = None, **_: Any,
+        ) -> dict[str, Any]:
+            if enhanced_memory is not None:
+                config.enhanced_memory = enhanced_memory
+            memsearch_installed = False
+            try:
+                import memsearch  # type: ignore[import-not-found]  # noqa: F401
+
+                memsearch_installed = True
+            except ImportError:
+                pass
+            status = "enabled" if config.enhanced_memory else "disabled"
+            if config.enhanced_memory and not memsearch_installed:
+                return {
+                    "status": status,
+                    "enhanced_memory": config.enhanced_memory,
+                    "memsearch_installed": False,
+                    "note": (
+                        "Enhanced memory is toggled on but the memsearch package is not installed. "
+                        "Install it with: pip install homeclaw[semantic]"
+                    ),
+                }
+            return {
+                "status": status,
+                "enhanced_memory": config.enhanced_memory,
+                "memsearch_installed": memsearch_installed,
+                "semantic_ready": config.enhanced_memory and memsearch_installed,
+            }
+
+        registry.register(
+            ToolDefinition(
+                name="settings_update",
+                description=(
+                    "Update homeclaw settings. Currently supports toggling enhanced "
+                    "(semantic) memory on or off. Use when a user asks to enable or "
+                    "disable semantic memory / enhanced recall."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "enhanced_memory": {
+                            "type": "boolean",
+                            "description": "Enable or disable semantic memory",
+                        },
+                    },
+                },
+            ),
+            settings_update,
+        )
