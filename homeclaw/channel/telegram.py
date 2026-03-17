@@ -238,22 +238,40 @@ class TelegramChannel:
         if self._on_scheduler_start:
             self._on_scheduler_start()
 
-    def run(self) -> None:
-        """Build the Telegram application and start polling. Blocks forever."""
+    def _build_app(self) -> Application:  # type: ignore[type-arg]
+        """Build and configure the Telegram Application."""
         app = (
             Application.builder()
             .token(self._token)
             .post_init(self._post_init)
             .build()
         )
-
         app.add_handler(CommandHandler("start", self._handle_start))
         app.add_handler(CommandHandler("register", self._handle_register))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
         app.add_handler(MessageHandler(filters.PHOTO, self._handle_photo))
+        return app
 
+    def run(self) -> None:
+        """Build the Telegram application and start polling. Blocks forever."""
+        app = self._build_app()
         logger.info("Starting Telegram polling...")
         app.run_polling()
+
+    async def start(self) -> None:
+        """Start polling without blocking — for running alongside other async tasks."""
+        self._app = self._build_app()
+        await self._app.initialize()
+        await self._app.start()
+        await self._app.updater.start_polling()  # type: ignore[union-attr]
+        logger.info("Telegram polling started (non-blocking)")
+
+    async def stop(self) -> None:
+        """Stop the non-blocking Telegram polling."""
+        if hasattr(self, "_app"):
+            await self._app.updater.stop()  # type: ignore[union-attr]
+            await self._app.stop()
+            await self._app.shutdown()
 
 
 async def _send_markdown(message: Any, text: str) -> None:

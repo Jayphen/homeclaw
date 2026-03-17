@@ -225,18 +225,69 @@ def _run_chat(workspaces: Path, args: argparse.Namespace) -> None:
 
 
 def _run_serve(workspaces: Path, port: int) -> None:
-    """Start the FastAPI server for the web UI and REST API."""
+    """Start the FastAPI server for the web UI and REST API.
+
+    When TELEGRAM_TOKEN is configured, also starts the Telegram bot
+    in the same process.
+    """
     import uvicorn
 
     from homeclaw.api.app import app, set_config
+    from homeclaw.api.deps import generate_setup_token
     from homeclaw.config import HomeclawConfig
 
     config = HomeclawConfig(workspaces_path=str(workspaces))
     set_config(config)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    logger.info("Starting web server on port %d (workspaces: %s)", port, workspaces)
-    uvicorn.run(app, host="0.0.0.0", port=port)
+
+    if not config.web_password:
+        generate_setup_token()
+
+    if config.telegram_token:
+        _run_serve_with_telegram(app, config, workspaces, port)
+    else:
+        logger.info("Starting web server on port %d (workspaces: %s)", port, workspaces)
+        uvicorn.run(app, host="0.0.0.0", port=port)
+
+
+def _run_serve_with_telegram(
+    app: Any, config: Any, workspaces: Path, port: int
+) -> None:
+    """Run uvicorn + Telegram bot concurrently in one event loop."""
+    import uvicorn
+
+    from homeclaw.channel.telegram import TelegramChannel
+
+    hc_app = HomeclawApp(workspaces=workspaces)
+    hc_app.load_scheduler()
+
+    channel = TelegramChannel(
+        token=config.telegram_token,
+        loop=hc_app.loop,
+        workspaces=workspaces,
+        on_scheduler_start=hc_app.start_scheduler,
+        allowed_user_ids=config.telegram_allowed_user_ids,
+    )
+
+    async def _serve() -> None:
+        await channel.start()
+        hc_app.start_scheduler()
+
+        uv_config = uvicorn.Config(app, host="0.0.0.0", port=port)
+        server = uvicorn.Server(uv_config)
+
+        logger.info(
+            "Starting web server on port %d + Telegram bot (workspaces: %s)",
+            port, workspaces,
+        )
+        try:
+            await server.serve()
+        finally:
+            await channel.stop()
+            hc_app.shutdown()
+
+    asyncio.run(_serve())
 
 
 def _run_telegram() -> None:

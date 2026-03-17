@@ -7,6 +7,7 @@
   import Contacts from "./views/Contacts.svelte";
   import Plugins from "./views/Plugins.svelte";
   import Settings from "./views/Settings.svelte";
+  import Setup from "./views/Setup.svelte";
 
   const routes = {
     "/": Dashboard,
@@ -19,6 +20,30 @@
     "/plugins": Plugins,
     "/settings": Settings,
   };
+
+  let needsSetup: boolean | null = $state(null);
+
+  async function checkSetup() {
+    try {
+      const r = await fetch("/api/setup/status");
+      if (r.ok) {
+        const data = await r.json();
+        needsSetup = !data.provider_configured || !data.has_password;
+      } else {
+        needsSetup = false;
+      }
+    } catch {
+      needsSetup = false;
+    }
+  }
+
+  function onSetupComplete() {
+    needsSetup = false;
+  }
+
+  $effect(() => {
+    checkSetup();
+  });
 </script>
 
 <svelte:head>
@@ -30,22 +55,28 @@
   />
 </svelte:head>
 
-<nav>
-  <span class="brand">homeclaw</span>
-  <div class="links">
-    <a href="#/">Dashboard</a>
-    <a href="#/calendar">Calendar</a>
-    <a href="#/notes">Notes</a>
-    <a href="#/memory">Memory</a>
-    <a href="#/contacts">Contacts</a>
-    <a href="#/plugins">Plugins</a>
-    <a href="#/settings">Settings</a>
-  </div>
-</nav>
+{#if needsSetup === null}
+  <!-- Loading -->
+{:else if needsSetup}
+  <Setup oncomplete={onSetupComplete} />
+{:else}
+  <nav>
+    <span class="brand">homeclaw</span>
+    <div class="links">
+      <a href="#/">Dashboard</a>
+      <a href="#/calendar">Calendar</a>
+      <a href="#/notes">Notes</a>
+      <a href="#/memory">Memory</a>
+      <a href="#/contacts">Contacts</a>
+      <a href="#/plugins">Plugins</a>
+      <a href="#/settings">Settings</a>
+    </div>
+  </nav>
 
-<main>
-  <Router {routes} />
-</main>
+  <main>
+    <Router {routes} />
+  </main>
+{/if}
 
 <style>
   :global(*) {
