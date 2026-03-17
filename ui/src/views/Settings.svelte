@@ -185,7 +185,19 @@
       <div class="field">
         <label for="base-url">Base URL</label>
         <input id="base-url" type="url" bind:value={openaiBaseUrl} placeholder="https://openrouter.ai/api/v1" />
-        <small class="field-hint">For OpenRouter, Ollama, or any OpenAI-compatible API.</small>
+        <div class="presets">
+          {#each [
+            ["OpenRouter", "https://openrouter.ai/api/v1"],
+            ["Ollama", "http://localhost:11434/v1"],
+            ["Groq", "https://api.groq.com/openai/v1"],
+            ["Together", "https://api.together.xyz/v1"],
+            ["OpenAI", "https://api.openai.com/v1"],
+          ] as [name, url]}
+            <button class="preset" class:active={openaiBaseUrl === url} onclick={() => { openaiBaseUrl = url; }}>
+              {name}
+            </button>
+          {/each}
+        </div>
       </div>
     </section>
 
@@ -387,6 +399,37 @@
     font-size: 0.78rem;
     color: var(--text-muted);
     margin-top: 0.25rem;
+  }
+
+  .presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+  }
+
+  .preset {
+    padding: 0.25rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fdfcfa;
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .preset:hover {
+    color: var(--text);
+    border-color: var(--text-muted);
+  }
+
+  .preset.active {
+    border-color: var(--terracotta);
+    color: var(--terracotta);
+    background: #fff;
   }
 
   /* ---- Save row ---- */
