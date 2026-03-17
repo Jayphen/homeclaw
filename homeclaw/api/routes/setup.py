@@ -38,6 +38,8 @@ async def setup_status() -> dict[str, Any]:
         "telegram_configured": config.telegram_token is not None,
         "telegram_allowed_users": config.telegram_allowed_users,
         "ha_configured": config.ha_url is not None,
+        "conversation_model": config.routing.conversation_model,
+        "routine_model": config.routing.routine_model,
     }
 
 
@@ -57,6 +59,10 @@ class SetupBody(BaseModel):
     # Home Assistant
     ha_url: str | None = None
     ha_token: str | None = None
+
+    # Routing
+    conversation_model: str | None = None
+    routine_model: str | None = None
 
     # Auth
     web_password: str | None = None
@@ -95,6 +101,10 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         config.ha_url = body.ha_url or None
     if body.ha_token is not None:
         config.ha_token = body.ha_token or None
+    if body.conversation_model is not None:
+        config.routing.conversation_model = body.conversation_model
+    if body.routine_model is not None:
+        config.routing.routine_model = body.routine_model
     if body.web_password is not None:
         config.web_password = body.web_password
 

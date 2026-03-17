@@ -132,8 +132,18 @@ class HomeclawConfig(BaseSettings):
         return has_anthropic or has_openai
 
     @model_validator(mode="after")
-    def check_provider_configured(self) -> "HomeclawConfig":
-        # Allow unconfigured state for onboarding — the setup flow will set keys.
+    def _load_routing_overrides(self) -> "HomeclawConfig":
+        """Load routing model overrides from config.json if present."""
+        try:
+            path = self.workspaces.resolve() / "config.json"
+            if path.is_file():
+                data = json.loads(path.read_text())
+                if "conversation_model" in data:
+                    self.routing.conversation_model = data["conversation_model"]
+                if "routine_model" in data:
+                    self.routing.routine_model = data["routine_model"]
+        except (json.JSONDecodeError, OSError):
+            pass
         return self
 
     @property
@@ -159,6 +169,10 @@ class HomeclawConfig(BaseSettings):
                 existing[field_name] = val
             elif field_name in existing and (val is None or val == ""):
                 del existing[field_name]
+
+        # Routing fields
+        existing["conversation_model"] = self.routing.conversation_model
+        existing["routine_model"] = self.routing.routine_model
 
         self.config_json_path.parent.mkdir(parents=True, exist_ok=True)
         self.config_json_path.write_text(json.dumps(existing, indent=2) + "\n")

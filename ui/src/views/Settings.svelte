@@ -11,6 +11,8 @@
     telegram_configured: boolean;
     telegram_allowed_users: string | null;
     ha_configured: boolean;
+    conversation_model: string;
+    routine_model: string;
   }
 
   let setup: SetupStatus | null = $state(null);
@@ -20,7 +22,8 @@
   let saveSuccess: boolean = $state(false);
 
   // Editable config fields
-  let model: string = $state("");
+  let conversationModel: string = $state("");
+  let routineModel: string = $state("");
   let anthropicKey: string = $state("");
   let openaiKey: string = $state("");
   let openaiBaseUrl: string = $state("");
@@ -36,7 +39,8 @@
       const setupRes = await api("/api/setup/status");
       if (!setupRes.ok) throw new Error(`${setupRes.status}`);
       setup = await setupRes.json();
-      model = setup!.model;
+      conversationModel = setup!.conversation_model;
+      routineModel = setup!.routine_model;
       openaiBaseUrl = setup!.openai_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
     } catch (e: any) {
@@ -57,7 +61,8 @@
     saving = true;
     const body: Record<string, string | null> = {};
 
-    if (model !== setup?.model) body.model = model;
+    if (conversationModel !== setup?.conversation_model) body.conversation_model = conversationModel;
+    if (routineModel !== setup?.routine_model) body.routine_model = routineModel;
     if (anthropicKey) body.anthropic_api_key = anthropicKey;
     if (openaiKey) body.openai_api_key = openaiKey;
     if (openaiBaseUrl !== (setup?.openai_base_url || "")) body.openai_base_url = openaiBaseUrl || null;
@@ -83,7 +88,8 @@
         throw new Error(data?.detail || `Error ${r.status}`);
       }
       setup = await r.json();
-      model = setup!.model;
+      conversationModel = setup!.conversation_model;
+      routineModel = setup!.routine_model;
       openaiBaseUrl = setup!.openai_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
 
@@ -136,8 +142,15 @@
       <h2>LLM provider</h2>
 
       <div class="field">
-        <label for="model">Model</label>
-        <input id="model" type="text" bind:value={model} />
+        <label for="conversation-model">Conversation model</label>
+        <input id="conversation-model" type="text" bind:value={conversationModel} />
+        <small class="field-hint">Used for chat messages that require reasoning.</small>
+      </div>
+
+      <div class="field">
+        <label for="routine-model">Routine model</label>
+        <input id="routine-model" type="text" bind:value={routineModel} />
+        <small class="field-hint">Used for scheduled tasks and simple tool follow-ups (cheaper).</small>
       </div>
 
       <div class="field">
