@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.9](https://github.com/Jayphen/homeclaw/compare/v0.1.8...v0.1.9) (2026-03-18)
+
+
+### Features
+
+* add data export/import buttons to Settings page ([9dc7fd1](https://github.com/Jayphen/homeclaw/commit/9dc7fd1354b1c7008a43b8aadcd7cbfc702044db))
+
+
+### Bug Fixes
+
+* handle missing workspaces dir and milvus-lite failures in memory page ([ab2bc41](https://github.com/Jayphen/homeclaw/commit/ab2bc4133ea68ea0ace4ecd8c351fbd0507dabce))
+* normalize person names to lowercase to prevent duplicate workspaces ([fae9763](https://github.com/Jayphen/homeclaw/commit/fae9763eec2cd462dcb9b703fe0b28a8babaaf9b))
+* resolve P1 and P2 state drift issues from audit ([f625ea8](https://github.com/Jayphen/homeclaw/commit/f625ea8040ed1a4f02408f3fd9eb1ab7a04a2719))
+
 ## [0.1.8](https://github.com/Jayphen/homeclaw/compare/v0.1.7...v0.1.8) (2026-03-18)
 
 
