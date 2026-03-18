@@ -36,6 +36,58 @@
   let newPassword: string = $state("");
   let newPasswordConfirm: string = $state("");
 
+  // Data import/export
+  let exporting: boolean = $state(false);
+  let importing: boolean = $state(false);
+  let importResult: string | null = $state(null);
+  let importError: string | null = $state(null);
+
+  async function exportData() {
+    exporting = true;
+    try {
+      const r = await api("/api/data/export");
+      if (!r.ok) throw new Error(`${r.status}`);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const disposition = r.headers.get("Content-Disposition");
+      const match = disposition?.match(/filename="(.+)"/);
+      a.download = match?.[1] ?? "homeclaw-export.zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      error = e.message;
+    }
+    exporting = false;
+  }
+
+  async function importData(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    importing = true;
+    importResult = null;
+    importError = null;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const r = await api("/api/data/import", { method: "POST", body: formData });
+      if (!r.ok) {
+        const data = await r.json().catch(() => null);
+        throw new Error(data?.detail || `Error ${r.status}`);
+      }
+      const data = await r.json();
+      importResult = `Imported ${data.files_written} files (${data.members_imported?.length ?? 0} members).`;
+    } catch (e: any) {
+      importError = e.message;
+    }
+    importing = false;
+    input.value = "";
+  }
+
   async function fetchAll() {
     loading = true;
     error = null;
@@ -250,6 +302,26 @@
         <span class="save-ok">Saved</span>
       {/if}
     </div>
+
+    <section class="card">
+      <h2>Data</h2>
+      <p class="data-desc">Export or import all household data (memory, contacts, notes, calendar) as a ZIP archive.</p>
+      <div class="data-actions">
+        <button class="btn secondary" onclick={exportData} disabled={exporting}>
+          {exporting ? "Exporting..." : "Export data"}
+        </button>
+        <label class="btn secondary import-label" class:disabled={importing}>
+          {importing ? "Importing..." : "Import data"}
+          <input type="file" accept=".zip" onchange={importData} disabled={importing} hidden />
+        </label>
+      </div>
+      {#if importResult}
+        <p class="import-ok">{importResult}</p>
+      {/if}
+      {#if importError}
+        <p class="import-err">{importError}</p>
+      {/if}
+    </section>
   {/if}
 </div>
 
@@ -474,5 +546,58 @@
     font-size: 0.78rem;
     font-weight: 500;
     cursor: pointer;
+  }
+
+  /* ---- Data section ---- */
+  .data-desc {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin: 0 0 0.75rem;
+    line-height: 1.4;
+  }
+
+  .data-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .btn.secondary {
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: #fdfcfa;
+    color: var(--text);
+    transition: all 0.15s;
+  }
+
+  .btn.secondary:hover { background: #f0ebe5; }
+  .btn.secondary:disabled { opacity: 0.5; cursor: default; }
+
+  .import-label {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .import-label.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .import-ok {
+    font-size: 0.82rem;
+    color: var(--sage);
+    font-weight: 600;
+    margin: 0.75rem 0 0;
+  }
+
+  .import-err {
+    font-size: 0.82rem;
+    color: var(--terracotta);
+    font-weight: 500;
+    margin: 0.75rem 0 0;
   }
 </style>
