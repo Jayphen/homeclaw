@@ -1,7 +1,10 @@
 """OpenAI-compatible LLM provider — covers OpenAI, Ollama, OpenRouter, Groq, etc."""
 
 import json
+import logging
 from typing import Any, Literal
+
+logger = logging.getLogger(__name__)
 
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
@@ -120,6 +123,13 @@ def _to_api_tool(tool: ToolDefinition) -> dict[str, Any]:
 
 def _parse_response(response: ChatCompletion) -> LLMResponse:
     if not response.choices:
+        logger.error(
+            "LLM returned empty choices — model=%s, id=%s, usage=%s, raw=%s",
+            response.model,
+            response.id,
+            response.usage,
+            response.model_dump_json(indent=2) if hasattr(response, "model_dump_json") else str(response),
+        )
         return LLMResponse(content="Sorry, the LLM returned an empty response.", tool_calls=[], stop_reason="error")
     choice = response.choices[0]
     message = choice.message
