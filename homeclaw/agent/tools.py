@@ -24,7 +24,7 @@ from homeclaw.contacts.store import (
     list_contacts,
     save_contact,
 )
-from homeclaw.memory.facts import HouseholdMemory, load_memory, save_memory, save_memory_safe
+from homeclaw.memory.markdown import memory_read_topic, memory_save_topic, memory_list_topics
 
 _logger = logging.getLogger(__name__)
 
@@ -238,18 +238,65 @@ def register_builtin_tools(
 
     # --- Memory tools ---
 
-    async def memory_read(*, person: str, **_: Any) -> dict[str, Any]:
-        memory = load_memory(workspaces, person)
-        return memory.model_dump(mode="json")
+    async def memory_save(
+        *, person: str, topic: str, content: str, **_: Any
+    ) -> dict[str, Any]:
+        path = memory_save_topic(workspaces, person, topic, content)
+        return {"status": "saved", "topic": topic, "path": str(path)}
 
     registry.register(
         ToolDefinition(
-            name="memory_read",
-            description="Read stored facts and preferences for a household member.",
+            name="memory_save",
+            description=(
+                "Save a piece of knowledge about a household member. Appends to "
+                "a topic file — never overwrites. Pick a short topic name "
+                "(e.g. 'food', 'health', 'routines', 'work')."
+            ),
             parameters={
                 "type": "object",
                 "properties": {
                     "person": {"type": "string", "description": "Household member name"},
+                    "topic": {
+                        "type": "string",
+                        "description": "Topic name (e.g. 'food', 'health', 'family')",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The fact or knowledge to remember",
+                    },
+                },
+                "required": ["person", "topic", "content"],
+            },
+        ),
+        memory_save,
+    )
+
+    async def memory_read(
+        *, person: str, topic: str | None = None, **_: Any
+    ) -> dict[str, Any]:
+        if topic:
+            text = memory_read_topic(workspaces, person, topic)
+            if text is None:
+                return {"person": person, "topic": topic, "content": None}
+            return {"person": person, "topic": topic, "content": text}
+        topics = memory_list_topics(workspaces, person)
+        return {"person": person, "topics": topics}
+
+    registry.register(
+        ToolDefinition(
+            name="memory_read",
+            description=(
+                "Read stored knowledge about a household member. "
+                "Call without topic to list all topics, or with a topic to read it."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member name"},
+                    "topic": {
+                        "type": "string",
+                        "description": "Topic to read (omit to list all topics)",
+                    },
                 },
                 "required": ["person"],
             },
@@ -257,69 +304,33 @@ def register_builtin_tools(
         memory_read,
     )
 
-    async def memory_update(
-        *,
-        person: str,
-        facts: list[str] | None = None,
-        preferences: dict[str, str | list[str]] | None = None,
-        **_: Any,
+    async def household_share(
+        *, topic: str, content: str, **_: Any
     ) -> dict[str, Any]:
-        memory = load_memory(workspaces, person)
-        if facts is not None:
-            memory.facts = facts
-        if preferences is not None:
-            memory.preferences = preferences
-        await save_memory_safe(workspaces, person, memory)
-        return {"status": "updated", "person": person}
-
-    registry.register(
-        ToolDefinition(
-            name="memory_update",
-            description="Update stored facts or preferences for a household member.",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "person": {"type": "string", "description": "Household member name"},
-                    "facts": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Facts to store (replaces existing)",
-                    },
-                    "preferences": {
-                        "type": "object",
-                        "description": "Preferences to store (replaces existing)",
-                    },
-                },
-                "required": ["person"],
-            },
-        ),
-        memory_update,
-    )
-
-    async def household_share(*, fact: str, **_: Any) -> dict[str, Any]:
-        """Share a fact with the entire household."""
-        memory = load_memory(workspaces, HOUSEHOLD_WORKSPACE)
-        memory.facts.append(fact)
-        await save_memory_safe(workspaces, HOUSEHOLD_WORKSPACE, memory)
-        return {"status": "shared", "fact": fact}
+        """Share knowledge with the entire household."""
+        path = memory_save_topic(workspaces, HOUSEHOLD_WORKSPACE, topic, content)
+        return {"status": "shared", "topic": topic, "path": str(path)}
 
     registry.register(
         ToolDefinition(
             name="household_share",
             description=(
-                "Share a fact with the entire household. Use this when a member "
-                "explicitly asks to share something with everyone. The fact will "
-                "be visible to all members in both private and group chats."
+                "Share knowledge with the entire household. Use when a member "
+                "explicitly asks to share something with everyone."
             ),
             parameters={
                 "type": "object",
                 "properties": {
-                    "fact": {
+                    "topic": {
                         "type": "string",
-                        "description": "The fact to share with the household",
+                        "description": "Topic name (e.g. 'house-rules', 'wifi', 'emergency')",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The information to share",
                     },
                 },
-                "required": ["fact"],
+                "required": ["topic", "content"],
             },
         ),
         household_share,

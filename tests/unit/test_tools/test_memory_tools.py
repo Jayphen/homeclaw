@@ -1,8 +1,7 @@
-"""Tests for built-in memory tools (memory_read, memory_update)."""
+"""Tests for built-in memory tools (memory_save, memory_read, household_share)."""
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -17,101 +16,106 @@ def registry(dev_workspaces: Path) -> ToolRegistry:
     return reg
 
 
-# ── memory_read ───────────────────────────────────────────────────────────
+# ── memory_save ──────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_memory_read_alice(registry: ToolRegistry) -> None:
-    handler = registry.get_handler("memory_read")
+async def test_memory_save_creates_topic(
+    registry: ToolRegistry, dev_workspaces: Path
+) -> None:
+    handler = registry.get_handler("memory_save")
     assert handler is not None
-    result = await handler(person="alice")
-    assert len(result["facts"]) == 4
-    assert "Vegetarian" in result["facts"]
-    prefs = result["preferences"]
-    assert prefs["reminder_time"] == "7:30am"
-    assert prefs["communication_style"] == "brief and friendly"
-    assert prefs["dietary"] == "vegetarian"
-    assert result["last_updated"] is not None
+    result = await handler(person="alice", topic="food", content="Likes manchego")
+    assert result["status"] == "saved"
+    assert result["topic"] == "food"
+
+    # Verify file was created
+    path = dev_workspaces / "alice" / "memory" / "food.md"
+    assert path.exists()
+    text = path.read_text()
+    assert "# food" in text
+    assert "Likes manchego" in text
+
+
+@pytest.mark.asyncio
+async def test_memory_save_appends(
+    registry: ToolRegistry, dev_workspaces: Path
+) -> None:
+    handler = registry.get_handler("memory_save")
+    assert handler is not None
+    await handler(person="alice", topic="health", content="Allergic to shellfish")
+    await handler(person="alice", topic="health", content="Runs 3x per week")
+
+    path = dev_workspaces / "alice" / "memory" / "health.md"
+    text = path.read_text()
+    assert "Allergic to shellfish" in text
+    assert "Runs 3x per week" in text
+
+
+# ── memory_read ──────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_memory_read_lists_topics(
+    registry: ToolRegistry, dev_workspaces: Path
+) -> None:
+    save = registry.get_handler("memory_save")
+    read = registry.get_handler("memory_read")
+    assert save is not None and read is not None
+
+    await save(person="bob", topic="work", content="Works remotely")
+    await save(person="bob", topic="hobbies", content="Likes cooking")
+
+    result = await read(person="bob")
+    assert "hobbies" in result["topics"]
+    assert "work" in result["topics"]
+
+
+@pytest.mark.asyncio
+async def test_memory_read_specific_topic(
+    registry: ToolRegistry, dev_workspaces: Path
+) -> None:
+    save = registry.get_handler("memory_save")
+    read = registry.get_handler("memory_read")
+    assert save is not None and read is not None
+
+    await save(person="alice", topic="pets", content="Cat named Mochi")
+    result = await read(person="alice", topic="pets")
+    assert result["content"] is not None
+    assert "Cat named Mochi" in result["content"]
+
+
+@pytest.mark.asyncio
+async def test_memory_read_nonexistent_topic(registry: ToolRegistry) -> None:
+    read = registry.get_handler("memory_read")
+    assert read is not None
+    result = await read(person="alice", topic="nonexistent")
+    assert result["content"] is None
 
 
 @pytest.mark.asyncio
 async def test_memory_read_nonexistent_person(registry: ToolRegistry) -> None:
-    handler = registry.get_handler("memory_read")
-    assert handler is not None
-    result = await handler(person="nobody")
-    assert result["facts"] == []
-    assert result["preferences"] == {}
-
-
-# ── memory_update ─────────────────────────────────────────────────────────
-
-
-@pytest.mark.asyncio
-async def test_memory_update_replaces_facts(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
-    handler = registry.get_handler("memory_update")
-    assert handler is not None
-    new_facts = ["Likes running", "Works from home"]
-    result = await handler(person="alice", facts=new_facts)
-    assert result["status"] == "updated"
-    assert result["person"] == "alice"
-
-    # Verify via read
-    read_handler = registry.get_handler("memory_read")
-    assert read_handler is not None
-    mem = await read_handler(person="alice")
-    assert mem["facts"] == new_facts
-
-
-@pytest.mark.asyncio
-async def test_memory_update_replaces_preferences(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
-    handler = registry.get_handler("memory_update")
-    assert handler is not None
-    new_prefs = {"theme": "dark", "language": "en"}
-    result = await handler(person="bob", preferences=new_prefs)
-    assert result["status"] == "updated"
-
-    read_handler = registry.get_handler("memory_read")
-    assert read_handler is not None
-    mem = await read_handler(person="bob")
-    assert mem["preferences"] == new_prefs
-
-
-@pytest.mark.asyncio
-async def test_memory_update_persists_to_disk(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
-    handler = registry.get_handler("memory_update")
-    assert handler is not None
-    await handler(person="alice", facts=["Only fact"])
-
-    # Read directly from disk, not through the tool
-    path = dev_workspaces / "alice" / "memory.json"
-    data = json.loads(path.read_text())
-    assert data["facts"] == ["Only fact"]
-    assert data["last_updated"] is not None
+    read = registry.get_handler("memory_read")
+    assert read is not None
+    result = await read(person="nobody")
+    assert result["topics"] == []
 
 
 # ── household_share ──────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_household_share_appends_fact(
+async def test_household_share_writes_to_household(
     registry: ToolRegistry, dev_workspaces: Path,
 ) -> None:
     handler = registry.get_handler("household_share")
     assert handler is not None
-    result = await handler(fact="We adopted a cat named Miso")
+    result = await handler(topic="pets", content="We adopted a cat named Miso")
     assert result["status"] == "shared"
-    assert result["fact"] == "We adopted a cat named Miso"
 
-    # Verify it's in household memory
-    path = dev_workspaces / "household" / "memory.json"
-    data = json.loads(path.read_text())
-    assert "We adopted a cat named Miso" in data["facts"]
+    path = dev_workspaces / "household" / "memory" / "pets.md"
+    assert path.exists()
+    assert "We adopted a cat named Miso" in path.read_text()
 
 
 @pytest.mark.asyncio
@@ -120,10 +124,8 @@ async def test_household_share_does_not_touch_personal_memory(
 ) -> None:
     handler = registry.get_handler("household_share")
     assert handler is not None
-    await handler(fact="Shared fact")
+    await handler(topic="house-rules", content="No shoes indoors")
 
-    # Alice's personal memory should be unchanged
-    read_handler = registry.get_handler("memory_read")
-    assert read_handler is not None
-    alice_mem = await read_handler(person="alice")
-    assert "Shared fact" not in alice_mem["facts"]
+    # Alice should not have this in her personal memory
+    alice_memory = dev_workspaces / "alice" / "memory" / "house-rules.md"
+    assert not alice_memory.exists()

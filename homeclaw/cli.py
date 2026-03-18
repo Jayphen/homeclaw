@@ -110,13 +110,22 @@ class HomeclawApp:
                 on_semantic_ready=self._notify_semantic_ready,
             )
 
+        from homeclaw.memory.semantic import SemanticMemory
+
+        self._semantic_memory = SemanticMemory(str(self.workspaces))
+
         self.loop = AgentLoop(
             provider=provider,
             registry=self.registry,
             workspaces=self.workspaces,
+            semantic_memory=self._semantic_memory,
             on_tool_call=on_tool_call,
             routing=self.config.routing,
         )
+
+    async def initialize(self) -> None:
+        """Async initialization — call after constructing in an event loop."""
+        await self._semantic_memory.initialize()
 
     def _reload_routines(self) -> None:
         """Called by routine tools when ROUTINES.md changes."""
@@ -217,6 +226,7 @@ def _run_chat(workspaces: Path, args: argparse.Namespace) -> None:
     app.load_scheduler()
 
     async def _chat() -> None:
+        await app.initialize()
         app.start_scheduler()
         await run_repl(person=args.person.lower(), loop=app.loop, on_tool_call=_print_tool_call)
 
@@ -270,6 +280,7 @@ def _run_serve_with_telegram(
     )
 
     async def _serve() -> None:
+        await hc_app.initialize()
         await channel.start()
         hc_app.start_scheduler()
 
@@ -315,6 +326,7 @@ def _run_serve_with_deferred_telegram(
             except ValueError:
                 logger.warning("Cannot start Telegram bot — LLM provider not configured yet")
                 return
+            await hc_app.initialize()
             hc_app.load_scheduler()
             channel = TelegramChannel(
                 token=token,

@@ -42,9 +42,8 @@ bookmarks with bookmark_search before answering. The household has been collecti
 recommendations for a reason.
 
 Proactively remember personal details (likes, allergies, birthdays, routines, goals) via \
-memory_update. Always memory_read first and merge — memory_update replaces the full list. \
-Do this silently. Use preferences for structured key-value pairs, facts for everything else. \
-Use household_share for household-wide info.
+memory_save. Pick a short topic name and it appends — no need to read first. Do this \
+silently. Use household_share for household-wide info.
 
 {context}"""
 
@@ -55,7 +54,7 @@ MAX_TOOL_ROUNDS = 10
 # attribute notes/memory/reminders to someone else.
 _PERSONAL_WRITE_TOOLS = frozenset({
     "note_save",
-    "memory_update",
+    "memory_save",
     "reminder_add",
     "reminder_complete",
     "reminder_delete",

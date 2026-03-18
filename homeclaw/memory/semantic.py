@@ -1,10 +1,19 @@
-"""Semantic recall layer (Layer 2) — opt-in, uses memsearch for vector search."""
+"""Semantic recall layer — uses memsearch to index and search workspace content.
+
+Indexes all markdown and JSON files under the workspaces directory so that
+notes, memory, contacts, and bookmarks are all searchable. Replaces the
+old always-on Layer 1 injection with on-demand semantic recall.
+"""
 
 from __future__ import annotations
 
+import logging
+from pathlib import Path
 from typing import Any
 
 from homeclaw import SEMANTIC_INDEX_PATH
+
+logger = logging.getLogger(__name__)
 
 
 class SemanticMemory:
@@ -17,27 +26,75 @@ class SemanticMemory:
     def enabled(self) -> bool:
         return self._enabled
 
+    def _collect_paths(self) -> list[str]:
+        """Collect all workspace subdirectories that contain indexable content."""
+        ws = Path(self._workspaces_path)
+        paths: list[str] = []
+        if not ws.is_dir():
+            return paths
+        for child in ws.iterdir():
+            if not child.is_dir() or child.name.startswith("."):
+                continue
+            paths.append(str(child))
+        return paths
+
     async def initialize(self) -> None:
         try:
             from memsearch import MemSearch  # type: ignore[import-not-found]
 
+            paths = self._collect_paths()
+            if not paths:
+                logger.warning("No workspace directories found to index")
+                return
+
             self._mem = MemSearch(
-                paths=[
-                    f"{self._workspaces_path}/household/notes",
-                    f"{self._workspaces_path}/household/contacts",
-                ],
+                paths=paths,
                 milvus_uri=f"{self._workspaces_path}/{SEMANTIC_INDEX_PATH}",
             )
+            await self._mem.index()
             self._enabled = True
+            logger.info("Semantic memory indexed %d workspace paths", len(paths))
+        except ImportError:
+            logger.debug("memsearch not installed — semantic memory disabled")
+            self._enabled = False
         except Exception:
+            logger.exception("Failed to initialize semantic memory")
             self._enabled = False
 
-    async def recall(self, query: str, top_k: int = 3) -> list[dict[str, Any]]:
-        """Return recall results as {text, score} dicts."""
+    async def recall(
+        self,
+        query: str,
+        top_k: int = 3,
+        person: str | None = None,
+        shared_only: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Return recall results as {text, score} dicts.
+
+        Args:
+            query: The search query.
+            top_k: Max results to return.
+            person: If set, include results from this person's workspace
+                and the household workspace. Other members' data is excluded.
+            shared_only: If True, only return household-level results.
+        """
         if not self._enabled or self._mem is None:
             return []
-        results: list[dict[str, Any]] = await self._mem.search(query, top_k=top_k)
+        # Fetch extra results so we have enough after filtering
+        results: list[dict[str, Any]] = await self._mem.search(query, top_k=top_k * 3)
+
+        household_prefix = f"{self._workspaces_path}/household"
+        person_prefix = f"{self._workspaces_path}/{person}" if person else None
+
+        filtered: list[dict[str, Any]] = []
+        for r in results:
+            source = r.get("source", "")
+            if source.startswith(household_prefix):
+                filtered.append(r)
+            elif not shared_only and person_prefix and source.startswith(person_prefix):
+                filtered.append(r)
+            # Other members' data is silently excluded
+
         return [
             {"text": r["content"], "score": r.get("score", 0.0)}
-            for r in results
+            for r in filtered[:top_k]
         ]

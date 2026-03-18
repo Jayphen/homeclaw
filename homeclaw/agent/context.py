@@ -6,9 +6,7 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.contacts.store import list_contacts
-from homeclaw.memory.facts import load_memory
 from homeclaw.memory.semantic import SemanticMemory
 from homeclaw.reminders.store import load_reminders
 
@@ -20,7 +18,6 @@ class ContextConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    max_facts_per_person: int = 20
     max_contacts_in_context: int = 5
     max_semantic_chunks: int = 3
     max_ha_entities: int = 20
@@ -42,25 +39,6 @@ async def build_context(
     # Current time (local timezone so the LLM gives time-aware answers)
     now = datetime.now().astimezone()
     parts.append(f"Current time: {now.strftime('%Y-%m-%d %H:%M %Z')}")
-
-    # Household-level facts (always injected — shared knowledge)
-    household_memory = load_memory(workspaces, HOUSEHOLD_WORKSPACE)
-    if household_memory.facts:
-        parts.append("Household facts:")
-        for fact in household_memory.facts[: cfg.max_facts_per_person]:
-            parts.append(f"  - {fact}")
-
-    # Personal facts (only in DMs — never in group context)
-    if not shared_only:
-        memory = load_memory(workspaces, person)
-        if memory.facts:
-            parts.append(f"Known facts about {person}:")
-            for fact in memory.facts[: cfg.max_facts_per_person]:
-                parts.append(f"  - {fact}")
-        if memory.preferences:
-            parts.append(f"Preferences for {person}:")
-            for k, v in memory.preferences.items():
-                parts.append(f"  - {k}: {v}")
 
     # Active reminders due today (never dropped)
     contacts = list_contacts(workspaces)
@@ -117,7 +95,10 @@ async def build_context(
     # --- Priority 3: semantic memory chunks (dropped second) ---
     if semantic_memory and semantic_memory.enabled:
         recalled = await semantic_memory.recall(
-            message, top_k=cfg.max_semantic_chunks
+            message,
+            top_k=cfg.max_semantic_chunks,
+            person=person,
+            shared_only=shared_only,
         )
         if recalled:
             parts.append("Relevant context from memory:")

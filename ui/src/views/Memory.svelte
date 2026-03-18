@@ -3,15 +3,8 @@
 
   interface MemberSummary {
     person: string;
-    fact_count: number;
-    preference_count: number;
-    last_updated: string | null;
-  }
-
-  interface MemoryDetail {
-    person: string;
-    facts: string[];
-    preferences: Record<string, string>;
+    topic_count: number;
+    topics: string[];
     last_updated: string | null;
   }
 
@@ -28,12 +21,8 @@
   let error: string | null = $state(null);
 
   let selectedPerson: string | null = $state(null);
-  let detail: MemoryDetail | null = $state(null);
+  let topicContents: Record<string, string> | null = $state(null);
   let detailLoading: boolean = $state(false);
-  let editing: boolean = $state(false);
-  let editFacts: string = $state("");
-  let editPrefs: Array<{ key: string; value: string }> = $state([]);
-  let saving: boolean = $state(false);
 
   let searchQuery: string = $state("");
   let searchResults: RecallResult | null = $state(null);
@@ -72,68 +61,24 @@
   async function selectPerson(person: string) {
     if (selectedPerson === person) {
       selectedPerson = null;
-      detail = null;
-      editing = false;
+      topicContents = null;
       searchResults = null;
       return;
     }
     selectedPerson = person;
     detailLoading = true;
-    editing = false;
     searchResults = null;
     searchQuery = "";
     try {
       const r = await api(`/api/memory/${person}`);
       if (!r.ok) throw new Error(`${r.status}`);
-      detail = await r.json();
+      const data = await r.json();
+      topicContents = data.topics;
       detailLoading = false;
     } catch (e: any) {
       error = e.message;
       detailLoading = false;
     }
-  }
-
-  function startEditing() {
-    if (!detail) return;
-    editFacts = detail.facts.join("\n");
-    editPrefs = Object.entries(detail.preferences).map(([key, value]) => ({ key, value }));
-    editing = true;
-  }
-
-  function cancelEditing() {
-    editing = false;
-  }
-
-  function addPref() {
-    editPrefs = [...editPrefs, { key: "", value: "" }];
-  }
-
-  function removePref(index: number) {
-    editPrefs = editPrefs.filter((_, i) => i !== index);
-  }
-
-  async function saveEdits() {
-    if (!selectedPerson) return;
-    saving = true;
-    const facts = editFacts.split("\n").map((f) => f.trim()).filter(Boolean);
-    const preferences: Record<string, string> = {};
-    for (const p of editPrefs) {
-      if (p.key.trim()) preferences[p.key.trim()] = p.value.trim();
-    }
-    try {
-      const r = await api(`/api/memory/${selectedPerson}/facts`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ facts, preferences }),
-      });
-      if (!r.ok) throw new Error(`${r.status}`);
-      // Reload detail
-      await selectPerson(selectedPerson);
-      editing = false;
-    } catch (e: any) {
-      error = e.message;
-    }
-    saving = false;
   }
 
   async function doSearch() {
@@ -185,7 +130,7 @@
           <div class="member-info">
             <span class="member-name">{member.person}</span>
             <span class="member-stats">
-              {member.fact_count} facts · {member.preference_count} preferences
+              {member.topic_count} {member.topic_count === 1 ? "topic" : "topics"}
             </span>
           </div>
           <span class="member-updated">
@@ -211,117 +156,55 @@
             <div class="loading-dot"></div>
             <div class="loading-dot"></div>
           </div>
-        {:else if detail}
+        {:else if topicContents}
           <div class="detail-header">
-            <h2>{detail.person}'s memory</h2>
-            {#if !editing}
-              <button class="edit-btn" onclick={startEditing}>Edit</button>
-            {/if}
+            <h2>{selectedPerson}'s memory</h2>
           </div>
 
-          {#if editing}
-            <!-- Edit mode -->
-            <div class="edit-section">
-              <label class="edit-label" for="edit-facts">Facts <small>(one per line)</small></label>
-              <textarea
-                id="edit-facts"
-                class="edit-textarea"
-                bind:value={editFacts}
-                rows="8"
-              ></textarea>
-
-              <span class="edit-label">Preferences</span>
-              <div class="pref-list">
-                {#each editPrefs as pref, i}
-                  <div class="pref-row">
-                    <input
-                      class="pref-key"
-                      placeholder="key"
-                      bind:value={pref.key}
-                    />
-                    <input
-                      class="pref-value"
-                      placeholder="value"
-                      bind:value={pref.value}
-                    />
-                    <button class="pref-remove" onclick={() => removePref(i)}>×</button>
-                  </div>
-                {/each}
-                <button class="pref-add" onclick={addPref}>+ Add preference</button>
-              </div>
-
-              <div class="edit-actions">
-                <button class="save-btn" onclick={saveEdits} disabled={saving}>
-                  {saving ? "Saving…" : "Save"}
-                </button>
-                <button class="cancel-btn" onclick={cancelEditing}>Cancel</button>
-              </div>
-            </div>
+          {#if Object.keys(topicContents).length === 0}
+            <p class="empty-detail">No memories stored yet for {selectedPerson}.</p>
           {:else}
-            <!-- View mode -->
-            {#if detail.facts.length > 0}
-              <div class="section">
-                <h3>Facts</h3>
-                <ul class="fact-list">
-                  {#each detail.facts as fact}
-                    <li>{fact}</li>
-                  {/each}
-                </ul>
+            {#each Object.entries(topicContents) as [topic, content]}
+              <div class="topic-card">
+                <h3>{topic}</h3>
+                <pre class="topic-content">{content}</pre>
               </div>
-            {/if}
+            {/each}
+          {/if}
 
-            {#if Object.keys(detail.preferences).length > 0}
-              <div class="section">
-                <h3>Preferences</h3>
-                <div class="pref-grid">
-                  {#each Object.entries(detail.preferences) as [key, value]}
-                    <div class="pref-item">
-                      <span class="pref-key-label">{key}</span>
-                      <span class="pref-value-label">{value}</span>
-                    </div>
-                  {/each}
-                </div>
-              </div>
-            {/if}
+          <!-- Semantic search -->
+          {#if semanticReady}
+            <div class="search-section">
+              <h3>Recall</h3>
+              <form class="search-form" onsubmit={(e) => { e.preventDefault(); doSearch(); }}>
+                <input
+                  class="search-input"
+                  type="text"
+                  placeholder="Search memories..."
+                  bind:value={searchQuery}
+                />
+                <button class="search-btn" type="submit" disabled={searching || !searchQuery.trim()}>
+                  {searching ? "..." : "Search"}
+                </button>
+              </form>
 
-            {#if detail.facts.length === 0 && Object.keys(detail.preferences).length === 0}
-              <p class="empty-detail">No memories stored yet for {detail.person}.</p>
-            {/if}
-
-            <!-- Semantic search -->
-            {#if semanticReady}
-              <div class="search-section">
-                <h3>Recall</h3>
-                <form class="search-form" onsubmit={(e) => { e.preventDefault(); doSearch(); }}>
-                  <input
-                    class="search-input"
-                    type="text"
-                    placeholder="Search memories…"
-                    bind:value={searchQuery}
-                  />
-                  <button class="search-btn" type="submit" disabled={searching || !searchQuery.trim()}>
-                    {searching ? "…" : "Search"}
-                  </button>
-                </form>
-
-                {#if searchResults}
-                  {#if searchResults.note}
-                    <p class="search-note">{searchResults.note}</p>
-                  {:else if searchResults.results.length === 0}
-                    <p class="search-note">No results for "{searchResults.query}"</p>
-                  {:else}
-                    <ul class="recall-results">
-                      {#each searchResults.results as result}
-                        <li>
-                          <p class="recall-text">{result.text}</p>
-                          <span class="recall-score">{(result.score * 100).toFixed(0)}%</span>
-                        </li>
-                      {/each}
-                    </ul>
-                  {/if}
+              {#if searchResults}
+                {#if searchResults.note}
+                  <p class="search-note">{searchResults.note}</p>
+                {:else if searchResults.results.length === 0}
+                  <p class="search-note">No results for "{searchResults.query}"</p>
+                {:else}
+                  <ul class="recall-results">
+                    {#each searchResults.results as result}
+                      <li>
+                        <p class="recall-text">{result.text}</p>
+                        <span class="recall-score">{(result.score * 100).toFixed(0)}%</span>
+                      </li>
+                    {/each}
+                  </ul>
                 {/if}
-              </div>
-            {/if}
+              {/if}
+            </div>
           {/if}
         {/if}
       </div>
@@ -414,9 +297,6 @@
   }
 
   .detail-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     margin-bottom: 1rem;
   }
 
@@ -429,92 +309,32 @@
     text-transform: capitalize;
   }
 
-  .edit-btn {
-    padding: 0.3rem 0.7rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface);
-    color: var(--text-muted);
-    font-family: var(--font-sans);
-    font-size: 0.78rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-  }
-
-  .edit-btn:hover {
-    background: #f0ebe5;
-    color: var(--text);
-  }
-
-  /* ---- Sections ---- */
-  .section {
-    margin-bottom: 1.25rem;
-  }
-
-  .section h3 {
-    font-family: var(--font-serif);
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    margin: 0 0 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .fact-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .fact-list li {
-    padding: 0.4rem 0;
-    border-top: 1px solid var(--border);
-    font-size: 0.88rem;
-    color: var(--text);
-    line-height: 1.4;
-  }
-
-  .fact-list li:first-child {
-    border-top: none;
-    padding-top: 0;
-  }
-
-  /* ---- Preferences grid ---- */
-  .pref-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-  }
-
-  @media (max-width: 640px) {
-    .pref-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  .pref-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-    padding: 0.5rem 0.65rem;
+  /* ---- Topic cards ---- */
+  .topic-card {
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
     background: #fdfcfa;
-    border-radius: 6px;
+    border-radius: 8px;
     border-left: 3px solid var(--sage);
   }
 
-  .pref-key-label {
-    font-size: 0.72rem;
+  .topic-card h3 {
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
     font-weight: 600;
     color: var(--sage);
+    margin: 0 0 0.5rem;
     text-transform: capitalize;
-    letter-spacing: 0.02em;
   }
 
-  .pref-value-label {
-    font-size: 0.85rem;
+  .topic-content {
+    font-family: var(--font-sans);
+    font-size: 0.84rem;
+    line-height: 1.5;
     color: var(--text);
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
   }
 
   .empty-detail {
@@ -522,160 +342,6 @@
     font-style: italic;
     color: var(--text-muted);
     font-size: 0.9rem;
-  }
-
-  /* ---- Edit mode ---- */
-  .edit-section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .edit-label {
-    font-family: var(--font-serif);
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .edit-label small {
-    font-weight: 400;
-    color: var(--text-muted);
-    font-family: var(--font-sans);
-  }
-
-  .edit-textarea {
-    width: 100%;
-    padding: 0.6rem 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-family: var(--font-sans);
-    font-size: 0.85rem;
-    line-height: 1.5;
-    color: var(--text);
-    background: var(--surface);
-    resize: vertical;
-  }
-
-  .edit-textarea:focus {
-    outline: none;
-    border-color: var(--terracotta);
-  }
-
-  .pref-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-  }
-
-  .pref-row {
-    display: flex;
-    gap: 0.4rem;
-    align-items: center;
-  }
-
-  .pref-row input {
-    padding: 0.4rem 0.6rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-family: var(--font-sans);
-    font-size: 0.82rem;
-    color: var(--text);
-    background: var(--surface);
-  }
-
-  .pref-row input:focus {
-    outline: none;
-    border-color: var(--terracotta);
-  }
-
-  .pref-row .pref-key {
-    width: 35%;
-  }
-
-  .pref-row .pref-value {
-    flex: 1;
-  }
-
-  .pref-remove {
-    width: 1.6rem;
-    height: 1.6rem;
-    border: none;
-    background: none;
-    color: var(--text-muted);
-    font-size: 1rem;
-    cursor: pointer;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .pref-remove:hover {
-    background: #fef2f0;
-    color: var(--terracotta);
-  }
-
-  .pref-add {
-    align-self: flex-start;
-    padding: 0.3rem 0.6rem;
-    border: 1px dashed var(--border);
-    border-radius: 6px;
-    background: none;
-    color: var(--text-muted);
-    font-family: var(--font-sans);
-    font-size: 0.78rem;
-    cursor: pointer;
-  }
-
-  .pref-add:hover {
-    border-color: var(--sage);
-    color: var(--sage);
-  }
-
-  .edit-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.25rem;
-  }
-
-  .save-btn {
-    padding: 0.4rem 1rem;
-    border: none;
-    border-radius: 6px;
-    background: var(--terracotta);
-    color: #fff;
-    font-family: var(--font-sans);
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.15s;
-  }
-
-  .save-btn:hover {
-    opacity: 0.9;
-  }
-
-  .save-btn:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .cancel-btn {
-    padding: 0.4rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface);
-    color: var(--text-muted);
-    font-family: var(--font-sans);
-    font-size: 0.82rem;
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  .cancel-btn:hover {
-    background: #f0ebe5;
-    color: var(--text);
   }
 
   /* ---- Semantic search ---- */
