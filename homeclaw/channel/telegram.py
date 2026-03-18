@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from telegram import Update
-from telegram.constants import ChatType
+from telegram.constants import ChatAction, ChatType
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from homeclaw.agent.loop import AgentLoop
@@ -216,6 +216,22 @@ class TelegramChannel:
         )
         await self._run_and_reply(update, content, person, channel)
 
+    async def _send_typing_until_done(self, update: Update, done: asyncio.Event) -> None:
+        """Send 'typing' chat action every 4s until the done event is set."""
+        chat = update.effective_chat
+        if chat is None:
+            return
+        while not done.is_set():
+            try:
+                await chat.send_action(ChatAction.TYPING)
+            except Exception:
+                return
+            # Telegram typing indicator lasts ~5s; resend every 4s
+            try:
+                await asyncio.wait_for(done.wait(), timeout=4.0)
+            except TimeoutError:
+                pass
+
     async def _run_and_reply(
         self,
         update: Update,
@@ -224,6 +240,8 @@ class TelegramChannel:
         channel: str | None,
     ) -> None:
         """Send content through the agent loop and reply with the response."""
+        done = asyncio.Event()
+        typing_task = asyncio.create_task(self._send_typing_until_done(update, done))
         try:
             response = await self._loop.run(content, person, channel=channel)
         except Exception as exc:
@@ -238,6 +256,9 @@ class TelegramChannel:
                     f"Sorry, something went wrong:\n\n{error_msg}"
                 )
             return
+        finally:
+            done.set()
+            await typing_task
 
         if response and update.message:
             # Telegram has a 4096 char limit per message — split if needed
