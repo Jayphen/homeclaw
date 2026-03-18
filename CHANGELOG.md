@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3](https://github.com/Jayphen/homeclaw/compare/v0.3.2...v0.3.3) (2026-03-18)
+
+
+### Features
+
+* add data tools to skills and fix tool name validation ([dcc6a65](https://github.com/Jayphen/homeclaw/commit/dcc6a65d264620a8635e4fa26aa68d38a546628c))
+* expand schedule parsing with more patterns and cron expression support ([d6361c4](https://github.com/Jayphen/homeclaw/commit/d6361c458198f6d7fea6645e85a63e366ad753e1))
+
 ## [0.3.2](https://github.com/Jayphen/homeclaw/compare/v0.3.1...v0.3.2) (2026-03-18)
 
 
