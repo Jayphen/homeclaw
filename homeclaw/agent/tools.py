@@ -1073,7 +1073,7 @@ def register_builtin_tools(
         name: str,
         description: str,
         scope: str,
-        allowed_domains: list[str],
+        allowed_domains: list[str] | None = None,
         instructions: str,
         tools: list[dict[str, Any]] | None = None,
         initial_files: list[dict[str, Any]] | None = None,
@@ -1107,7 +1107,7 @@ def register_builtin_tools(
         skill_md = render_skill_markdown(
             name=slug,
             description=description,
-            allowed_domains=allowed_domains,
+            allowed_domains=allowed_domains or [],
             instructions=instructions,
             tools=tools or [],
         )
@@ -1190,11 +1190,13 @@ def register_builtin_tools(
         ToolDefinition(
             name="skill_create",
             description=(
-                "Create a new skill plugin. A skill lets homeclaw make HTTP calls to "
-                "external APIs or services. Choose 'household' scope to share the skill "
-                "with everyone, or 'private' to keep it personal. Skill data is stored "
-                "in a dedicated directory alongside the skill definition and will be "
-                "automatically indexed by semantic memory if saved as markdown files."
+                "Create a new skill — a self-contained mini-app with its own "
+                "data directory. Skills can be data-only (budget tracker, "
+                "recipe book) or wrap external APIs via http_call. Every "
+                "skill gets data_list, data_read, and data_write tools. "
+                "Choose 'household' scope to share with everyone, or "
+                "'private' to keep it personal. Markdown files in the skill "
+                "directory are automatically indexed by semantic memory."
             ),
             parameters={
                 "type": "object",
@@ -1285,7 +1287,7 @@ def register_builtin_tools(
                         },
                     },
                 },
-                "required": ["person", "name", "description", "scope", "allowed_domains", "instructions"],
+                "required": ["person", "name", "description", "scope", "instructions"],
             },
         ),
         skill_create,

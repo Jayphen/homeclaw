@@ -74,8 +74,8 @@ class PluginRegistry:
         try:
             tools = plugin.tools()
             for tool_def in tools:
-                # Namespace tool names to avoid collisions: plugin_name.tool_name
-                namespaced = f"{name}.{tool_def.name}"
+                # Namespace tool names to avoid collisions: plugin_name__tool_name
+                namespaced = f"{name}__{tool_def.name}"
                 namespaced_def = ToolDefinition(
                     name=namespaced,
                     description=f"[{name}] {tool_def.description}",
@@ -203,7 +203,7 @@ class PluginRegistry:
             tools = plugin.tools()
             entry.tool_names.clear()
             for tool_def in tools:
-                namespaced = f"{name}.{tool_def.name}"
+                namespaced = f"{name}__{tool_def.name}"
                 namespaced_def = ToolDefinition(
                     name=namespaced,
                     description=f"[{name}] {tool_def.description}",

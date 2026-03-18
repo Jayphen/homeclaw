@@ -257,9 +257,10 @@ def _parse_tools_section(lines: list[str]) -> list[SkillToolDef]:
 class SkillPlugin:
     """Adapts a ``SkillDefinition`` into the Plugin Protocol.
 
-    Each skill exposes a single ``http_call`` tool that is scoped to the
-    skill's allowed domains.  The skill's instructions and tool specs are
-    available as attributes so the agent context builder can inject them.
+    Every skill gets ``data_list``, ``data_read``, and ``data_write`` tools
+    for managing files in its directory.  Skills that declare
+    ``allowed_domains`` also get an ``http_call`` tool scoped to those
+    domains.
 
     Attributes:
         data_dir: The skill's directory. Skill data files (.md, .json) live
@@ -287,53 +288,170 @@ class SkillPlugin:
         return self._definition.tools
 
     def tools(self) -> list[ToolDefinition]:
-        """Return a single ``http_call`` ToolDefinition scoped to this skill."""
-        return [
+        """Return tool definitions for this skill.
+
+        Every skill gets ``data_list``, ``data_read``, and ``data_write``
+        for managing files in its directory.  If the skill declares
+        ``allowed_domains``, it also gets ``http_call``.
+        """
+        defs: list[ToolDefinition] = [
             ToolDefinition(
-                name="http_call",
+                name="data_list",
                 description=(
-                    f"Make an HTTP request within the '{self.name}' skill. "
-                    f"Allowed domains: {', '.join(self._definition.allowed_domains)}. "
-                    f"Instructions: {self._definition.instructions}"
+                    f"List data files in the '{self.name}' skill directory. "
+                    f"Returns filenames (excluding skill.md and logs/)."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {},
+                },
+            ),
+            ToolDefinition(
+                name="data_read",
+                description=(
+                    f"Read a data file from the '{self.name}' skill directory."
                 ),
                 parameters={
                     "type": "object",
                     "properties": {
-                        "url": {
+                        "filename": {
                             "type": "string",
-                            "description": "Full URL to call",
-                        },
-                        "method": {
-                            "type": "string",
-                            "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
-                            "description": "HTTP method (default GET)",
-                        },
-                        "headers": {
-                            "type": "object",
-                            "description": "Request headers",
-                        },
-                        "body": {
-                            "type": "string",
-                            "description": "Request body (for POST/PUT/PATCH)",
+                            "description": (
+                                "Name of the file to read (e.g. 'spending.md')"
+                            ),
                         },
                     },
-                    "required": ["url"],
+                    "required": ["filename"],
                 },
-            )
+            ),
+            ToolDefinition(
+                name="data_write",
+                description=(
+                    f"Write or overwrite a data file in the '{self.name}' "
+                    f"skill directory. Use for creating or updating files."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "filename": {
+                            "type": "string",
+                            "description": (
+                                "Name of the file to write (e.g. 'spending.md')"
+                            ),
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "Full file content to write",
+                        },
+                    },
+                    "required": ["filename", "content"],
+                },
+            ),
         ]
 
-    async def handle_tool(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
-        """Dispatch to ``http_call`` with this skill's config."""
-        if name != "http_call":
-            return {"error": f"Unknown tool: {name}"}
+        if self._definition.allowed_domains:
+            defs.append(
+                ToolDefinition(
+                    name="http_call",
+                    description=(
+                        f"Make an HTTP request within the '{self.name}' "
+                        f"skill. Allowed domains: "
+                        f"{', '.join(self._definition.allowed_domains)}."
+                    ),
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "url": {
+                                "type": "string",
+                                "description": "Full URL to call",
+                            },
+                            "method": {
+                                "type": "string",
+                                "enum": [
+                                    "GET", "POST", "PUT", "DELETE", "PATCH",
+                                ],
+                                "description": "HTTP method (default GET)",
+                            },
+                            "headers": {
+                                "type": "object",
+                                "description": "Request headers",
+                            },
+                            "body": {
+                                "type": "string",
+                                "description": (
+                                    "Request body (for POST/PUT/PATCH)"
+                                ),
+                            },
+                        },
+                        "required": ["url"],
+                    },
+                )
+            )
 
-        return await http_call(
-            url=args.get("url", ""),
-            method=args.get("method", "GET"),
-            headers=args.get("headers"),
-            body=args.get("body"),
-            config=self._config,
-        )
+        return defs
+
+    def _safe_path(self, filename: str) -> Path | None:
+        """Resolve *filename* inside the skill directory, rejecting traversal."""
+        resolved = (self.data_dir / filename).resolve()
+        if not resolved.is_relative_to(self.data_dir.resolve()):
+            return None
+        if resolved.name == "skill.md":
+            return None
+        return resolved
+
+    async def handle_tool(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
+        """Dispatch tool calls to the appropriate handler."""
+        if name == "data_list":
+            return self._handle_data_list()
+        if name == "data_read":
+            return self._handle_data_read(args.get("filename", ""))
+        if name == "data_write":
+            return self._handle_data_write(
+                args.get("filename", ""), args.get("content", ""),
+            )
+        if name == "http_call":
+            return await http_call(
+                url=args.get("url", ""),
+                method=args.get("method", "GET"),
+                headers=args.get("headers"),
+                body=args.get("body"),
+                config=self._config,
+            )
+        return {"error": f"Unknown tool: {name}"}
+
+    def _handle_data_list(self) -> dict[str, Any]:
+        files: list[str] = []
+        if self.data_dir.is_dir():
+            for child in sorted(self.data_dir.iterdir()):
+                if child.name == "skill.md" or child.is_dir():
+                    continue
+                files.append(child.name)
+        return {"files": files}
+
+    def _handle_data_read(self, filename: str) -> dict[str, Any]:
+        if not filename:
+            return {"error": "filename is required"}
+        path = self._safe_path(filename)
+        if path is None:
+            return {"error": f"Invalid filename: {filename}"}
+        if not path.is_file():
+            return {"error": f"File not found: {filename}"}
+        return {"filename": filename, "content": path.read_text()}
+
+    def _handle_data_write(
+        self, filename: str, content: str,
+    ) -> dict[str, Any]:
+        if not filename:
+            return {"error": "filename is required"}
+        path = self._safe_path(filename)
+        if path is None:
+            return {"error": f"Invalid filename: {filename}"}
+        path.write_text(content)
+        return {
+            "filename": filename,
+            "size": len(content),
+            "status": "written",
+        }
 
     def routines(self) -> list[RoutineDefinition]:
         """Skills don't have routines."""
