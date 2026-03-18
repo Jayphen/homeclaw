@@ -132,6 +132,10 @@ class Scheduler:
         self._job_count = 0
         count = self.load_routines_md()
         logger.info("Reloaded routines: %d (was %d)", count, old_count)
+        # Start the scheduler if it wasn't running and we now have jobs
+        if count > 0 and not self._scheduler.running:
+            self._scheduler.start()
+            logger.info("Scheduler started after reload with %d routines", count)
         return count
 
     @property

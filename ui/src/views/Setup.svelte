@@ -29,9 +29,9 @@
   let openaiBaseUrl: string = $state("https://openrouter.ai/api/v1");
   let model: string = $state("claude-sonnet-4-6");
 
-  const providerDefaults: Record<string, { model: string; baseUrl?: string }> = {
-    anthropic: { model: "claude-sonnet-4-6" },
-    openai: { model: "anthropic/claude-sonnet-4-6", baseUrl: "https://openrouter.ai/api/v1" },
+  const providerDefaults: Record<string, { model: string; routineModel: string; baseUrl?: string }> = {
+    anthropic: { model: "claude-sonnet-4-6", routineModel: "claude-haiku-4-5" },
+    openai: { model: "anthropic/claude-sonnet-4-6", routineModel: "anthropic/claude-haiku-4-5", baseUrl: "https://openrouter.ai/api/v1" },
   };
 
   function switchProvider(p: "anthropic" | "openai") {
@@ -84,9 +84,12 @@
     if (step === 3) {
       saving = true;
       try {
+        const defaults = providerDefaults[provider];
         const body: Record<string, string | null> = {
           setup_token: setupToken || null,
           model,
+          conversation_model: model,
+          routine_model: defaults.routineModel,
           web_password: webPassword,
         };
         if (provider === "anthropic") {

@@ -17,13 +17,13 @@ class RoutingConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # Primary: used for conversations requiring reasoning
-    conversation_model: str = "anthropic/claude-sonnet-4-6"
+    conversation_model: str = "claude-sonnet-4-6"
 
     # Cheap: used for scheduled routines and simple tool calls
-    routine_model: str = "anthropic/claude-haiku-4-5"
+    routine_model: str = "claude-haiku-4-5"
 
     # Whether to use OpenRouter (dev) or direct providers (hosted)
-    use_openrouter: bool = True
+    use_openrouter: bool = False
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # Prompt caching (Anthropic direct only)
@@ -37,8 +37,8 @@ class RoutingConfig(BaseSettings):
     routine_max_output_tokens: int = 2048
 
     @model_validator(mode="after")
-    def _disable_anthropic_features_on_openrouter(self) -> "RoutingConfig":
-        """Prompt caching and batch routines require Anthropic direct — disable on OpenRouter."""
+    def _apply_provider_defaults(self) -> "RoutingConfig":
+        """Adjust features based on provider mode."""
         if self.use_openrouter:
             self.enable_prompt_caching = False
             self.enable_batch_routines = False

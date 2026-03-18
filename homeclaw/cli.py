@@ -83,13 +83,14 @@ class HomeclawApp:
         workspaces: Path | None = None,
         register_tools: bool = True,
         on_tool_call: Any | None = _print_tool_call,
+        config: Any | None = None,
     ) -> None:
         from homeclaw.agent.loop import AgentLoop
         from homeclaw.agent.providers.factory import create_provider
         from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
         from homeclaw.config import HomeclawConfig
 
-        self.config = HomeclawConfig()
+        self.config = config or HomeclawConfig()
         self.workspaces = (workspaces or self.config.workspaces).resolve()
         _ensure_default_files(self.workspaces)
 
@@ -136,9 +137,7 @@ class HomeclawApp:
         from homeclaw.scheduler.scheduler import Scheduler
 
         self._scheduler = Scheduler(loop=self.loop, workspaces=self.workspaces)
-        count = self._scheduler.load_routines_md()
-        if count == 0:
-            self._scheduler = None
+        self._scheduler.load_routines_md()
 
     def start_scheduler(self) -> None:
         """Start the scheduler. Must be called inside a running event loop."""
@@ -256,7 +255,7 @@ def _run_serve_with_telegram(
 
     from homeclaw.channel.telegram import TelegramChannel
 
-    hc_app = HomeclawApp(workspaces=workspaces)
+    hc_app = HomeclawApp(workspaces=workspaces, config=config)
     hc_app.load_scheduler()
 
     channel = TelegramChannel(
@@ -305,7 +304,7 @@ def _run_serve_with_deferred_telegram(
             logger.info("Telegram bot already running, skipping")
             return
         try:
-            hc_app = HomeclawApp(workspaces=workspaces)
+            hc_app = HomeclawApp(workspaces=workspaces, config=config)
         except ValueError:
             logger.warning("Cannot start Telegram bot — LLM provider not configured yet")
             return
