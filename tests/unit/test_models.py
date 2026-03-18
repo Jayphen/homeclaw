@@ -2,7 +2,7 @@
 
 from datetime import date, datetime, timezone
 
-from homeclaw.contacts.models import Contact, Interaction, Reminder
+from homeclaw.contacts.models import Contact, ContactReminder, Interaction
 from homeclaw.memory.facts import HouseholdMemory
 
 
@@ -30,12 +30,12 @@ def test_contact_full():
             )
         ],
         reminders=[
-            Reminder(interval_days=14, next_date=date(2026, 3, 20), note="Check in")
+            ContactReminder(interval_days=14, next_date=date(2026, 3, 20), note="Check in")
         ],
-        last_contact=datetime(2026, 3, 1, tzinfo=timezone.utc),
     )
     assert c.birthday == date(1990, 5, 15)
     assert len(c.interactions) == 1
+    assert c.last_contact == datetime(2026, 3, 1, tzinfo=timezone.utc)
 
 
 def test_household_memory_defaults():

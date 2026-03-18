@@ -203,7 +203,6 @@ def register_builtin_tools(
             date=datetime.now(timezone.utc), type=type, notes=notes
         )
         contact.interactions.append(interaction)
-        contact.last_contact = interaction.date
         # Advance recurring reminders based on the new interaction date
         for reminder in contact.reminders:
             if reminder.interval_days and reminder.next_date:

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
-from homeclaw.contacts.models import Contact, Reminder
+from homeclaw.contacts.models import Contact, ContactReminder
 from homeclaw.contacts.store import get_contact, save_contact
 
 
@@ -160,7 +160,7 @@ async def test_interaction_log_advances_recurring_reminder(
     contact = get_contact(dev_workspaces, "grandma-eleanor")
     assert contact is not None
     contact.reminders = [
-        Reminder(interval_days=14, next_date=date(2026, 3, 1), note="Bi-weekly call")
+        ContactReminder(interval_days=14, next_date=date(2026, 3, 1), note="Bi-weekly call")
     ]
     save_contact(dev_workspaces, contact)
 
