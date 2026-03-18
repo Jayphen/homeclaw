@@ -30,6 +30,9 @@
   let detail: NoteDetail | null = $state(null);
   let loading: boolean = $state(true);
   let error: string | null = $state(null);
+  let editing: boolean = $state(false);
+  let editContent: string = $state("");
+  let saving: boolean = $state(false);
 
   const mode = $derived.by(() => {
     if (params.person && params.date) return "detail" as const;
@@ -113,6 +116,36 @@
     }
   }
 
+  function startEdit() {
+    if (detail) {
+      editContent = detail.content;
+      editing = true;
+    }
+  }
+
+  function cancelEdit() {
+    editing = false;
+  }
+
+  async function saveEdit() {
+    if (!detail || !params.person || !params.date) return;
+    saving = true;
+    try {
+      const r = await api(`/api/notes/${params.person}/${params.date}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editContent }),
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+      detail = await r.json();
+      editing = false;
+    } catch (e: any) {
+      error = e.message;
+    } finally {
+      saving = false;
+    }
+  }
+
   $effect(() => {
     if (mode === "detail" && params.person && params.date) {
       fetchDetail(params.person, params.date);
@@ -160,7 +193,26 @@
           <a class="note-cal-link" href="#/calendar?date={detail.date}">View in calendar</a>
         </div>
       </header>
-      <div class="note-body">{@html renderMarkdown(detail.content)}</div>
+      {#if editing}
+        <div class="note-editor">
+          <textarea
+            class="note-textarea"
+            bind:value={editContent}
+            disabled={saving}
+          ></textarea>
+          <div class="editor-actions">
+            <button class="btn btn-secondary" onclick={cancelEdit} disabled={saving}>Cancel</button>
+            <button class="btn btn-primary" onclick={saveEdit} disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      {:else}
+        <div class="note-body">
+          <button class="btn-edit" onclick={startEdit} title="Edit note">Edit</button>
+          {@html renderMarkdown(detail.content)}
+        </div>
+      {/if}
     </article>
   {:else if mode === "person"}
     <!-- Person's notes list -->
@@ -568,6 +620,92 @@
 
   .error-card p { margin: 0 0 0.5rem; font-weight: 500; }
   .error-card small { color: var(--text-muted); }
+
+  /* ---- Edit button ---- */
+  .btn-edit {
+    float: right;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.3rem 0.75rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .btn-edit:hover {
+    border-color: var(--terracotta);
+    color: var(--terracotta);
+  }
+
+  /* ---- Editor ---- */
+  .note-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .note-textarea {
+    width: 100%;
+    min-height: 400px;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+    resize: vertical;
+    box-sizing: border-box;
+  }
+
+  .note-textarea:focus {
+    outline: none;
+    border-color: var(--terracotta);
+  }
+
+  .editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  .btn {
+    padding: 0.4rem 1rem;
+    border-radius: var(--radius);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    border-color: var(--text-muted);
+  }
+
+  .btn-primary {
+    background: var(--terracotta);
+    border: 1px solid var(--terracotta);
+    color: #fff;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: #b35a36;
+    border-color: #b35a36;
+  }
 
   @media (max-width: 640px) {
     .note-article {

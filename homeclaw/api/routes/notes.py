@@ -4,6 +4,7 @@ from datetime import date, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from homeclaw.api.deps import AuthDep, get_config, list_member_workspaces
 
@@ -89,5 +90,38 @@ async def note_detail(person: str, note_date: str) -> dict[str, Any]:
         "person": person,
         "date": note_date,
         "content": path.read_text().strip(),
+        "updated_at": mtime,
+    }
+
+
+class NoteUpdate(BaseModel):
+    content: str
+
+
+@router.put("/{person}/{note_date}", dependencies=[AuthDep])
+async def note_save(person: str, note_date: str, body: NoteUpdate) -> dict[str, Any]:
+    """Create or update a note's content."""
+    workspaces = get_config().workspaces.resolve()
+    try:
+        date.fromisoformat(note_date)
+    except ValueError as err:
+        raise HTTPException(
+            status_code=400, detail="Invalid date format, expected YYYY-MM-DD"
+        ) from err
+
+    members = list_member_workspaces(workspaces)
+    if person not in members:
+        raise HTTPException(status_code=404, detail="Unknown person")
+
+    notes_dir = workspaces / person / "notes"
+    notes_dir.mkdir(parents=True, exist_ok=True)
+    path = notes_dir / f"{note_date}.md"
+    path.write_text(body.content)
+
+    mtime = datetime.fromtimestamp(path.stat().st_mtime).isoformat()
+    return {
+        "person": person,
+        "date": note_date,
+        "content": body.content,
         "updated_at": mtime,
     }
