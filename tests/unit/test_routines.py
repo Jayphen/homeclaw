@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from homeclaw.scheduler.routines import ParsedRoutine, parse_routines_md, _parse_schedule, _parse_time
+from homeclaw.scheduler.routines import ParsedRoutine, parse_routines_md, _parse_schedule, _parse_time, _ordinal_day_range
 
 
 class TestParseTime:
@@ -69,6 +69,84 @@ class TestParseSchedule:
     def test_invalid_schedule(self):
         with pytest.raises(ValueError, match="Cannot parse schedule"):
             _parse_schedule("whenever I feel like it")
+
+    # --- New patterns ---
+
+    def test_cron_expression_weekday_morning(self):
+        assert _parse_schedule("30 7 * * 1-5") == (
+            "cron", {"minute": "30", "hour": "7", "day": "*", "month": "*", "day_of_week": "1-5"}
+        )
+
+    def test_cron_expression_monthly(self):
+        assert _parse_schedule("0 9 1 * *") == (
+            "cron", {"minute": "0", "hour": "9", "day": "1", "month": "*", "day_of_week": "*"}
+        )
+
+    def test_every_other_day(self):
+        result = _parse_schedule("Every other day at 7:30am")
+        assert result == ("interval", {"days": 2, "hours": 7, "minutes": 30})
+
+    def test_every_other_tuesday(self):
+        result = _parse_schedule("Every other Tuesday at 9:00am")
+        assert result[0] == "interval"
+        assert result[1]["weeks"] == 2
+
+    def test_every_n_weeks_on_day(self):
+        result = _parse_schedule("Every 3 weeks on Wednesday at 10:00am")
+        assert result[0] == "interval"
+        assert result[1]["weeks"] == 3
+
+    def test_every_n_weeks_simple(self):
+        assert _parse_schedule("Every 2 weeks") == ("interval", {"weeks": 2})
+
+    def test_monthly_on_the_15th(self):
+        assert _parse_schedule("Monthly on the 15th at 9:00am") == (
+            "cron", {"day": 15, "hour": 9, "minute": 0}
+        )
+
+    def test_monthly_on_the_1st(self):
+        assert _parse_schedule("Monthly on the 1st at 10:00am") == (
+            "cron", {"day": 1, "hour": 10, "minute": 0}
+        )
+
+    def test_first_monday_of_month(self):
+        result = _parse_schedule("1st Monday of the month at 10:00am")
+        assert result == ("cron", {"day_of_week": "mon", "day": "1-7", "hour": 10, "minute": 0})
+
+    def test_last_friday_of_month(self):
+        result = _parse_schedule("Last Friday of the month at 3:00pm")
+        assert result == ("cron", {"day_of_week": "fri", "day": "25-31", "hour": 15, "minute": 0})
+
+    def test_second_wednesday_of_month(self):
+        result = _parse_schedule("2nd Wednesday of the month at 9:00am")
+        assert result == ("cron", {"day_of_week": "wed", "day": "8-14", "hour": 9, "minute": 0})
+
+    def test_fourth_thursday_of_month(self):
+        result = _parse_schedule("Fourth Thursday of month at 6:00pm")
+        assert result == ("cron", {"day_of_week": "thu", "day": "22-28", "hour": 18, "minute": 0})
+
+    def test_invalid_still_raises(self):
+        with pytest.raises(ValueError, match="Cannot parse schedule"):
+            _parse_schedule("whenever I feel like it")
+
+    def test_error_message_mentions_cron(self):
+        with pytest.raises(ValueError, match="cron"):
+            _parse_schedule("on a whim")
+
+
+class TestOrdinalDayRange:
+    def test_first(self):
+        assert _ordinal_day_range("1st") == "1-7"
+        assert _ordinal_day_range("first") == "1-7"
+
+    def test_second(self):
+        assert _ordinal_day_range("2nd") == "8-14"
+
+    def test_last(self):
+        assert _ordinal_day_range("last") == "25-31"
+
+    def test_unknown_defaults(self):
+        assert _ordinal_day_range("fifth") == "1-7"
 
 
 class TestParseRoutinesMd:

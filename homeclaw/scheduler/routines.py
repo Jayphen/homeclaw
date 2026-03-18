@@ -53,25 +53,88 @@ def _parse_schedule(text: str) -> tuple[str, dict[str, int | str]]:
       - "Every weekday at 7:30am"
       - "Every Sunday at 10:00am"
       - "Every Monday at 9:00am"
-      - "Every 3 days"
-      - "Every N hours"
+      - "Every 3 days" / "Every N hours"
+      - "Every other day at 7:30am"
+      - "Every other Tuesday at 9:00am"
+      - "Every N weeks on Wednesday at 10:00am"
+      - "Monthly on the 15th at 9:00am"
+      - "1st/2nd/3rd/4th Monday of the month at 10:00am"
+      - "Last Friday of the month at 3:00pm"
+      - Standard 5-field cron expressions (e.g. "30 7 * * 1-5")
     """
     text = text.strip()
 
-    # "Every N days/hours/minutes"
-    m = re.match(r"every\s+(\d+)\s+(day|hour|minute)s?", text, re.IGNORECASE)
+    # --- Direct cron expression: "30 7 * * 1-5" ---
+    m = re.match(r"^([\d*/,-]+)\s+([\d*/,-]+)\s+([\d*/,-]+)\s+([\d*/,-]+)\s+([\d*/,a-zA-Z-]+)$", text)
+    if m:
+        return "cron", {
+            "minute": m.group(1),
+            "hour": m.group(2),
+            "day": m.group(3),
+            "month": m.group(4),
+            "day_of_week": m.group(5),
+        }
+
+    # --- "Every N days/hours/minutes/weeks" ---
+    m = re.match(r"every\s+(\d+)\s+(day|hour|minute|week)s?", text, re.IGNORECASE)
     if m:
         amount = int(m.group(1))
         unit = m.group(2).lower() + "s"
         return "interval", {unit: amount}
 
-    # "Every weekday at TIME"
+    # --- "Every other day at TIME" ---
+    m = re.match(r"every\s+other\s+day\s+at\s+(.+)", text, re.IGNORECASE)
+    if m:
+        hour, minute = _parse_time(m.group(1))
+        return "interval", {"days": 2, "hours": hour, "minutes": minute}
+
+    # --- "Every other <dayname> at TIME" ---
+    m = re.match(r"every\s+other\s+(\w+)\s+at\s+(.+)", text, re.IGNORECASE)
+    if m:
+        day_word = m.group(1).lower()
+        day_code = _DAYS.get(day_word)
+        if day_code:
+            hour, minute = _parse_time(m.group(2))
+            return "interval", {"weeks": 2, "days": _day_offset(day_code), "hours": hour, "minutes": minute}
+
+    # --- "Every N weeks on <dayname> at TIME" ---
+    m = re.match(r"every\s+(\d+)\s+weeks?\s+on\s+(\w+)\s+at\s+(.+)", text, re.IGNORECASE)
+    if m:
+        n_weeks = int(m.group(1))
+        day_word = m.group(2).lower()
+        day_code = _DAYS.get(day_word)
+        if day_code:
+            hour, minute = _parse_time(m.group(3))
+            return "interval", {"weeks": n_weeks, "days": _day_offset(day_code), "hours": hour, "minutes": minute}
+
+    # --- Ordinal weekday of month: "1st Monday of the month at TIME" ---
+    m = re.match(
+        r"(1st|2nd|3rd|4th|first|second|third|fourth|last)\s+(\w+)\s+of\s+(?:the\s+)?month\s+at\s+(.+)",
+        text, re.IGNORECASE,
+    )
+    if m:
+        ordinal_str = m.group(1).lower()
+        day_word = m.group(2).lower()
+        day_code = _DAYS.get(day_word)
+        if day_code:
+            hour, minute = _parse_time(m.group(3))
+            day_range = _ordinal_day_range(ordinal_str)
+            return "cron", {"day_of_week": day_code, "day": day_range, "hour": hour, "minute": minute}
+
+    # --- "Monthly on the Nth at TIME" ---
+    m = re.match(r"monthly\s+on\s+the\s+(\d+)(?:st|nd|rd|th)?\s+at\s+(.+)", text, re.IGNORECASE)
+    if m:
+        day_of_month = int(m.group(1))
+        hour, minute = _parse_time(m.group(2))
+        return "cron", {"day": day_of_month, "hour": hour, "minute": minute}
+
+    # --- "Every weekday at TIME" ---
     m = re.match(r"every\s+weekday\s+at\s+(.+)", text, re.IGNORECASE)
     if m:
         hour, minute = _parse_time(m.group(1))
         return "cron", {"day_of_week": "mon-fri", "hour": hour, "minute": minute}
 
-    # "Every <dayname> at TIME"
+    # --- "Every <dayname> at TIME" / "Every day at TIME" ---
     m = re.match(r"every\s+(\w+)\s+at\s+(.+)", text, re.IGNORECASE)
     if m:
         day_word = m.group(1).lower()
@@ -82,7 +145,36 @@ def _parse_schedule(text: str) -> tuple[str, dict[str, int | str]]:
         if day_code:
             return "cron", {"day_of_week": day_code, "hour": hour, "minute": minute}
 
-    raise ValueError(f"Cannot parse schedule: {text!r}")
+    raise ValueError(
+        f"Cannot parse schedule: {text!r}. Use natural language "
+        f"(e.g. 'Every Monday at 9am', 'Monthly on the 1st at 10am') "
+        f"or a 5-field cron expression (e.g. '0 9 * * 1')."
+    )
+
+
+# Weekday offsets from Monday (for interval-based scheduling)
+_DAY_OFFSETS = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+
+
+def _day_offset(day_code: str) -> int:
+    """Return the offset (0-6) for a day code, for use with interval triggers."""
+    return _DAY_OFFSETS.get(day_code, 0)
+
+
+def _ordinal_day_range(ordinal: str) -> str:
+    """Convert an ordinal like '1st'/'first'/'last' to a cron day-of-month range.
+
+    Uses the trick of constraining both day_of_week and day to get
+    'Nth weekday of the month' behavior with APScheduler's CronTrigger.
+    """
+    mapping = {
+        "1st": "1-7", "first": "1-7",
+        "2nd": "8-14", "second": "8-14",
+        "3rd": "15-21", "third": "15-21",
+        "4th": "22-28", "fourth": "22-28",
+        "last": "25-31",
+    }
+    return mapping.get(ordinal, "1-7")
 
 
 def _extract_schedule_and_actions(lines: list[str]) -> tuple[str | None, list[str]]:

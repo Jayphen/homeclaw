@@ -967,8 +967,8 @@ def register_builtin_tools(
             name="routine_add",
             description=(
                 "Add a new scheduled routine for the household. "
-                "Schedule must be natural language like 'Every weekday at 7:30am', "
-                "'Every Sunday at 10:00am', or 'Every 3 days'."
+                "Schedule can be natural language or a 5-field cron expression "
+                "for complex schedules."
             ),
             parameters={
                 "type": "object",
@@ -980,8 +980,12 @@ def register_builtin_tools(
                     "schedule": {
                         "type": "string",
                         "description": (
-                            "When to run. Examples: 'Every weekday at 7:30am', "
-                            "'Every Sunday at 10:00am', 'Every 3 days', 'Every Monday at 9:00am'"
+                            "When to run. Natural language examples: 'Every weekday at 7:30am', "
+                            "'Every Sunday at 10:00am', 'Every 3 days', 'Every other Tuesday at 9am', "
+                            "'Monthly on the 1st at 10am', '1st Monday of the month at 9am', "
+                            "'Last Friday of the month at 3pm'. "
+                            "For complex schedules, use a 5-field cron expression: 'minute hour day month day_of_week' "
+                            "(e.g. '30 7 * * 1-5' for weekdays at 7:30am, '0 9 1 * *' for 1st of month at 9am)."
                         ),
                     },
                     "action": {
