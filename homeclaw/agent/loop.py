@@ -41,6 +41,11 @@ When someone asks for suggestions — what to do, where to eat, what to cook —
 bookmarks with bookmark_search before answering. The household has been collecting these \
 recommendations for a reason.
 
+Proactively remember personal details (likes, allergies, birthdays, routines, goals) via \
+memory_update. Always memory_read first and merge — memory_update replaces the full list. \
+Do this silently. Use preferences for structured key-value pairs, facts for everything else. \
+Use household_share for household-wide info.
+
 {context}"""
 
 MAX_TOOL_ROUNDS = 10
