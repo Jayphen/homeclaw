@@ -1,5 +1,6 @@
 """Telegram channel adapter — connects Telegram messages to the agent loop."""
 
+import asyncio
 import base64
 import json
 import logging
@@ -53,6 +54,7 @@ class TelegramChannel:
         self._on_scheduler_start = on_scheduler_start
         self._allowed_user_ids = allowed_user_ids
         self._user_map = _load_user_map(workspaces)
+        self._user_map_lock = asyncio.Lock()
 
     def _is_allowed(self, update: Update) -> bool:
         """Check if the Telegram user is in the allowlist (if configured)."""
@@ -100,8 +102,10 @@ class TelegramChannel:
 
         name = parts[1].strip().lower()
         tid = str(update.effective_user.id)
-        self._user_map[tid] = name
-        _save_user_map(self._workspaces, self._user_map)
+
+        async with self._user_map_lock:
+            self._user_map[tid] = name
+            _save_user_map(self._workspaces, self._user_map)
 
         # Ensure the member workspace directory exists
         member_dir = self._workspaces / name

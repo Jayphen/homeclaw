@@ -28,6 +28,9 @@ _SAVEABLE_FIELDS = {
     "enhanced_memory",
 }
 
+# Routing model fields are saved/loaded via the nested RoutingConfig object.
+_ROUTING_FIELDS = {"conversation_model", "routine_model"}
+
 
 class _JsonFileSource(PydanticBaseSettingsSource):
     """Load settings from {workspaces}/config.json if it exists."""
@@ -142,10 +145,9 @@ class HomeclawConfig(BaseSettings):
             path = self.workspaces.resolve() / "config.json"
             if path.is_file():
                 data = json.loads(path.read_text())
-                if "conversation_model" in data:
-                    self.routing.conversation_model = data["conversation_model"]
-                if "routine_model" in data:
-                    self.routing.routine_model = data["routine_model"]
+                for field_name in _ROUTING_FIELDS:
+                    if field_name in data:
+                        setattr(self.routing, field_name, data[field_name])
         except (json.JSONDecodeError, OSError):
             pass
         return self
@@ -174,9 +176,9 @@ class HomeclawConfig(BaseSettings):
             elif field_name in existing and (val is None or val == ""):
                 del existing[field_name]
 
-        # Routing fields
-        existing["conversation_model"] = self.routing.conversation_model
-        existing["routine_model"] = self.routing.routine_model
+        # Routing fields (nested on RoutingConfig, not top-level)
+        for field_name in _ROUTING_FIELDS:
+            existing[field_name] = getattr(self.routing, field_name)
 
         self.config_json_path.parent.mkdir(parents=True, exist_ok=True)
         self.config_json_path.write_text(json.dumps(existing, indent=2) + "\n")

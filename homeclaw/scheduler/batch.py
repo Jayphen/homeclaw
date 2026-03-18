@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 _BATCH_TIMEOUT = timedelta(minutes=30)
 
+# Batch processing_status values that mean "no more results coming".
+_TERMINAL_STATUSES = frozenset({"ended", "errored", "canceled", "expired"})
+
 
 @dataclass
 class RoutineRun:
@@ -129,6 +132,12 @@ class BatchScheduler:
                     "Batch %s completed: %d results",
                     pending.batch_id,
                     len(results),
+                )
+            elif batch.processing_status in _TERMINAL_STATUSES:
+                logger.warning(
+                    "Batch %s reached terminal status '%s' — discarding",
+                    pending.batch_id,
+                    batch.processing_status,
                 )
             elif self._is_timed_out(pending):
                 logger.warning(
