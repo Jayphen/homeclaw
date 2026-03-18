@@ -1,5 +1,6 @@
 <script lang="ts">
   import Router from "svelte-spa-router";
+  import Bookmarks from "./views/Bookmarks.svelte";
   import Dashboard from "./views/Dashboard.svelte";
   import Calendar from "./views/Calendar.svelte";
   import Memory from "./views/Memory.svelte";
@@ -12,6 +13,7 @@
 
   const routes = {
     "/": Dashboard,
+    "/bookmarks": Bookmarks,
     "/calendar": Calendar,
     "/memory": Memory,
     "/notes": Notes,
@@ -131,6 +133,7 @@
     <span class="brand">homeclaw</span>
     <div class="links">
       <a href="#/">Dashboard</a>
+      <a href="#/bookmarks">Bookmarks</a>
       <a href="#/calendar">Calendar</a>
       <a href="#/notes">Notes</a>
       <a href="#/memory">Memory</a>
