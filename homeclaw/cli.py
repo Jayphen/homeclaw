@@ -100,13 +100,22 @@ class HomeclawApp:
 
         self._scheduler: Scheduler | None = None
 
+        from homeclaw.plugins.registry import PluginRegistry
+        from homeclaw.plugins.skills.loader import load_all_skills
+
         self.registry = ToolRegistry()
+        self.plugin_registry = PluginRegistry(tool_registry=self.registry)
+
+        # Load household-wide skills at startup (private skills hot-loaded on skill_create)
+        load_all_skills(self.workspaces, "household", self.plugin_registry)
+
         if register_tools:
             register_builtin_tools(
                 self.registry,
                 self.workspaces,
                 on_routines_changed=self._reload_routines,
                 config=self.config,
+                plugin_registry=self.plugin_registry,
             )
 
         from homeclaw.memory.semantic import SemanticMemory

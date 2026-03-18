@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,71 @@ class SkillDefinition(BaseModel):
     allowed_domains: list[str]
     tools: list[SkillToolDef]
     instructions: str
+
+
+@dataclass
+class SkillLocation:
+    """A discovered skill's name, scope, and directory path."""
+
+    name: str
+    scope: str  # "household" or person name
+    skill_dir: Path
+
+
+# ---------------------------------------------------------------------------
+# Skill markdown renderer
+# ---------------------------------------------------------------------------
+
+_NAME_SLUG_RE = re.compile(r"[^a-z0-9_-]")
+
+
+def slugify_skill_name(name: str) -> str:
+    """Convert a skill name to a filesystem-safe slug."""
+    return _NAME_SLUG_RE.sub("", name.lower().replace(" ", "_")).strip("_-")
+
+
+def render_skill_markdown(
+    name: str,
+    description: str,
+    allowed_domains: list[str],
+    instructions: str,
+    tools: list[dict[str, Any]],
+) -> str:
+    """Render a skill definition as a markdown file that ``parse_skill_markdown`` can read.
+
+    Args:
+        name: Skill slug name (used in the ``# Skill:`` header).
+        description: Short description of what the skill does.
+        allowed_domains: Domains the skill's http_call is allowed to reach.
+        instructions: Free-text instructions injected into the agent's system prompt.
+        tools: List of tool dicts, each with ``name``, ``description``, and an
+            optional ``params`` list of dicts with ``name``, ``type``,
+            ``required`` (bool), and ``description``.
+    """
+    lines: list[str] = [
+        f"# Skill: {name}",
+        "",
+        f"Description: {description}",
+        "",
+        "## Allowed Domains",
+    ]
+    for domain in allowed_domains:
+        lines.append(f"- {domain}")
+
+    lines.extend(["", "## Tools", ""])
+    for tool in tools:
+        lines.append(f"### {tool['name']}")
+        lines.append(f"Description: {tool.get('description', '')}")
+        params = tool.get("params", [])
+        if params:
+            lines.append("Parameters:")
+            for p in params:
+                req = "required" if p.get("required", True) else "optional"
+                lines.append(f"- {p['name']} ({p['type']}, {req}): {p['description']}")
+        lines.append("")
+
+    lines.extend(["## Instructions", instructions, ""])
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -194,15 +260,22 @@ class SkillPlugin:
     Each skill exposes a single ``http_call`` tool that is scoped to the
     skill's allowed domains.  The skill's instructions and tool specs are
     available as attributes so the agent context builder can inject them.
+
+    Attributes:
+        data_dir: The skill's directory. Skill data files (.md, .json) live
+            here alongside ``skill.md``. memsearch indexes any .md files.
+        scope: ``"household"`` or a person name — where the skill lives.
     """
 
-    def __init__(self, definition: SkillDefinition, workspaces: Path) -> None:
+    def __init__(self, definition: SkillDefinition, skill_dir: Path, scope: str) -> None:
         self.name: str = definition.name
         self.description: str = definition.description
+        self.scope: str = scope
+        self.data_dir: Path = skill_dir
         self._definition = definition
         self._config = HttpCallConfig(
             allowed_domains=definition.allowed_domains,
-            log_dir=workspaces / "plugins" / definition.name / "logs",
+            log_dir=skill_dir / "logs",
         )
 
     @property
@@ -272,38 +345,68 @@ class SkillPlugin:
 # ---------------------------------------------------------------------------
 
 
-def discover_skills(skills_dir: Path) -> list[str]:
-    """Return skill names (stem of each .md file) found in *skills_dir*."""
-    if not skills_dir.is_dir():
-        return []
-    return sorted(p.stem for p in skills_dir.glob("*.md"))
+def discover_skills(workspaces: Path, person: str) -> list[SkillLocation]:
+    """Discover all skills visible to *person*.
+
+    Scans both ``workspaces/household/skills/`` and
+    ``workspaces/{person}/skills/`` for subdirectories that contain a
+    ``skill.md`` file.  Hidden directories (starting with ``.``) are skipped
+    so that ``.archive/`` is never treated as a skill.
+
+    Returns a list of :class:`SkillLocation` objects sorted by scope then name
+    (household first, then personal).
+    """
+    locations: list[SkillLocation] = []
+
+    scopes: list[tuple[str, Path]] = [
+        ("household", workspaces / "household" / "skills"),
+    ]
+    if person != "household":
+        scopes.append((person, workspaces / person / "skills"))
+
+    for scope, skills_dir in scopes:
+        if not skills_dir.is_dir():
+            continue
+        for child in sorted(skills_dir.iterdir()):
+            if (
+                child.is_dir()
+                and not child.name.startswith(".")
+                and (child / "skill.md").is_file()
+            ):
+                locations.append(SkillLocation(name=child.name, scope=scope, skill_dir=child))
+
+    return locations
 
 
-def load_skill(skills_dir: Path, name: str, workspaces: Path) -> SkillPlugin:
-    """Parse a single skill markdown and return a ``SkillPlugin``."""
-    path = skills_dir / f"{name}.md"
+def load_skill(skill_dir: Path, scope: str) -> SkillPlugin:
+    """Parse ``skill.md`` inside *skill_dir* and return a ``SkillPlugin``."""
+    path = skill_dir / "skill.md"
     content = path.read_text()
     definition = parse_skill_markdown(content)
-    return SkillPlugin(definition, workspaces)
+    return SkillPlugin(definition, skill_dir, scope)
 
 
 def load_all_skills(
-    skills_dir: Path,
     workspaces: Path,
+    person: str,
     registry: PluginRegistry,
 ) -> list[PluginEntry]:
-    """Discover, load, and register all skills.
+    """Discover, load, and register all skills visible to *person*.
 
+    Loads household skills and the person's private skills.  Errors for
+    individual skills are logged but do not prevent others from loading.
     Returns the list of ``PluginEntry`` objects that were registered.
     """
     entries: list[PluginEntry] = []
-    names = discover_skills(skills_dir)
-    for name in names:
+    locations = discover_skills(workspaces, person)
+
+    for loc in locations:
         try:
-            plugin = load_skill(skills_dir, name, workspaces)
+            plugin = load_skill(loc.skill_dir, loc.scope)
             entry = registry.register(plugin, PluginType.SKILL)
             entries.append(entry)
-            logger.info("Loaded skill plugin '%s'", name)
+            logger.info("Loaded skill plugin '%s' (scope: %s)", loc.name, loc.scope)
         except Exception:
-            logger.exception("Failed to load skill '%s'", name)
+            logger.exception("Failed to load skill '%s'", loc.name)
+
     return entries

@@ -61,6 +61,7 @@ def register_builtin_tools(
     workspaces: Path,
     on_routines_changed: Callable[[], None] | None = None,
     config: Any = None,
+    plugin_registry: Any = None,  # PluginRegistry | None — avoided to prevent circular import
 ) -> None:
     """Register all built-in tools with the registry."""
 
@@ -980,6 +981,426 @@ def register_builtin_tools(
             },
         ),
         routine_remove,
+    )
+
+    # --- Skill tools ---
+
+    async def skill_list(*, person: str, **_: Any) -> dict[str, Any]:
+        from homeclaw.plugins.skills.loader import discover_skills, parse_skill_markdown
+
+        locations = discover_skills(workspaces, person)
+        skills = []
+        for loc in locations:
+            try:
+                defn = parse_skill_markdown((loc.skill_dir / "skill.md").read_text())
+                skills.append({
+                    "name": loc.name,
+                    "scope": loc.scope,
+                    "description": defn.description,
+                    "tool_count": len(defn.tools),
+                    "allowed_domains": defn.allowed_domains,
+                })
+            except Exception:
+                skills.append({"name": loc.name, "scope": loc.scope, "error": "failed to parse"})
+        return {"skills": skills, "count": len(skills)}
+
+    registry.register(
+        ToolDefinition(
+            name="skill_list",
+            description=(
+                "List all skill plugins available to this household member — "
+                "includes household-wide skills and their own private skills."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member name"},
+                },
+                "required": ["person"],
+            },
+        ),
+        skill_list,
+    )
+
+    async def skill_create(
+        *,
+        person: str,
+        name: str,
+        description: str,
+        scope: str,
+        allowed_domains: list[str],
+        instructions: str,
+        tools: list[dict[str, Any]] | None = None,
+        initial_files: list[dict[str, Any]] | None = None,
+        source_notes: list[str] | None = None,
+        source_bookmarks: dict[str, Any] | None = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        from homeclaw.plugins.skills.loader import (
+            load_skill,
+            render_skill_markdown,
+            slugify_skill_name,
+        )
+        from homeclaw.plugins.registry import PluginType
+
+        slug = slugify_skill_name(name)
+        if not slug:
+            return {"error": f"Invalid skill name '{name}' — must contain alphanumeric characters"}
+
+        if scope not in ("household", "private"):
+            return {"error": f"Invalid scope '{scope}' — must be 'household' or 'private'"}
+
+        owner = "household" if scope == "household" else person
+        skill_dir = workspaces / owner / "skills" / slug
+
+        if skill_dir.exists():
+            return {"error": f"Skill '{slug}' already exists under {owner}"}
+
+        skill_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write skill.md
+        skill_md = render_skill_markdown(
+            name=slug,
+            description=description,
+            allowed_domains=allowed_domains,
+            instructions=instructions,
+            tools=tools or [],
+        )
+        (skill_dir / "skill.md").write_text(skill_md)
+
+        seeded: list[str] = []
+
+        # Write initial_files
+        for f in initial_files or []:
+            filename = Path(f["filename"]).name  # strip any path components
+            (skill_dir / filename).write_text(f["content"])
+            seeded.append(filename)
+
+        # Copy from source_notes
+        for topic in source_notes or []:
+            from homeclaw.memory.markdown import memory_read_topic
+
+            content = memory_read_topic(workspaces, person, topic)
+            if content is None:
+                content = memory_read_topic(workspaces, "household", topic)
+            if content is not None:
+                dest = skill_dir / f"{topic}.md"
+                dest.write_text(content)
+                seeded.append(f"{topic}.md")
+            else:
+                _logger.warning("skill_create: topic '%s' not found for %s or household", topic, person)
+
+        # Export source_bookmarks as markdown
+        if source_bookmarks:
+            bm_category = source_bookmarks.get("category")
+            bm_ids: list[str] = source_bookmarks.get("ids", [])
+            all_bms = list_bookmarks(workspaces, category=bm_category)
+            if bm_ids:
+                all_bms = [b for b in all_bms if b.id in bm_ids]
+            if all_bms:
+                lines = ["# Bookmarks", ""]
+                for bm in all_bms:
+                    lines.append(f"## {bm.title}")
+                    lines.append(f"- Category: {bm.category}")
+                    if bm.url:
+                        lines.append(f"- URL: {bm.url}")
+                    if bm.tags:
+                        lines.append(f"- Tags: {', '.join(bm.tags)}")
+                    if bm.saved_by:
+                        lines.append(f"- Saved by: {bm.saved_by}")
+                    lines.append("")
+                (skill_dir / "bookmarks.md").write_text("\n".join(lines))
+                seeded.append("bookmarks.md")
+
+        # Hot-load into registry
+        loaded = False
+        if plugin_registry is not None:
+            try:
+                plugin = load_skill(skill_dir, owner)
+                plugin_registry.register(plugin, PluginType.SKILL)
+                loaded = True
+            except Exception as e:
+                _logger.exception("skill_create: failed to hot-load skill '%s'", slug)
+                return {
+                    "status": "created",
+                    "name": slug,
+                    "scope": scope,
+                    "skill_dir": str(skill_dir),
+                    "seeded_files": seeded,
+                    "loaded": False,
+                    "warning": f"Skill created but failed to load: {e}",
+                }
+
+        return {
+            "status": "created",
+            "name": slug,
+            "scope": scope,
+            "skill_dir": str(skill_dir),
+            "seeded_files": seeded,
+            "loaded": loaded,
+            **({"note": "Restart required to activate skill — no plugin registry available"} if not loaded else {}),
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="skill_create",
+            description=(
+                "Create a new skill plugin. A skill lets homeclaw make HTTP calls to "
+                "external APIs or services. Choose 'household' scope to share the skill "
+                "with everyone, or 'private' to keep it personal. Skill data is stored "
+                "in a dedicated directory alongside the skill definition and will be "
+                "automatically indexed by semantic memory if saved as markdown files."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member creating the skill"},
+                    "name": {
+                        "type": "string",
+                        "description": "Skill name (slug-style, e.g. 'weather', 'my_calendar')",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Short description of what the skill does",
+                    },
+                    "scope": {
+                        "type": "string",
+                        "enum": ["household", "private"],
+                        "description": (
+                            "Who can use this skill and see its data. "
+                            "'household' = shared with all members; "
+                            "'private' = only accessible to this person."
+                        ),
+                    },
+                    "allowed_domains": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Domains the skill's HTTP calls are allowed to reach (e.g. 'api.example.com')",
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "description": "Instructions for how to use this skill, injected into the agent's context",
+                    },
+                    "tools": {
+                        "type": "array",
+                        "description": "Tool definitions exposed by this skill",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "description": {"type": "string"},
+                                "params": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": {"type": "string"},
+                                            "type": {"type": "string"},
+                                            "required": {"type": "boolean"},
+                                            "description": {"type": "string"},
+                                        },
+                                        "required": ["name", "type", "description"],
+                                    },
+                                },
+                            },
+                            "required": ["name", "description"],
+                        },
+                    },
+                    "initial_files": {
+                        "type": "array",
+                        "description": "Files to seed in the skill's data directory",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "filename": {"type": "string", "description": "Filename (e.g. 'notes.md')"},
+                                "content": {"type": "string", "description": "File content"},
+                            },
+                            "required": ["filename", "content"],
+                        },
+                    },
+                    "source_notes": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Memory topic names to copy into the skill's data directory "
+                            "(e.g. ['recipes', 'restaurant-notes']). Checks person's memory first, "
+                            "then household memory."
+                        ),
+                    },
+                    "source_bookmarks": {
+                        "type": "object",
+                        "description": "Export saved bookmarks into the skill's data directory as bookmarks.md",
+                        "properties": {
+                            "category": {"type": "string", "description": "Filter by category"},
+                            "ids": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Specific bookmark IDs to include",
+                            },
+                        },
+                    },
+                },
+                "required": ["person", "name", "description", "scope", "allowed_domains", "instructions"],
+            },
+        ),
+        skill_create,
+    )
+
+    async def skill_remove(
+        *,
+        person: str,
+        name: str,
+        owner: str,
+        **_: Any,
+    ) -> dict[str, Any]:
+        import shutil
+        from datetime import datetime, timezone
+
+        skill_dir = workspaces / owner / "skills" / name
+        if not skill_dir.exists():
+            return {"error": f"Skill '{name}' not found under '{owner}'"}
+
+        # Unregister from plugin registry
+        unregistered = False
+        if plugin_registry is not None:
+            unregistered = plugin_registry.unregister(name)
+
+        # Archive: move to .archive/{name}_{timestamp}/
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        archive_root = workspaces / owner / "skills" / ".archive"
+        archive_root.mkdir(parents=True, exist_ok=True)
+        archive_dir = archive_root / f"{name}_{timestamp}"
+        shutil.move(str(skill_dir), str(archive_dir))
+
+        return {
+            "status": "archived",
+            "name": name,
+            "owner": owner,
+            "archive_path": str(archive_dir),
+            "unregistered": unregistered,
+            "note": "Skill data is preserved in the archive. Permanent deletion is only available via the web UI.",
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="skill_remove",
+            description=(
+                "Remove a skill plugin. The skill is unregistered immediately and its "
+                "directory is archived (not permanently deleted). Data can be recovered "
+                "or permanently deleted via the web UI."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member requesting the removal"},
+                    "name": {"type": "string", "description": "Skill name to remove"},
+                    "owner": {
+                        "type": "string",
+                        "description": "Who owns the skill: 'household' or a person's name",
+                    },
+                },
+                "required": ["person", "name", "owner"],
+            },
+        ),
+        skill_remove,
+    )
+
+    async def skill_migrate(
+        *,
+        person: str,
+        name: str,
+        current_owner: str,
+        to_scope: str,
+        to_person: str | None = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        import shutil
+
+        from homeclaw.plugins.skills.loader import load_skill
+        from homeclaw.plugins.registry import PluginType
+
+        if to_scope not in ("household", "private"):
+            return {"error": f"Invalid to_scope '{to_scope}' — must be 'household' or 'private'"}
+
+        if to_scope == "private" and not to_person:
+            return {"error": "to_person is required when to_scope is 'private'"}
+
+        new_owner = "household" if to_scope == "household" else (to_person or person)
+
+        src_dir = workspaces / current_owner / "skills" / name
+        if not src_dir.exists():
+            return {"error": f"Skill '{name}' not found under '{current_owner}'"}
+
+        dst_dir = workspaces / new_owner / "skills" / name
+        if dst_dir.exists():
+            return {"error": f"A skill named '{name}' already exists under '{new_owner}'"}
+
+        # Unregister current instance
+        if plugin_registry is not None:
+            plugin_registry.unregister(name)
+
+        # Move directory (all data moves with it)
+        dst_dir.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src_dir), str(dst_dir))
+
+        # Re-register under new scope
+        loaded = False
+        if plugin_registry is not None:
+            try:
+                plugin = load_skill(dst_dir, new_owner)
+                plugin_registry.register(plugin, PluginType.SKILL)
+                loaded = True
+            except Exception as e:
+                _logger.exception("skill_migrate: failed to re-load skill '%s'", name)
+                return {
+                    "status": "migrated",
+                    "name": name,
+                    "from_owner": current_owner,
+                    "to_owner": new_owner,
+                    "loaded": False,
+                    "warning": f"Skill moved but failed to reload: {e}",
+                }
+
+        return {
+            "status": "migrated",
+            "name": name,
+            "from_owner": current_owner,
+            "to_owner": new_owner,
+            "skill_dir": str(dst_dir),
+            "loaded": loaded,
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="skill_migrate",
+            description=(
+                "Move a skill from one scope to another — household to private or vice versa. "
+                "All skill data (definition + data files) moves with it. "
+                "The skill is re-registered immediately under the new scope."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member requesting the migration"},
+                    "name": {"type": "string", "description": "Skill name to migrate"},
+                    "current_owner": {
+                        "type": "string",
+                        "description": "Current owner: 'household' or a person's name",
+                    },
+                    "to_scope": {
+                        "type": "string",
+                        "enum": ["household", "private"],
+                        "description": "Target scope",
+                    },
+                    "to_person": {
+                        "type": "string",
+                        "description": "Required when to_scope is 'private' — which person to move the skill to",
+                    },
+                },
+                "required": ["person", "name", "current_owner", "to_scope"],
+            },
+        ),
+        skill_migrate,
     )
 
     # --- Settings tools ---

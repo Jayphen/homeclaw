@@ -61,6 +61,9 @@ _PERSONAL_WRITE_TOOLS = frozenset({
     "reminder_complete",
     "reminder_delete",
     "bookmark_save",
+    "skill_create",
+    "skill_remove",
+    "skill_migrate",
 })
 
 
