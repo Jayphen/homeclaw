@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import Depends, HTTPException, Request
 
+from homeclaw import HOUSEHOLD_WORKSPACE, PLUGINS_DIR
 from homeclaw.config import HomeclawConfig
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ SKIP_EXPORT_NAMES = frozenset({
 })
 
 # Additional top-level dirs that are not member workspaces.
-_NON_MEMBER_DIRS = frozenset({"household", "plugins"})
+_NON_MEMBER_DIRS = frozenset({HOUSEHOLD_WORKSPACE, PLUGINS_DIR})
 
 
 def list_member_workspaces(workspaces: Path) -> list[str]:

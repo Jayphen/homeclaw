@@ -5,12 +5,17 @@ from homeclaw.config import HomeclawConfig
 
 
 def create_provider(config: HomeclawConfig) -> LLMProvider:
+    # Use the routing conversation model as the initial model when routing is
+    # configured, since the agent loop will override it per-call anyway.
+    # This avoids config.model (which may be stale) from ever hitting the API.
+    model = config.routing.conversation_model
+
     if config.anthropic_api_key:
         from homeclaw.agent.providers.anthropic import AnthropicProvider
 
         return AnthropicProvider(
             api_key=config.anthropic_api_key,
-            model=config.model,
+            model=model,
             enable_prompt_caching=config.routing.enable_prompt_caching,
         )
 
@@ -28,6 +33,6 @@ def create_provider(config: HomeclawConfig) -> LLMProvider:
     return OpenAIProvider(
         api_key=config.openai_api_key,
         base_url=config.openai_base_url,
-        model=config.model,
+        model=model,
         use_max_completion_tokens=direct_openai,
     )

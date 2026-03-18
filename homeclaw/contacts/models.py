@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, computed_field, model_validator
 
 InteractionType = Literal["call", "message", "meetup", "other"]
 
@@ -18,6 +18,12 @@ class ContactReminder(BaseModel):
     interval_days: int | None = None  # recurring: check in every N days
     next_date: date | None = None  # one-shot: remind on this date
     note: str = ""
+
+    @model_validator(mode="after")
+    def _require_at_least_one(self) -> "ContactReminder":
+        if self.interval_days is None and self.next_date is None:
+            raise ValueError("ContactReminder must have interval_days or next_date")
+        return self
 
 
 class Contact(BaseModel):

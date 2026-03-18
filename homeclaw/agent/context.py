@@ -6,6 +6,7 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.contacts.store import list_contacts
 from homeclaw.memory.facts import load_memory
 from homeclaw.memory.semantic import SemanticMemory
@@ -43,7 +44,7 @@ async def build_context(
     parts.append(f"Current time: {now.strftime('%Y-%m-%d %H:%M %Z')}")
 
     # Household-level facts (always injected — shared knowledge)
-    household_memory = load_memory(workspaces, "household")
+    household_memory = load_memory(workspaces, HOUSEHOLD_WORKSPACE)
     if household_memory.facts:
         parts.append("Household facts:")
         for fact in household_memory.facts[: cfg.max_facts_per_person]:

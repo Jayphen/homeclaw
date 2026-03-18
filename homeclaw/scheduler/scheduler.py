@@ -10,15 +10,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.agent.loop import AgentLoop
 from homeclaw.agent.routing import CallType
 from homeclaw.plugins.interface import RoutineDefinition
 from homeclaw.scheduler.routines import parse_routines_md
 
 logger = logging.getLogger(__name__)
-
-# The "person" used when the scheduler triggers a routine (system-initiated).
-_SCHEDULER_PERSON = "household"
 
 
 class Scheduler:
@@ -51,7 +49,7 @@ class Scheduler:
             try:
                 await self._loop.run(
                     f"[Scheduled routine] {description}",
-                    _SCHEDULER_PERSON,
+                    HOUSEHOLD_WORKSPACE,
                     call_type=CallType.ROUTINE,
                 )
             except Exception:

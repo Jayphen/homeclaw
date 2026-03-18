@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from homeclaw import SEMANTIC_INDEX_PATH
 from homeclaw.api.deps import AuthDep, get_config
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -23,7 +24,7 @@ def _check_memsearch_available() -> bool:
 
 def _check_index_exists(workspaces: Path) -> bool:
     """Check if the Milvus Lite index file has been created."""
-    return (workspaces / ".index" / "milvus.db").exists()
+    return (workspaces / SEMANTIC_INDEX_PATH).exists()
 
 
 def _semantic_status(config: Any, workspaces: Path) -> dict[str, Any]:

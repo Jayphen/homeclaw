@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
+from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.api.deps import SKIP_EXPORT_NAMES, AuthDep, get_config, list_member_workspaces
 
 logger = logging.getLogger(__name__)
@@ -96,7 +97,7 @@ def _restore_zip(workspaces: Path, zf: zipfile.ZipFile) -> dict[str, Any]:
         stats["files_written"] += 1
 
         # Track members
-        if len(cleaned.parts) >= 1 and cleaned.parts[0] != "household":
+        if len(cleaned.parts) >= 1 and cleaned.parts[0] != HOUSEHOLD_WORKSPACE:
             members_seen.add(cleaned.parts[0])
 
     return {

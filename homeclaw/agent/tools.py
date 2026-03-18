@@ -7,8 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-_logger = logging.getLogger(__name__)
-
+from homeclaw import HOUSEHOLD_WORKSPACE, SEMANTIC_INDEX_PATH
 from homeclaw.agent.providers.base import ToolDefinition
 from homeclaw.bookmarks.models import Bookmark
 from homeclaw.bookmarks.store import (
@@ -26,6 +25,8 @@ from homeclaw.contacts.store import (
     save_contact,
 )
 from homeclaw.memory.facts import HouseholdMemory, load_memory, save_memory, save_memory_safe
+
+_logger = logging.getLogger(__name__)
 
 ToolHandler = Callable[..., Coroutine[Any, Any, dict[str, Any]]]
 
@@ -63,7 +64,7 @@ async def _watch_for_index(
     timeout: float = 300.0,
 ) -> None:
     """Poll for the Milvus index file and notify when it appears."""
-    index_path = workspaces / ".index" / "milvus.db"
+    index_path = workspaces / SEMANTIC_INDEX_PATH
     elapsed = 0.0
     while elapsed < timeout:
         await asyncio.sleep(poll_interval)
@@ -297,9 +298,9 @@ def register_builtin_tools(
 
     async def household_share(*, fact: str, **_: Any) -> dict[str, Any]:
         """Share a fact with the entire household."""
-        memory = load_memory(workspaces, "household")
+        memory = load_memory(workspaces, HOUSEHOLD_WORKSPACE)
         memory.facts.append(fact)
-        await save_memory_safe(workspaces, "household", memory)
+        await save_memory_safe(workspaces, HOUSEHOLD_WORKSPACE, memory)
         return {"status": "shared", "fact": fact}
 
     registry.register(
@@ -942,7 +943,7 @@ def register_builtin_tools(
             except ImportError:
                 pass
             index_exists = (
-                workspaces / ".index" / "milvus.db"
+                workspaces / SEMANTIC_INDEX_PATH
             ).exists()
             return {
                 "enhanced_memory": config.enhanced_memory,
@@ -978,7 +979,7 @@ def register_builtin_tools(
             except ImportError:
                 pass
             index_exists = (
-                workspaces / ".index" / "milvus.db"
+                workspaces / SEMANTIC_INDEX_PATH
             ).exists()
             status = "enabled" if config.enhanced_memory else "disabled"
             if config.enhanced_memory and not memsearch_installed:

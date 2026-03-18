@@ -191,6 +191,16 @@ class AgentLoop:
             logger.warning(
                 "Agent loop exhausted %d tool rounds without completing", MAX_TOOL_ROUNDS
             )
+            # Surface the exhaustion to the user instead of returning partial content.
+            _save_history(self._workspaces, history_key, history)
+            return (
+                response.content + "\n\n"
+                "(I ran out of tool rounds before finishing — "
+                "please try a simpler request or ask me to continue.)"
+                if response.content
+                else "Sorry, I wasn't able to complete that — I ran out of steps. "
+                "Try a simpler request or ask me to continue."
+            )
 
         _save_history(self._workspaces, history_key, history)
         return response.content if response else ""

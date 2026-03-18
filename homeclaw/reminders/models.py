@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class Reminder(BaseModel):
@@ -17,6 +17,15 @@ class Reminder(BaseModel):
     last_completed: date | None = None
     created_at: datetime | None = None
     done: bool = False
+
+    @model_validator(mode="after")
+    def _validate_reminder_type(self) -> "Reminder":
+        if self.due_date is None and self.interval_days is None:
+            raise ValueError("Reminder must have due_date or interval_days")
+        if self.done and self.interval_days is not None:
+            # Recurring reminders are never permanently done — reset the flag.
+            self.done = False
+        return self
 
     @property
     def next_due(self) -> date | None:

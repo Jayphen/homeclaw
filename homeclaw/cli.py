@@ -62,7 +62,9 @@ _DEFAULT_ROUTINES_MD = """\
 
 def _ensure_default_files(workspaces: Path) -> None:
     """Seed default files into a fresh workspaces directory."""
-    household = workspaces / "household"
+    from homeclaw import HOUSEHOLD_WORKSPACE
+
+    household = workspaces / HOUSEHOLD_WORKSPACE
     household.mkdir(parents=True, exist_ok=True)
     routines = household / "ROUTINES.md"
     if not routines.exists():
@@ -123,12 +125,13 @@ class HomeclawApp:
 
     async def _notify_semantic_ready(self, message: str) -> None:
         """Called when the semantic index is built for the first time."""
+        from homeclaw import HOUSEHOLD_WORKSPACE
         from homeclaw.agent.routing import CallType
 
         logger.info("Semantic memory ready — notifying household")
         await self.loop.run(
             f"[System notification] {message}",
-            "household",
+            HOUSEHOLD_WORKSPACE,
             call_type=CallType.ROUTINE,
         )
 

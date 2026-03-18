@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from homeclaw import SEMANTIC_INDEX_PATH
+
 
 class SemanticMemory:
     def __init__(self, workspaces_path: str) -> None:
@@ -24,7 +26,7 @@ class SemanticMemory:
                     f"{self._workspaces_path}/household/notes",
                     f"{self._workspaces_path}/household/contacts",
                 ],
-                milvus_uri=f"{self._workspaces_path}/.index/milvus.db",
+                milvus_uri=f"{self._workspaces_path}/{SEMANTIC_INDEX_PATH}",
             )
             self._enabled = True
         except ImportError:
