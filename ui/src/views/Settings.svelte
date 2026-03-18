@@ -3,6 +3,7 @@
 
   interface SetupStatus {
     provider_configured: boolean;
+    provider: string | null;
     has_password: boolean;
     model: string;
     anthropic_api_key: string | null;
@@ -23,6 +24,7 @@
   let saveSuccess: boolean = $state(false);
 
   // Editable config fields
+  let selectedProvider: "anthropic" | "openai" = $state("anthropic");
   let conversationModel: string = $state("");
   let routineModel: string = $state("");
   let anthropicKey: string = $state("");
@@ -41,6 +43,7 @@
       const setupRes = await api("/api/setup/status");
       if (!setupRes.ok) throw new Error(`${setupRes.status}`);
       setup = await setupRes.json();
+      selectedProvider = (setup!.provider === "openai" ? "openai" : setup!.provider === "anthropic" ? "anthropic" : setup!.anthropic_api_key ? "anthropic" : "openai") as "anthropic" | "openai";
       conversationModel = setup!.conversation_model;
       routineModel = setup!.routine_model;
       openaiBaseUrl = setup!.openai_base_url || "";
@@ -63,6 +66,7 @@
     saving = true;
     const body: Record<string, string | null> = {};
 
+    if (selectedProvider !== setup?.provider) body.provider = selectedProvider;
     if (conversationModel !== setup?.conversation_model) body.conversation_model = conversationModel;
     if (routineModel !== setup?.routine_model) body.routine_model = routineModel;
     if (anthropicKey) body.anthropic_api_key = anthropicKey;
@@ -91,6 +95,7 @@
         throw new Error(data?.detail || `Error ${r.status}`);
       }
       setup = await r.json();
+      selectedProvider = (setup!.provider === "openai" ? "openai" : setup!.provider === "anthropic" ? "anthropic" : setup!.anthropic_api_key ? "anthropic" : "openai") as "anthropic" | "openai";
       conversationModel = setup!.conversation_model;
       routineModel = setup!.routine_model;
       openaiBaseUrl = setup!.openai_base_url || "";
@@ -144,6 +149,19 @@
     <!-- Configuration -->
     <section class="card">
       <h2>LLM provider</h2>
+
+      <div class="field">
+        <span class="field-label">Active provider</span>
+        <div class="provider-toggle">
+          <button class:selected={selectedProvider === "anthropic"} onclick={() => { selectedProvider = "anthropic"; }}>
+            Anthropic
+          </button>
+          <button class:selected={selectedProvider === "openai"} onclick={() => { selectedProvider = "openai"; }}>
+            OpenAI / OpenRouter
+          </button>
+        </div>
+        <small class="field-hint">Determines which API key and model format to use.</small>
+      </div>
 
       <div class="field">
         <label for="conversation-model">Conversation model</label>
@@ -236,6 +254,37 @@
 </div>
 
 <style>
+  .provider-toggle {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .provider-toggle button {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fdfcfa;
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .provider-toggle button.selected {
+    border-color: var(--terracotta);
+    color: var(--terracotta);
+    background: #fff;
+  }
+
+  .field-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }

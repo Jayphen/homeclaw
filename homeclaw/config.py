@@ -19,6 +19,7 @@ _config_save_lock = asyncio.Lock()
 
 # Fields that the web UI can persist to config.json.
 _SAVEABLE_FIELDS = {
+    "provider",
     "anthropic_api_key",
     "openai_api_key",
     "openai_base_url",
@@ -57,7 +58,10 @@ class _JsonFileSource(PydanticBaseSettingsSource):
 
 
 class HomeclawConfig(BaseSettings):
-    # LLM provider — set one of these:
+    # Explicit provider selection — "anthropic" or "openai"
+    provider: str | None = None
+
+    # LLM provider keys
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     openai_base_url: str | None = None

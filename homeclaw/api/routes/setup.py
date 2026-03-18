@@ -30,6 +30,7 @@ async def setup_status() -> dict[str, Any]:
     config = get_config()
     return {
         "provider_configured": config.is_provider_configured,
+        "provider": config.provider,
         "has_password": bool(config.web_password),
         "needs_setup_token": get_setup_token() is not None,
         "model": config.model,
@@ -49,6 +50,7 @@ class SetupBody(BaseModel):
     setup_token: str | None = None
 
     # LLM provider
+    provider: str | None = None
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     openai_base_url: str | None = None
@@ -90,6 +92,8 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
             raise HTTPException(status_code=401, detail="Unauthorized")
 
     # Apply changes to the in-memory config.
+    if body.provider is not None:
+        config.provider = body.provider or None
     if body.anthropic_api_key is not None:
         config.anthropic_api_key = body.anthropic_api_key or None
     if body.openai_api_key is not None:

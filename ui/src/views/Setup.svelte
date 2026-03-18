@@ -87,6 +87,7 @@
         const defaults = providerDefaults[provider];
         const body: Record<string, string | null> = {
           setup_token: setupToken || null,
+          provider,
           model,
           conversation_model: model,
           routine_model: defaults.routineModel,

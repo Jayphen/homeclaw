@@ -5,12 +5,21 @@ from homeclaw.config import HomeclawConfig
 
 
 def create_provider(config: HomeclawConfig) -> LLMProvider:
-    # Use the routing conversation model as the initial model when routing is
-    # configured, since the agent loop will override it per-call anyway.
-    # This avoids config.model (which may be stale) from ever hitting the API.
     model = config.routing.conversation_model
 
-    if config.anthropic_api_key:
+    # Determine provider: explicit setting, or infer from which keys are set.
+    provider = config.provider
+    if not provider:
+        if config.anthropic_api_key and not config.openai_api_key:
+            provider = "anthropic"
+        elif config.openai_api_key or config.openai_base_url:
+            provider = "openai"
+        elif config.anthropic_api_key:
+            provider = "anthropic"
+
+    if provider == "anthropic":
+        if not config.anthropic_api_key:
+            raise ValueError("Anthropic provider selected but ANTHROPIC_API_KEY is not set.")
         from homeclaw.agent.providers.anthropic import AnthropicProvider
 
         return AnthropicProvider(
@@ -19,20 +28,20 @@ def create_provider(config: HomeclawConfig) -> LLMProvider:
             enable_prompt_caching=config.routing.enable_prompt_caching,
         )
 
-    if not config.openai_api_key and not config.openai_base_url:
-        raise ValueError(
-            "No LLM provider configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY "
-            "(via environment, .env, or the web UI setup)."
+    if provider == "openai":
+        if not config.openai_api_key and not config.openai_base_url:
+            raise ValueError("OpenAI provider selected but no API key or base URL is set.")
+        from homeclaw.agent.providers.openai import OpenAIProvider
+
+        direct_openai = not config.openai_base_url
+        return OpenAIProvider(
+            api_key=config.openai_api_key,
+            base_url=config.openai_base_url,
+            model=model,
+            use_max_completion_tokens=direct_openai,
         )
 
-    from homeclaw.agent.providers.openai import OpenAIProvider
-
-    # Direct OpenAI (no base_url) needs max_completion_tokens for reasoning models.
-    # Proxies like OpenRouter expect max_tokens.
-    direct_openai = not config.openai_base_url
-    return OpenAIProvider(
-        api_key=config.openai_api_key,
-        base_url=config.openai_base_url,
-        model=model,
-        use_max_completion_tokens=direct_openai,
+    raise ValueError(
+        "No LLM provider configured. Set PROVIDER and the corresponding API key "
+        "(via environment, .env, or the web UI setup)."
     )
