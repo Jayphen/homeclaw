@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.4](https://github.com/Jayphen/homeclaw/compare/v0.3.3...v0.3.4) (2026-03-18)
+
+
+### Features
+
+* add bookmark_note_edit tool for editing existing notes ([5ad398f](https://github.com/Jayphen/homeclaw/commit/5ad398f7026a47c44cd26bb15cae6a7e1333880e))
+* add markdown editor component with toolbar and live preview ([88187d7](https://github.com/Jayphen/homeclaw/commit/88187d7d8f73db4668388e421e768824078e8de2))
+* add marketplace index client with caching and typed models ([3a35699](https://github.com/Jayphen/homeclaw/commit/3a35699b4f28ed33f412ddb29e58db0527a4306b))
+* add note editing via web UI ([5b253db](https://github.com/Jayphen/homeclaw/commit/5b253dbbd0064b1fcbd842a17d1c667c93da385c))
+
+
+### Bug Fixes
+
+* handle None choices from OpenRouter/OpenAI response ([caa2a8c](https://github.com/Jayphen/homeclaw/commit/caa2a8cd4ddea9a2800e20084f6f86d953c1c80e))
+* log full LLM response when choices is empty ([b1e4246](https://github.com/Jayphen/homeclaw/commit/b1e4246337af9807864f827ee6cad7c32957cae7))
+
+
+### Documentation
+
+* add web UI section to CLAUDE.md ([4ff9988](https://github.com/Jayphen/homeclaw/commit/4ff99887d5083a73dc7a558709cc66eda653b767))
+
 ## [0.3.3](https://github.com/Jayphen/homeclaw/compare/v0.3.2...v0.3.3) (2026-03-18)
 
 
