@@ -56,13 +56,22 @@ def verify_setup_token(token: str) -> bool:
     return _setup_token is not None and secrets.compare_digest(token, _setup_token)
 
 
+# Names to skip at any level during export/import (derived data, caches).
+SKIP_EXPORT_NAMES = frozenset({
+    ".index", "__pycache__", "config.json", "cost_log.jsonl",
+})
+
+# Additional top-level dirs that are not member workspaces.
+_NON_MEMBER_DIRS = frozenset({"household", "plugins"})
+
+
 def list_member_workspaces(workspaces: Path) -> list[str]:
     """List household member workspace directories.
 
     This is the single source of truth for enumerating members.
     """
     ws = workspaces if isinstance(workspaces, Path) else Path(workspaces)
-    skip = {"household", "plugins", "config.json", "cost_log.jsonl", ".index"}
+    skip = SKIP_EXPORT_NAMES | _NON_MEMBER_DIRS
     return sorted(
         d.name
         for d in ws.iterdir()

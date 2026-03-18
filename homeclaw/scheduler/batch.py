@@ -7,6 +7,7 @@ calls if batch results take too long.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -57,6 +58,8 @@ class BatchScheduler:
         self._queue: list[RoutineRun] = []
         self._pending: list[PendingBatch] = []
         self._results: list[dict[str, Any]] = []
+        # Protects _queue and _pending from concurrent submit/poll races.
+        self._lock = asyncio.Lock()
 
     def add_routine(self, run: RoutineRun) -> None:
         """Queue a routine run for the next batch submission."""
@@ -73,6 +76,10 @@ class BatchScheduler:
 
     async def submit(self) -> str | None:
         """Submit all queued routines as a single batch. Returns batch_id."""
+        async with self._lock:
+            return await self._submit_inner()
+
+    async def _submit_inner(self) -> str | None:
         if not self._queue:
             return None
 
@@ -114,6 +121,10 @@ class BatchScheduler:
 
     async def poll_and_dispatch(self) -> list[dict[str, Any]]:
         """Check pending batches for results. Returns completed results."""
+        async with self._lock:
+            return await self._poll_inner()
+
+    async def _poll_inner(self) -> list[dict[str, Any]]:
         completed: list[dict[str, Any]] = []
         still_pending: list[PendingBatch] = []
 

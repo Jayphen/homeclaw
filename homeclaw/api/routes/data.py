@@ -11,14 +11,14 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
-from homeclaw.api.deps import AuthDep, get_config, list_member_workspaces
+from homeclaw.api.deps import SKIP_EXPORT_NAMES, AuthDep, get_config, list_member_workspaces
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/data", tags=["data"])
 
-# Directories/files to skip during export (derived data, secrets, caches).
-_SKIP_NAMES = {".index", "__pycache__", "config.json", "cost_log.jsonl"}
+# Re-use the shared skip set from deps for consistency.
+_SKIP_NAMES = SKIP_EXPORT_NAMES
 
 # Maximum upload size: 100 MB.
 _MAX_UPLOAD_BYTES = 100 * 1024 * 1024

@@ -107,16 +107,17 @@ class TelegramChannel:
             self._user_map[tid] = name
             _save_user_map(self._workspaces, self._user_map)
 
-        # Ensure the member workspace directory exists
-        member_dir = self._workspaces / name
-        member_dir.mkdir(parents=True, exist_ok=True)
+            # Ensure the member workspace directory exists before the lock
+            # releases, so message handlers won't write to a missing dir.
+            member_dir = self._workspaces / name
+            member_dir.mkdir(parents=True, exist_ok=True)
 
-        # Auto-link to existing contact record if one matches
-        contact = get_contact(self._workspaces, name)
-        if contact and contact.member != name:
-            contact.member = name
-            save_contact(self._workspaces, contact)
-            logger.info("Linked contact '%s' to member workspace '%s'", contact.id, name)
+            # Auto-link to existing contact record if one matches
+            contact = get_contact(self._workspaces, name)
+            if contact and contact.member != name:
+                contact.member = name
+                save_contact(self._workspaces, contact)
+                logger.info("Linked contact '%s' to member workspace '%s'", contact.id, name)
 
         await update.message.reply_text(f"Registered as '{name}'. You can now chat with me!")
         logger.info(
