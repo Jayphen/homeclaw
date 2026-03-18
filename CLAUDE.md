@@ -70,6 +70,21 @@ indexes `.md` files.
 
 All conform to the Plugin Protocol in `homeclaw/plugins/interface.py`.
 
+## Web UI — Svelte 5
+
+The web UI lives in `ui/` and is built with **Svelte 5** (runes mode) + **Vite**. No heavy
+component libraries — the design system uses CSS custom properties defined in `App.svelte`
+(`--terracotta`, `--sage`, `--border`, `--surface`, etc.).
+
+Reusable components go in `ui/src/lib/`:
+
+- **`MarkdownEditor.svelte`** — markdown editor with formatting toolbar, keyboard shortcuts
+  (`⌘B`, `⌘I`, `⌘K`, `⌘E`), and live preview toggle. Uses `marked` for rendering. Use this
+  anywhere users need to edit markdown content.
+- **`api.ts`** — fetch wrapper that injects the auth token.
+
+Views live in `ui/src/views/` and are wired to routes in `App.svelte` via `svelte-spa-router`.
+
 ## Key directories
 
 ```
