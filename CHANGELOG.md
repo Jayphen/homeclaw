@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/Jayphen/homeclaw/compare/v0.2.0...v0.3.0) (2026-03-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* neighborhood and city fields removed from Bookmark.
+
+### Bug Fixes
+
+* instruct agent to check for duplicate bookmarks before saving ([f5dc3a4](https://github.com/Jayphen/homeclaw/commit/f5dc3a4b3a6792cae51196738bbdd18d243b1eab))
+
+
+### Code Refactoring
+
+* remove neighborhood/city from bookmarks, use notes instead ([2b3a00f](https://github.com/Jayphen/homeclaw/commit/2b3a00f0625b919ffbf28c1ff6c6f247f5618e62))
+
 ## [0.2.0](https://github.com/Jayphen/homeclaw/compare/v0.1.9...v0.2.0) (2026-03-18)
 
 
