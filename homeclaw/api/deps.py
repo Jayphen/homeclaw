@@ -85,6 +85,8 @@ def list_member_workspaces(workspaces: Path) -> list[str]:
     """
     ws = workspaces if isinstance(workspaces, Path) else Path(workspaces)
     skip = SKIP_EXPORT_NAMES | _NON_MEMBER_DIRS
+    if not ws.is_dir():
+        return []
     return sorted(
         d.name
         for d in ws.iterdir()

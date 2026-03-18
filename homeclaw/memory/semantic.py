@@ -29,7 +29,7 @@ class SemanticMemory:
                 milvus_uri=f"{self._workspaces_path}/{SEMANTIC_INDEX_PATH}",
             )
             self._enabled = True
-        except ImportError:
+        except Exception:
             self._enabled = False
 
     async def recall(self, query: str, top_k: int = 3) -> list[str]:
