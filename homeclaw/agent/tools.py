@@ -5,7 +5,7 @@ import logging
 from collections.abc import Callable, Coroutine
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 from homeclaw import HOUSEHOLD_WORKSPACE, SEMANTIC_INDEX_PATH
 from homeclaw.agent.providers.base import ToolDefinition
@@ -225,7 +225,7 @@ def register_builtin_tools(
                     "contact_id": {"type": "string", "description": "Contact ID"},
                     "type": {
                         "type": "string",
-                        "enum": ["call", "message", "meetup", "other"],
+                        "enum": list(get_args(InteractionType)),
                         "description": "Interaction type",
                     },
                     "notes": {"type": "string", "description": "What happened"},
@@ -934,24 +934,23 @@ def register_builtin_tools(
 
     if config is not None:
 
-        async def settings_get(**_: Any) -> dict[str, Any]:
-            memsearch_installed = False
+        def _semantic_status() -> str:
+            """Return a single status string for semantic memory state."""
+            if not config.enhanced_memory:
+                return "disabled"
             try:
                 import memsearch  # type: ignore[import-not-found]  # noqa: F401
-
-                memsearch_installed = True
             except ImportError:
-                pass
-            index_exists = (
-                workspaces / SEMANTIC_INDEX_PATH
-            ).exists()
+                return "missing_memsearch"
+            if not (workspaces / SEMANTIC_INDEX_PATH).exists():
+                return "indexing"
+            return "ready"
+
+        async def settings_get(**_: Any) -> dict[str, Any]:
+            status = _semantic_status()
             return {
                 "enhanced_memory": config.enhanced_memory,
-                "memsearch_installed": memsearch_installed,
-                "index_exists": index_exists,
-                "semantic_ready": (
-                    config.enhanced_memory and memsearch_installed
-                ),
+                "semantic_status": status,
             }
 
         registry.register(
@@ -971,62 +970,32 @@ def register_builtin_tools(
         ) -> dict[str, Any]:
             if enhanced_memory is not None:
                 config.enhanced_memory = enhanced_memory
-            memsearch_installed = False
-            try:
-                import memsearch  # type: ignore[import-not-found]  # noqa: F401
-
-                memsearch_installed = True
-            except ImportError:
-                pass
-            index_exists = (
-                workspaces / SEMANTIC_INDEX_PATH
-            ).exists()
-            status = "enabled" if config.enhanced_memory else "disabled"
-            if config.enhanced_memory and not memsearch_installed:
-                return {
-                    "status": status,
-                    "enhanced_memory": config.enhanced_memory,
-                    "memsearch_installed": False,
-                    "index_exists": False,
-                    "note": (
-                        "Enhanced memory is toggled on but the "
-                        "memsearch package is not installed. "
-                        "Install it with: pip install homeclaw[semantic]"
-                    ),
-                }
-            if (
-                config.enhanced_memory
-                and memsearch_installed
-                and not index_exists
-            ):
+            semantic = _semantic_status()
+            result: dict[str, Any] = {
+                "enhanced_memory": config.enhanced_memory,
+                "semantic_status": semantic,
+            }
+            if semantic == "missing_memsearch":
+                result["note"] = (
+                    "Enhanced memory is toggled on but the "
+                    "memsearch package is not installed. "
+                    "Install it with: pip install homeclaw[semantic]"
+                )
+            elif semantic == "indexing":
                 nonlocal _index_watcher_running
                 if not _index_watcher_running and on_semantic_ready:
                     _index_watcher_running = True
                     asyncio.create_task(
                         _watch_for_index(workspaces, on_semantic_ready)
                     )
-                return {
-                    "status": status,
-                    "enhanced_memory": True,
-                    "memsearch_installed": True,
-                    "index_exists": False,
-                    "note": (
-                        "Semantic memory is now enabled. On the next "
-                        "message, the embedding model (~30-90 MB) will "
-                        "be downloaded and the index built. This is a "
-                        "one-time setup. Tell the user it's enabled and "
-                        "you'll let them know once the index is ready."
-                    ),
-                }
-            return {
-                "status": status,
-                "enhanced_memory": config.enhanced_memory,
-                "memsearch_installed": memsearch_installed,
-                "index_exists": index_exists,
-                "semantic_ready": (
-                    config.enhanced_memory and memsearch_installed
-                ),
-            }
+                result["note"] = (
+                    "Semantic memory is now enabled. On the next "
+                    "message, the embedding model (~30-90 MB) will "
+                    "be downloaded and the index built. This is a "
+                    "one-time setup. Tell the user it's enabled and "
+                    "you'll let them know once the index is ready."
+                )
+            return result
 
         registry.register(
             ToolDefinition(

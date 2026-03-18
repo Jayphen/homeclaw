@@ -1,10 +1,11 @@
 """Structured facts store (Layer 1) — always on, injected in full into every context."""
 
-import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
 from pydantic import BaseModel
+
+from homeclaw.locking import LockPool
 
 
 class HouseholdMemory(BaseModel):
@@ -13,14 +14,7 @@ class HouseholdMemory(BaseModel):
     last_updated: datetime | None = None
 
 
-# Per-person lock prevents concurrent read-modify-write races on memory.json.
-_locks: dict[str, asyncio.Lock] = {}
-
-
-def _lock_for(person: str) -> asyncio.Lock:
-    if person not in _locks:
-        _locks[person] = asyncio.Lock()
-    return _locks[person]
+_lock_pool = LockPool()
 
 
 def load_memory(workspaces: Path, person: str) -> HouseholdMemory:
@@ -39,5 +33,5 @@ def save_memory(workspaces: Path, person: str, memory: HouseholdMemory) -> None:
 
 async def save_memory_safe(workspaces: Path, person: str, memory: HouseholdMemory) -> None:
     """Save memory with per-person locking to prevent concurrent races."""
-    async with _lock_for(person):
+    async with _lock_pool.lock_for(person):
         save_memory(workspaces, person, memory)

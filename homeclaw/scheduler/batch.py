@@ -11,7 +11,7 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal, get_args
 
 import anthropic
 
@@ -19,8 +19,11 @@ logger = logging.getLogger(__name__)
 
 _BATCH_TIMEOUT = timedelta(minutes=30)
 
+BatchResultStatus = Literal["succeeded", "failed"]
+BatchProcessingStatus = Literal["ended", "errored", "canceled", "expired"]
+
 # Batch processing_status values that mean "no more results coming".
-_TERMINAL_STATUSES = frozenset({"ended", "errored", "canceled", "expired"})
+_TERMINAL_STATUSES: frozenset[str] = frozenset(get_args(BatchProcessingStatus))
 
 
 @dataclass
@@ -163,7 +166,7 @@ class BatchScheduler:
         self._results.extend(completed)
         return completed
 
-    async def _collect_results(self, pending: PendingBatch, batch: Any) -> list[dict[str, Any]]:
+    async def _collect_results(self, pending: PendingBatch, batch: Any) -> list[dict[str, Any | BatchResultStatus]]:
         """Collect results from a completed batch."""
         results: list[dict[str, Any]] = []
         runs_by_id = {r.custom_id: r for r in pending.routine_runs}
@@ -177,23 +180,18 @@ class BatchScheduler:
             if entry.result.type == "succeeded":
                 msg = entry.result.message
                 content = "\n".join(b.text for b in msg.content if b.type == "text")
-                results.append(
-                    {
-                        "custom_id": entry.custom_id,
-                        "description": run.description,
-                        "content": content,
-                        "status": "succeeded",
-                    }
-                )
+                status: BatchResultStatus = "succeeded"
             else:
-                results.append(
-                    {
-                        "custom_id": entry.custom_id,
-                        "description": run.description,
-                        "content": "",
-                        "status": "failed",
-                    }
-                )
+                content = ""
+                status = "failed"
+            results.append(
+                {
+                    "custom_id": entry.custom_id,
+                    "description": run.description,
+                    "content": content,
+                    "status": status,
+                }
+            )
 
         return results
 

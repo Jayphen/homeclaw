@@ -1,6 +1,5 @@
 """Core agent loop — receive message, build context, call LLM, dispatch tools."""
 
-import asyncio
 import json
 import logging
 from collections.abc import Callable
@@ -12,6 +11,7 @@ from homeclaw.agent.context import build_context
 from homeclaw.agent.providers.base import LLMProvider, LLMResponse, Message, ToolCall
 from homeclaw.agent.routing import CallType, RoutingConfig, classify_tool_round, max_tokens_for, route_model
 from homeclaw.agent.tools import ToolRegistry
+from homeclaw.locking import LockPool
 from homeclaw.memory.semantic import SemanticMemory
 
 logger = logging.getLogger(__name__)
@@ -74,14 +74,7 @@ class AgentLoop:
         self._semantic_memory = semantic_memory
         self._on_tool_call = on_tool_call
         self._routing = routing
-        # Per-key lock prevents concurrent runs for the same person/channel
-        # from racing on history file reads/writes.
-        self._run_locks: dict[str, asyncio.Lock] = {}
-
-    def _lock_for(self, key: str) -> asyncio.Lock:
-        if key not in self._run_locks:
-            self._run_locks[key] = asyncio.Lock()
-        return self._run_locks[key]
+        self._lock_pool = LockPool()
 
     async def run(
         self,
@@ -102,7 +95,7 @@ class AgentLoop:
         """
         person = person.lower()
         history_key = channel or person
-        async with self._lock_for(history_key):
+        async with self._lock_pool.lock_for(history_key):
             return await self._run_inner(user_message, person, channel, call_type, history_key)
 
     async def _run_inner(

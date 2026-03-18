@@ -18,10 +18,17 @@
   }
 
   let setup: SetupStatus | null = $state(null);
-  let loading: boolean = $state(true);
+  let pageState: "loading" | "ready" | "error" = $state("loading");
   let error: string | null = $state(null);
-  let saving: boolean = $state(false);
-  let saveSuccess: boolean = $state(false);
+
+  // Save state machine: idle → saving → success (auto-clears) or error
+  let saveState: "idle" | "saving" | "success" | "error" = $state("idle");
+  let saveTimeout: ReturnType<typeof setTimeout> | null = $state(null);
+
+  // Data operation state machine: idle → exporting/importing → result/error
+  let dataState: "idle" | "exporting" | "importing" = $state("idle");
+  let dataResult: string | null = $state(null);
+  let dataError: string | null = $state(null);
 
   // Editable config fields
   let selectedProvider: "anthropic" | "openai" = $state("anthropic");
@@ -36,14 +43,11 @@
   let newPassword: string = $state("");
   let newPasswordConfirm: string = $state("");
 
-  // Data import/export
-  let exporting: boolean = $state(false);
-  let importing: boolean = $state(false);
-  let importResult: string | null = $state(null);
-  let importError: string | null = $state(null);
-
   async function exportData() {
-    exporting = true;
+    if (dataState !== "idle") return;
+    dataState = "exporting";
+    dataResult = null;
+    dataError = null;
     try {
       const r = await api("/api/data/export");
       if (!r.ok) throw new Error(`${r.status}`);
@@ -59,18 +63,19 @@
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      error = e.message;
+      dataError = e.message;
     }
-    exporting = false;
+    dataState = "idle";
   }
 
   async function importData(event: Event) {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
-    importing = true;
-    importResult = null;
-    importError = null;
+    if (dataState !== "idle") return;
+    dataState = "importing";
+    dataResult = null;
+    dataError = null;
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -80,16 +85,16 @@
         throw new Error(data?.detail || `Error ${r.status}`);
       }
       const data = await r.json();
-      importResult = `Imported ${data.files_written} files (${data.members_imported?.length ?? 0} members).`;
+      dataResult = `Imported ${data.files_written} files (${data.members_imported?.length ?? 0} members).`;
     } catch (e: any) {
-      importError = e.message;
+      dataError = e.message;
     }
-    importing = false;
+    dataState = "idle";
     input.value = "";
   }
 
   async function fetchAll() {
-    loading = true;
+    pageState = "loading";
     error = null;
     try {
       const setupRes = await api("/api/setup/status");
@@ -100,22 +105,24 @@
       routineModel = setup!.routine_model;
       openaiBaseUrl = setup!.openai_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
+      pageState = "ready";
     } catch (e: any) {
       error = e.message;
+      pageState = "error";
     }
-    loading = false;
   }
 
   async function saveConfig() {
+    if (saveState === "saving") return;
     error = null;
-    saveSuccess = false;
+    if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
 
     if (newPassword && newPassword !== newPasswordConfirm) {
       error = "Passwords don't match.";
       return;
     }
 
-    saving = true;
+    saveState = "saving";
     const body: Record<string, string | null> = {};
 
     if (selectedProvider !== setup?.provider) body.provider = selectedProvider;
@@ -132,7 +139,7 @@
     if (newPassword) body.web_password = newPassword;
 
     if (Object.keys(body).length === 0) {
-      saving = false;
+      saveState = "idle";
       return;
     }
 
@@ -165,12 +172,12 @@
         newPasswordConfirm = "";
       }
 
-      saveSuccess = true;
-      setTimeout(() => { saveSuccess = false; }, 3000);
+      saveState = "success";
+      saveTimeout = setTimeout(() => { saveState = "idle"; saveTimeout = null; }, 3000);
     } catch (e: any) {
       error = e.message;
+      saveState = "idle";
     }
-    saving = false;
   }
 
   $effect(() => {
@@ -183,7 +190,7 @@
     <h1>Settings</h1>
   </header>
 
-  {#if loading}
+  {#if pageState === "loading"}
     <div class="loading">
       <div class="loading-dot"></div>
       <div class="loading-dot"></div>
@@ -197,7 +204,7 @@
     </div>
   {/if}
 
-  {#if !loading && setup}
+  {#if pageState === "ready" && setup}
     <!-- Configuration -->
     <section class="card">
       <h2>LLM provider</h2>
@@ -295,10 +302,10 @@
     </section>
 
     <div class="save-row">
-      <button class="btn primary" onclick={saveConfig} disabled={saving}>
-        {saving ? "Saving..." : "Save changes"}
+      <button class="btn primary" onclick={saveConfig} disabled={saveState === "saving"}>
+        {saveState === "saving" ? "Saving..." : "Save changes"}
       </button>
-      {#if saveSuccess}
+      {#if saveState === "success"}
         <span class="save-ok">Saved</span>
       {/if}
     </div>
@@ -307,19 +314,19 @@
       <h2>Data</h2>
       <p class="data-desc">Export or import all household data (memory, contacts, notes, calendar) as a ZIP archive.</p>
       <div class="data-actions">
-        <button class="btn secondary" onclick={exportData} disabled={exporting}>
-          {exporting ? "Exporting..." : "Export data"}
+        <button class="btn secondary" onclick={exportData} disabled={dataState !== "idle"}>
+          {dataState === "exporting" ? "Exporting..." : "Export data"}
         </button>
-        <label class="btn secondary import-label" class:disabled={importing}>
-          {importing ? "Importing..." : "Import data"}
-          <input type="file" accept=".zip" onchange={importData} disabled={importing} hidden />
+        <label class="btn secondary import-label" class:disabled={dataState !== "idle"}>
+          {dataState === "importing" ? "Importing..." : "Import data"}
+          <input type="file" accept=".zip" onchange={importData} disabled={dataState !== "idle"} hidden />
         </label>
       </div>
-      {#if importResult}
-        <p class="import-ok">{importResult}</p>
+      {#if dataResult}
+        <p class="import-ok">{dataResult}</p>
       {/if}
-      {#if importError}
-        <p class="import-err">{importError}</p>
+      {#if dataError}
+        <p class="import-err">{dataError}</p>
       {/if}
     </section>
   {/if}

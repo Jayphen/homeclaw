@@ -1,18 +1,11 @@
 """Reminder JSON store — one file per person at workspaces/{person}/reminders.json."""
 
-import asyncio
 from pathlib import Path
 
+from homeclaw.locking import LockPool
 from homeclaw.reminders.models import Reminder
 
-# Per-person lock prevents concurrent read-modify-write races on reminders.json.
-_locks: dict[str, asyncio.Lock] = {}
-
-
-def _lock_for(person: str) -> asyncio.Lock:
-    if person not in _locks:
-        _locks[person] = asyncio.Lock()
-    return _locks[person]
+_lock_pool = LockPool()
 
 
 def _reminders_path(workspaces: Path, person: str) -> Path:
@@ -47,7 +40,7 @@ def add_reminder(workspaces: Path, reminder: Reminder) -> Reminder:
 
 async def add_reminder_safe(workspaces: Path, reminder: Reminder) -> Reminder:
     """Add a reminder with per-person locking to prevent concurrent races."""
-    async with _lock_for(reminder.person):
+    async with _lock_pool.lock_for(reminder.person):
         return add_reminder(workspaces, reminder)
 
 
@@ -77,7 +70,7 @@ def complete_reminder(workspaces: Path, person: str, reminder_id: str) -> Remind
 
 async def complete_reminder_safe(workspaces: Path, person: str, reminder_id: str) -> Reminder | None:
     """Complete a reminder with per-person locking."""
-    async with _lock_for(person):
+    async with _lock_pool.lock_for(person):
         return complete_reminder(workspaces, person, reminder_id)
 
 
@@ -92,5 +85,5 @@ def delete_reminder(workspaces: Path, person: str, reminder_id: str) -> bool:
 
 async def delete_reminder_safe(workspaces: Path, person: str, reminder_id: str) -> bool:
     """Delete a reminder with per-person locking."""
-    async with _lock_for(person):
+    async with _lock_pool.lock_for(person):
         return delete_reminder(workspaces, person, reminder_id)

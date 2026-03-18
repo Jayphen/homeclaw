@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, computed_field, model_validator
 
 
 class Reminder(BaseModel):
@@ -27,6 +27,7 @@ class Reminder(BaseModel):
             self.done = False
         return self
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def next_due(self) -> date | None:
         """Calculate when this reminder is next due."""
