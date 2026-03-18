@@ -1,6 +1,210 @@
 <script lang="ts">
-  // Will fetch from /api/plugins once the API is wired up
+  import { api } from "$lib/api";
+
+  interface SkillArchive {
+    id: string;
+    name: string;
+    owner: string;
+    archived_at: string;
+    file_count: number;
+    files: string[];
+  }
+
+  let archives: SkillArchive[] = $state([]);
+  let loading: boolean = $state(true);
+  let error: string | null = $state(null);
+
+  let expandedFiles: Set<string> = $state(new Set());
+  let confirmingDelete: string | null = $state(null);
+  let deleting: Set<string> = $state(new Set());
+  let restoring: Set<string> = $state(new Set());
+  let actionError: string | null = $state(null);
+
+  function formatDate(iso: string): string {
+    return new Date(iso).toLocaleString("en-US", {
+      month: "short", day: "numeric", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  }
+
+  function toggleFiles(id: string) {
+    const next = new Set(expandedFiles);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    expandedFiles = next;
+  }
+
+  async function fetchArchives() {
+    loading = true; error = null;
+    try {
+      const r = await api("/api/skills/archives");
+      if (!r.ok) throw new Error(`${r.status}`);
+      archives = (await r.json()).archives;
+    } catch (e: any) { error = e.message; }
+    loading = false;
+  }
+
+  function startDelete(id: string) { confirmingDelete = id; actionError = null; }
+  function cancelDelete() { confirmingDelete = null; }
+
+  async function confirmDelete(archive: SkillArchive) {
+    deleting = new Set([...deleting, archive.id]);
+    confirmingDelete = null; actionError = null;
+    try {
+      const r = await api(`/api/skills/archives/${archive.owner}/${archive.id}`, { method: "DELETE" });
+      if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail ?? `${r.status}`); }
+      archives = archives.filter(a => a.id !== archive.id);
+    } catch (e: any) { actionError = `Failed to delete "${archive.name}": ${e.message}`; }
+    const next = new Set(deleting); next.delete(archive.id); deleting = next;
+  }
+
+  async function restoreArchive(archive: SkillArchive) {
+    restoring = new Set([...restoring, archive.id]); actionError = null;
+    try {
+      const r = await api(`/api/skills/archives/${archive.owner}/${archive.id}/restore`, { method: "POST" });
+      if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail ?? `${r.status}`); }
+      archives = archives.filter(a => a.id !== archive.id);
+    } catch (e: any) { actionError = `Failed to restore "${archive.name}": ${e.message}`; }
+    const next = new Set(restoring); next.delete(archive.id); restoring = next;
+  }
+
+  $effect(() => { fetchArchives(); });
 </script>
 
-<h1>Plugins</h1>
-<p>Installed plugins and marketplace — coming soon.</p>
+{#if loading}
+  <div class="loading">
+    <div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div>
+  </div>
+{:else if error}
+  <div class="error-card"><p>Couldn't load skills data</p><small>{error}</small></div>
+{:else}
+  <header class="page-header" style="animation-delay: 0ms">
+    <h1>Plugins</h1>
+    <p class="subtitle">Manage installed skills and plugins</p>
+  </header>
+
+  <section class="section" style="animation-delay: 60ms">
+    <div class="section-header">
+      <h2>Skill archives</h2>
+      <p class="section-desc">Skills removed via chat are archived here. Restore them to bring them back, or delete permanently to free up space.</p>
+    </div>
+
+    {#if actionError}
+      <div class="action-error">{actionError}</div>
+    {/if}
+
+    {#if archives.length === 0}
+      <div class="empty">
+        <p>No archived skills</p>
+        <small>Skills removed via chat will appear here.</small>
+      </div>
+    {:else}
+      <div class="archive-list">
+        {#each archives as archive, i}
+          <div class="archive-card" style="animation-delay: {90 + i * 25}ms">
+            <div class="archive-title-row">
+              <div class="archive-identity">
+                <span class="archive-name">{archive.name}</span>
+                <span class="scope-badge" class:household={archive.owner === "household"}>
+                  {archive.owner === "household" ? "household" : archive.owner}
+                </span>
+              </div>
+              <div class="archive-actions">
+                {#if confirmingDelete === archive.id}
+                  <span class="confirm-text">Delete permanently?</span>
+                  <button class="btn btn-danger-sm" disabled={deleting.has(archive.id)} onclick={() => confirmDelete(archive)}>Yes, delete</button>
+                  <button class="btn btn-ghost-sm" onclick={cancelDelete}>Cancel</button>
+                {:else}
+                  <button class="btn btn-ghost-sm" disabled={restoring.has(archive.id)} onclick={() => restoreArchive(archive)}>
+                    {restoring.has(archive.id) ? "Restoring…" : "Restore"}
+                  </button>
+                  <button class="btn btn-danger-outline-sm" disabled={deleting.has(archive.id)} onclick={() => startDelete(archive.id)}>Delete</button>
+                {/if}
+              </div>
+            </div>
+
+            <div class="archive-meta">
+              <span class="meta-item">Archived {formatDate(archive.archived_at)}</span>
+              <button class="files-toggle" onclick={() => toggleFiles(archive.id)}>
+                {archive.file_count} {archive.file_count === 1 ? "file" : "files"}
+                <span class="toggle-arrow" class:open={expandedFiles.has(archive.id)}>▾</span>
+              </button>
+            </div>
+
+            {#if expandedFiles.has(archive.id)}
+              <ul class="file-list">
+                {#each archive.files as file}<li class="file-item">{file}</li>{/each}
+              </ul>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </section>
+{/if}
+
+<style>
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .page-header, .section, .empty { opacity: 0; animation: fadeUp 0.4s ease-out forwards; }
+
+  .loading { display: flex; justify-content: center; gap: 0.5rem; padding: 4rem 0; }
+  .loading-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--terracotta); opacity: 0.3; animation: pulse 1s ease-in-out infinite; }
+  .loading-dot:nth-child(2) { animation-delay: 0.15s; }
+  .loading-dot:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 1; transform: scale(1.2); } }
+
+  .error-card { background: #fef2f0; border: 1px solid #f0c4bc; border-radius: var(--radius); padding: 1.5rem; text-align: center; color: var(--terracotta); }
+  .error-card p { margin: 0 0 0.5rem; font-weight: 500; }
+  .error-card small { color: var(--text-muted); }
+
+  .action-error { background: #fef2f0; border: 1px solid #f0c4bc; border-radius: var(--radius); padding: 0.6rem 0.9rem; font-size: 0.83rem; color: var(--terracotta); margin-bottom: 1rem; }
+
+  .page-header { margin-bottom: 2rem; }
+  .page-header h1 { font-family: var(--font-serif); font-weight: 600; font-size: 2rem; margin: 0; color: var(--text); letter-spacing: -0.02em; }
+  .subtitle { font-size: 0.85rem; color: var(--text-muted); margin: 0.25rem 0 0; }
+
+  .section { margin-bottom: 2.5rem; }
+  .section-header { margin-bottom: 1rem; }
+  .section-header h2 { font-family: var(--font-serif); font-weight: 600; font-size: 1.2rem; margin: 0 0 0.3rem; color: var(--text); letter-spacing: -0.01em; }
+  .section-desc { font-size: 0.82rem; color: var(--text-muted); margin: 0; line-height: 1.5; }
+
+  .archive-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .archive-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1.1rem; transition: border-color 0.15s; opacity: 0; animation: fadeUp 0.4s ease-out forwards; }
+  .archive-card:hover { border-color: #d0c8be; }
+
+  .archive-title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+  .archive-identity { display: flex; align-items: center; gap: 0.5rem; }
+  .archive-name { font-weight: 600; font-size: 0.92rem; color: var(--text); }
+
+  .scope-badge { font-size: 0.68rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 4px; background: #f0ebe5; color: var(--text-muted); letter-spacing: 0.02em; }
+  .scope-badge.household { background: #eef4ef; color: var(--sage); }
+
+  .archive-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+  .confirm-text { font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
+
+  .archive-meta { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.4rem; flex-wrap: wrap; }
+  .meta-item { font-size: 0.75rem; color: var(--text-muted); }
+
+  .files-toggle { background: none; border: none; padding: 0; font-family: var(--font-sans); font-size: 0.75rem; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 0.2rem; transition: color 0.15s; }
+  .files-toggle:hover { color: var(--text); }
+  .toggle-arrow { display: inline-block; transition: transform 0.2s ease; font-size: 0.7rem; }
+  .toggle-arrow.open { transform: rotate(180deg); }
+
+  .file-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: #fdfcfa; border-left: 3px solid var(--border); border-radius: 4px; display: flex; flex-direction: column; gap: 0.15rem; }
+  .file-item { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }
+
+  .btn { border: none; border-radius: 6px; font-family: var(--font-sans); font-weight: 500; cursor: pointer; transition: filter 0.15s, opacity 0.15s; white-space: nowrap; }
+  .btn:disabled { opacity: 0.45; cursor: default; }
+  .btn-ghost-sm { background: transparent; border: 1px solid var(--border); color: var(--text-muted); font-size: 0.75rem; padding: 0.25rem 0.6rem; }
+  .btn-ghost-sm:not(:disabled):hover { background: #f5f2ee; color: var(--text); }
+  .btn-danger-outline-sm { background: transparent; border: 1px solid #f0c4bc; color: var(--terracotta); font-size: 0.75rem; padding: 0.25rem 0.6rem; }
+  .btn-danger-outline-sm:not(:disabled):hover { background: #fef2f0; }
+  .btn-danger-sm { background: var(--terracotta); color: #fff; font-size: 0.75rem; padding: 0.25rem 0.65rem; }
+  .btn-danger-sm:not(:disabled):hover { filter: brightness(1.1); }
+
+  .empty { text-align: center; padding: 2.5rem 1rem; color: var(--text-muted); background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); }
+  .empty p { font-family: var(--font-serif); font-style: italic; font-size: 1.05rem; margin: 0 0 0.4rem; }
+  .empty small { font-size: 0.82rem; }
+</style>
