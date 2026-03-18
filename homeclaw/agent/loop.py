@@ -50,9 +50,10 @@ MAX_TOOL_ROUNDS = 10
 _PERSONAL_WRITE_TOOLS = frozenset({
     "note_save",
     "memory_update",
-    "reminder_set",
+    "reminder_add",
     "reminder_complete",
     "reminder_delete",
+    "bookmark_save",
 })
 
 
