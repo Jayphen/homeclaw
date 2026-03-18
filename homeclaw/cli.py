@@ -189,7 +189,7 @@ def _dry_run(workspaces: Path, args: argparse.Namespace) -> None:
     from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
 
     context = asyncio.run(
-        build_context(message="(dry run)", person=args.person, workspaces=workspaces),
+        build_context(message="(dry run)", person=args.person.lower(), workspaces=workspaces),
     )
     system = SYSTEM_PROMPT.format(context=context)
 
@@ -218,7 +218,7 @@ def _run_chat(workspaces: Path, args: argparse.Namespace) -> None:
 
     async def _chat() -> None:
         app.start_scheduler()
-        await run_repl(person=args.person, loop=app.loop, on_tool_call=_print_tool_call)
+        await run_repl(person=args.person.lower(), loop=app.loop, on_tool_call=_print_tool_call)
 
     try:
         asyncio.run(_chat())

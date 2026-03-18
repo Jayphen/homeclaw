@@ -100,6 +100,7 @@ class AgentLoop:
                      and restrict context to household-level facts only.
             call_type: The type of call for model routing.
         """
+        person = person.lower()
         history_key = channel or person
         async with self._lock_for(history_key):
             return await self._run_inner(user_message, person, channel, call_type, history_key)
@@ -215,6 +216,10 @@ class AgentLoop:
         results: list[dict[str, Any]] = []
         for tc in tool_calls:
             args = dict(tc.arguments)
+
+            # Normalize person names to lowercase to prevent duplicate workspaces.
+            if "person" in args and isinstance(args["person"], str):
+                args["person"] = args["person"].lower()
 
             # In DMs, force personal-write tools to use the authenticated caller.
             if is_dm and tc.name in _PERSONAL_WRITE_TOOLS and "person" in args:
