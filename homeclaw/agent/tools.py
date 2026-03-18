@@ -808,6 +808,71 @@ def register_builtin_tools(
         bookmark_note,
     )
 
+    async def bookmark_note_edit(
+        *, bookmark_id: str, note_index: int, content: str, **_: Any
+    ) -> dict[str, Any]:
+        """Edit an existing note on a bookmark by its 1-based index."""
+        notes_dir = workspaces / "household" / "bookmarks" / "notes"
+        path = notes_dir / f"{bookmark_id}.md"
+        if not path.exists():
+            return {"error": f"No notes found for bookmark '{bookmark_id}'"}
+
+        lines = path.read_text().splitlines()
+        # Find note lines (start with "- [")
+        note_indices: list[int] = []
+        for i, line in enumerate(lines):
+            if line.startswith("- ["):
+                note_indices.append(i)
+
+        if not note_indices:
+            return {"error": "No note entries found in file"}
+        if note_index < 1 or note_index > len(note_indices):
+            return {
+                "error": (
+                    f"Invalid note_index {note_index}; "
+                    f"bookmark has {len(note_indices)} note(s)"
+                )
+            }
+
+        line_idx = note_indices[note_index - 1]
+        old_line = lines[line_idx]
+        # Preserve the original timestamp
+        bracket_end = old_line.index("] ")
+        timestamp_prefix = old_line[: bracket_end + 2]
+        lines[line_idx] = f"{timestamp_prefix}{content}"
+        path.write_text("\n".join(lines) + "\n")
+
+        return {"status": "updated", "bookmark_id": bookmark_id, "note_index": note_index}
+
+    registry.register(
+        ToolDefinition(
+            name="bookmark_note_edit",
+            description=(
+                "Edit an existing note on a bookmark. Use this to correct or update "
+                "a previous note rather than appending a new one."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "bookmark_id": {
+                        "type": "string",
+                        "description": "ID of the bookmark whose note to edit",
+                    },
+                    "note_index": {
+                        "type": "integer",
+                        "description": "1-based index of the note to edit (in chronological order)",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "New content to replace the existing note",
+                    },
+                },
+                "required": ["bookmark_id", "note_index", "content"],
+            },
+        ),
+        bookmark_note_edit,
+    )
+
     # --- Web tools (via Jina) ---
 
     def _jina_headers(accept: str = "text/markdown") -> dict[str, str]:
