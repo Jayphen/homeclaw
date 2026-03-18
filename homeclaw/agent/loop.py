@@ -21,6 +21,10 @@ schedules, contacts, reminders, home state, and daily routines.
 
 Be warm, concise, and practical. You are speaking with a household member, not a developer.
 
+In a direct message, notes, memory updates, and reminders always belong to the person \
+you are talking to. Use their name for the `person` parameter — never attribute their \
+notes or reminders to someone else, even if they mention another household member.
+
 When someone mentions they contacted, called, met, or messaged a person, always log it \
 with interaction_log so the household's records stay current. After logging, treat that \
 contact as up-to-date — do not describe them as overdue.
@@ -39,6 +43,17 @@ recommendations for a reason.
 {context}"""
 
 MAX_TOOL_ROUNDS = 10
+
+# Tools that write to a person's workspace. In DMs, the `person` argument
+# is forced to the authenticated caller so the LLM can't accidentally
+# attribute notes/memory/reminders to someone else.
+_PERSONAL_WRITE_TOOLS = frozenset({
+    "note_save",
+    "memory_update",
+    "reminder_set",
+    "reminder_complete",
+    "reminder_delete",
+})
 
 
 class AgentLoop:
@@ -130,7 +145,9 @@ class AgentLoop:
                 break
 
             # Dispatch tool calls
-            tool_results = await self._dispatch_tools(response.tool_calls)
+            tool_results = await self._dispatch_tools(
+                response.tool_calls, person=person, channel=channel,
+            )
             for tc, result in zip(response.tool_calls, tool_results):
                 history.append(
                     Message(
@@ -158,18 +175,34 @@ class AgentLoop:
         return response.content if response else ""
 
     async def _dispatch_tools(
-        self, tool_calls: list[ToolCall]
+        self,
+        tool_calls: list[ToolCall],
+        person: str,
+        channel: str | None,
     ) -> list[dict[str, Any]]:
+        is_dm = channel is None
         results: list[dict[str, Any]] = []
         for tc in tool_calls:
+            args = dict(tc.arguments)
+
+            # In DMs, force personal-write tools to use the authenticated caller.
+            if is_dm and tc.name in _PERSONAL_WRITE_TOOLS and "person" in args:
+                requested = args["person"]
+                if requested != person:
+                    logger.info(
+                        "Tool %s: overriding person %r → %r (DM enforcement)",
+                        tc.name, requested, person,
+                    )
+                    args["person"] = person
+
             if self._on_tool_call is not None:
-                self._on_tool_call(tc.name, tc.arguments)
+                self._on_tool_call(tc.name, args)
             handler = self._registry.get_handler(tc.name)
             if handler is None:
                 results.append({"error": f"Unknown tool: {tc.name}"})
                 continue
             try:
-                result = await handler(**tc.arguments)
+                result = await handler(**args)
                 results.append(result)
             except Exception as e:
                 logger.exception("Tool %s failed", tc.name)

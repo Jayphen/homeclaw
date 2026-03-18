@@ -139,3 +139,72 @@ async def test_history_persisted(
     assert user_msg["content"] == "Remember to buy milk"
     assert assistant_msg["role"] == "assistant"
     assert assistant_msg["content"] == "I've noted that."
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_dm_enforces_person_on_note_save(
+    mock_provider: AsyncMock, dev_workspaces: Path
+) -> None:
+    """In a DM (no channel), note_save should force person to the authenticated caller."""
+    mock_provider.complete.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCall(
+                    id="tc1",
+                    name="note_save",
+                    # LLM tries to write to "bob" but caller is "alice"
+                    arguments={"person": "bob", "content": "Test note"},
+                ),
+            ],
+            stop_reason="tool_use",
+        ),
+        LLMResponse(
+            content="Noted!",
+            tool_calls=[],
+            stop_reason="end_turn",
+        ),
+    ]
+
+    loop = _make_loop(mock_provider, dev_workspaces)
+    await loop.run("Save a note", person="alice")
+
+    # Note should be saved under alice, not bob
+    alice_notes = dev_workspaces / "alice" / "notes"
+    bob_notes = dev_workspaces / "bob" / "notes"
+    assert any(alice_notes.glob("*.md")), "Note should be saved under alice"
+    assert not any(bob_notes.glob("*.md")), "Note should NOT be saved under bob"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_group_chat_allows_cross_person_notes(
+    mock_provider: AsyncMock, dev_workspaces: Path
+) -> None:
+    """In a group chat (channel set), note_save should allow writing to any person."""
+    mock_provider.complete.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCall(
+                    id="tc1",
+                    name="note_save",
+                    arguments={"person": "bob", "content": "Group note for bob"},
+                ),
+            ],
+            stop_reason="tool_use",
+        ),
+        LLMResponse(
+            content="Done!",
+            tool_calls=[],
+            stop_reason="end_turn",
+        ),
+    ]
+
+    loop = _make_loop(mock_provider, dev_workspaces)
+    await loop.run("[alice] Save a note for bob", person="alice", channel="group-123")
+
+    # In group chat, bob's workspace should get the note
+    bob_notes = dev_workspaces / "bob" / "notes"
+    assert any(bob_notes.glob("*.md")), "Group chat should allow writing to bob"
