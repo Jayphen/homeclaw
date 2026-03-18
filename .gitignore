@@ -17,3 +17,9 @@ workspaces/
 
 # bv (beads viewer) local config and caches
 .bv/
+
+# Beads credential key
+.beads/.beads-credential-key
+
+# Dev workspace data
+workspaces-dev/
