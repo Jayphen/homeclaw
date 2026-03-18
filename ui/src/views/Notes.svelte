@@ -2,6 +2,7 @@
   import { marked } from "marked";
   import { format, parseISO } from "date-fns";
   import { api } from "$lib/api";
+  import MarkdownEditor from "$lib/MarkdownEditor.svelte";
 
   marked.setOptions({ breaks: true, gfm: true });
 
@@ -195,11 +196,7 @@
       </header>
       {#if editing}
         <div class="note-editor">
-          <textarea
-            class="note-textarea"
-            bind:value={editContent}
-            disabled={saving}
-          ></textarea>
+          <MarkdownEditor bind:value={editContent} disabled={saving} />
           <div class="editor-actions">
             <button class="btn btn-secondary" onclick={cancelEdit} disabled={saving}>Cancel</button>
             <button class="btn btn-primary" onclick={saveEdit} disabled={saving}>
@@ -646,27 +643,7 @@
     gap: 0.75rem;
   }
 
-  .note-textarea {
-    width: 100%;
-    min-height: 400px;
-    padding: 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.88rem;
-    line-height: 1.6;
-    color: var(--text);
-    background: var(--bg);
-    resize: vertical;
-    box-sizing: border-box;
-  }
-
-  .note-textarea:focus {
-    outline: none;
-    border-color: var(--terracotta);
-  }
-
-  .editor-actions {
+.editor-actions {
     display: flex;
     justify-content: flex-end;
     gap: 0.5rem;
