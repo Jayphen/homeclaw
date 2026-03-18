@@ -91,9 +91,12 @@
         };
         if (provider === "anthropic") {
           body.anthropic_api_key = anthropicKey;
+          body.openai_api_key = "";
+          body.openai_base_url = "";
         } else {
           body.openai_api_key = openaiKey;
           body.openai_base_url = openaiBaseUrl || null;
+          body.anthropic_api_key = "";
         }
         if (telegramToken.trim()) {
           body.telegram_token = telegramToken;
