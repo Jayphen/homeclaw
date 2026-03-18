@@ -23,11 +23,23 @@
 
   // Form state
   let setupToken: string = $state("");
-  let provider: "anthropic" | "openai" = $state("openai");
+  let provider: "anthropic" | "openai" = $state("anthropic");
   let anthropicKey: string = $state("");
   let openaiKey: string = $state("");
   let openaiBaseUrl: string = $state("https://openrouter.ai/api/v1");
-  let model: string = $state("anthropic/claude-sonnet-4-6");
+  let model: string = $state("claude-sonnet-4-6");
+
+  const providerDefaults: Record<string, { model: string; baseUrl?: string }> = {
+    anthropic: { model: "claude-sonnet-4-6" },
+    openai: { model: "anthropic/claude-sonnet-4-6", baseUrl: "https://openrouter.ai/api/v1" },
+  };
+
+  function switchProvider(p: "anthropic" | "openai") {
+    provider = p;
+    const defaults = providerDefaults[p];
+    model = defaults.model;
+    if (defaults.baseUrl) openaiBaseUrl = defaults.baseUrl;
+  }
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
   let webPassword: string = $state("");
@@ -157,11 +169,11 @@
       <div class="field-group">
         <span class="field-label">LLM provider</span>
         <div class="provider-toggle">
-          <button class:selected={provider === "openai"} onclick={() => { provider = "openai"; }}>
-            OpenAI / OpenRouter
-          </button>
-          <button class:selected={provider === "anthropic"} onclick={() => { provider = "anthropic"; }}>
+          <button class:selected={provider === "anthropic"} onclick={() => switchProvider("anthropic")}>
             Anthropic
+          </button>
+          <button class:selected={provider === "openai"} onclick={() => switchProvider("openai")}>
+            OpenAI / OpenRouter
           </button>
         </div>
 
@@ -189,7 +201,7 @@
         {/if}
 
         <label for="model">Model</label>
-        <input id="model" type="text" bind:value={model} placeholder="anthropic/claude-sonnet-4-6" />
+        <input id="model" type="text" bind:value={model} placeholder={providerDefaults[provider].model} />
       </div>
 
     {:else if step === 2}

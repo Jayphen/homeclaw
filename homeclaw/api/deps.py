@@ -2,6 +2,7 @@
 
 import logging
 import secrets
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from fastapi import Depends, HTTPException, Request
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 _config: HomeclawConfig | None = None
 _setup_token: str | None = None
+_on_telegram_configured: Callable[[str], Awaitable[None]] | None = None
 
 
 def set_config(config: HomeclawConfig) -> None:
@@ -54,6 +56,16 @@ def clear_setup_token() -> None:
 
 def verify_setup_token(token: str) -> bool:
     return _setup_token is not None and secrets.compare_digest(token, _setup_token)
+
+
+def set_on_telegram_configured(cb: Callable[[str], Awaitable[None]]) -> None:
+    """Register a callback to start Telegram when a token is configured via setup."""
+    global _on_telegram_configured
+    _on_telegram_configured = cb
+
+
+def get_on_telegram_configured() -> Callable[[str], Awaitable[None]] | None:
+    return _on_telegram_configured
 
 
 # Names to skip at any level during export/import (derived data, caches).

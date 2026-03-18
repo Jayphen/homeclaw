@@ -14,6 +14,12 @@ def create_provider(config: HomeclawConfig) -> LLMProvider:
             enable_prompt_caching=config.routing.enable_prompt_caching,
         )
 
+    if not config.openai_api_key and not config.openai_base_url:
+        raise ValueError(
+            "No LLM provider configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY "
+            "(via environment, .env, or the web UI setup)."
+        )
+
     from homeclaw.agent.providers.openai import OpenAIProvider
 
     # Direct OpenAI (no base_url) needs max_completion_tokens for reasoning models.

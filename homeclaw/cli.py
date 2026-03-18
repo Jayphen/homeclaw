@@ -230,8 +230,6 @@ def _run_serve(workspaces: Path, port: int) -> None:
     When TELEGRAM_TOKEN is configured, also starts the Telegram bot
     in the same process.
     """
-    import uvicorn
-
     from homeclaw.api.app import app, set_config
     from homeclaw.api.deps import generate_setup_token
     from homeclaw.config import HomeclawConfig
@@ -244,11 +242,10 @@ def _run_serve(workspaces: Path, port: int) -> None:
     if not config.web_password:
         generate_setup_token()
 
-    if config.telegram_token:
+    if config.telegram_token and config.is_provider_configured:
         _run_serve_with_telegram(app, config, workspaces, port)
     else:
-        logger.info("Starting web server on port %d (workspaces: %s)", port, workspaces)
-        uvicorn.run(app, host="0.0.0.0", port=port)
+        _run_serve_with_deferred_telegram(app, config, workspaces, port)
 
 
 def _run_serve_with_telegram(
@@ -286,6 +283,57 @@ def _run_serve_with_telegram(
         finally:
             await channel.stop()
             hc_app.shutdown()
+
+    asyncio.run(_serve())
+
+
+def _run_serve_with_deferred_telegram(
+    app: Any, config: Any, workspaces: Path, port: int
+) -> None:
+    """Run uvicorn, starting Telegram later if configured via setup."""
+    import uvicorn
+
+    from homeclaw.api.deps import set_on_telegram_configured
+    from homeclaw.channel.telegram import TelegramChannel
+
+    hc_app: HomeclawApp | None = None
+    channel: TelegramChannel | None = None
+
+    async def _start_telegram(token: str) -> None:
+        nonlocal hc_app, channel
+        if channel is not None:
+            logger.info("Telegram bot already running, skipping")
+            return
+        try:
+            hc_app = HomeclawApp(workspaces=workspaces)
+        except ValueError:
+            logger.warning("Cannot start Telegram bot — LLM provider not configured yet")
+            return
+        hc_app.load_scheduler()
+        channel = TelegramChannel(
+            token=token,
+            loop=hc_app.loop,
+            workspaces=workspaces,
+            on_scheduler_start=hc_app.start_scheduler,
+            allowed_user_ids=config.telegram_allowed_user_ids,
+        )
+        await channel.start()
+        hc_app.start_scheduler()
+        logger.info("Telegram bot started after setup")
+
+    set_on_telegram_configured(_start_telegram)
+
+    async def _serve() -> None:
+        uv_config = uvicorn.Config(app, host="0.0.0.0", port=port)
+        server = uvicorn.Server(uv_config)
+        logger.info("Starting web server on port %d (workspaces: %s)", port, workspaces)
+        try:
+            await server.serve()
+        finally:
+            if channel:
+                await channel.stop()
+            if hc_app:
+                hc_app.shutdown()
 
     asyncio.run(_serve())
 

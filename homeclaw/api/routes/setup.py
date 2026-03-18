@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from homeclaw.api.deps import (
     clear_setup_token,
     get_config,
+    get_on_telegram_configured,
     get_setup_token,
     verify_setup_token,
 )
@@ -119,5 +120,11 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
     # If a password was just set, invalidate the setup token.
     if body.web_password and get_setup_token() is not None:
         clear_setup_token()
+
+    # Start Telegram bot dynamically if token was just configured.
+    if body.telegram_token and config.telegram_token:
+        on_tg = get_on_telegram_configured()
+        if on_tg:
+            await on_tg(config.telegram_token)
 
     return await setup_status()
