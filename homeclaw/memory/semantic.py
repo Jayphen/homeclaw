@@ -20,6 +20,7 @@ class SemanticMemory:
     def __init__(self, workspaces_path: str) -> None:
         self._workspaces_path = workspaces_path
         self._mem: Any = None
+        self._watcher: Any = None
         self._enabled = False
 
     @property
@@ -52,14 +53,21 @@ class SemanticMemory:
                 milvus_uri=f"{self._workspaces_path}/{SEMANTIC_INDEX_PATH}",
             )
             await self._mem.index()
+            self._watcher = self._mem.watch()
             self._enabled = True
-            logger.info("Semantic memory indexed %d workspace paths", len(paths))
+            logger.info("Semantic memory indexed and watching %d workspace paths", len(paths))
         except ImportError:
             logger.debug("memsearch not installed — semantic memory disabled")
             self._enabled = False
         except Exception:
             logger.exception("Failed to initialize semantic memory")
             self._enabled = False
+
+    def stop(self) -> None:
+        """Stop the file watcher."""
+        if self._watcher is not None:
+            self._watcher.stop()
+            self._watcher = None
 
     async def recall(
         self,

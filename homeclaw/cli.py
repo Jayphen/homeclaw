@@ -158,6 +158,7 @@ class HomeclawApp:
 
     def shutdown(self) -> None:
         """Shut down background services."""
+        self._semantic_memory.stop()
         if self._scheduler:
             self._scheduler.shutdown()
 
