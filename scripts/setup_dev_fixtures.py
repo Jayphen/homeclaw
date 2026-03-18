@@ -34,12 +34,6 @@ SARAH_CHEN = {
     "nicknames": [],
     "relationship": "friend",
     "birthday": None,
-    "facts": [
-        "Lives in Brooklyn",
-        "Works as a UX designer at Figma",
-        "Has a golden retriever named Pixel",
-        "Allergic to shellfish",
-    ],
     "interactions": [
         {
             "date": "2026-01-20T15:30:00Z",
@@ -69,10 +63,6 @@ JAMES_KO = {
     "nicknames": ["Jim", "Jimmy"],
     "relationship": "colleague",
     "birthday": "1990-03-22",
-    "facts": [
-        "Team lead on the backend team",
-        "Into rock climbing",
-    ],
     "interactions": [
         {
             "date": "2026-03-01T10:00:00Z",
@@ -90,12 +80,6 @@ GRANDMA_ELEANOR = {
     "nicknames": ["Grandma", "Nana", "Gran"],
     "relationship": "family",
     "birthday": "1948-06-15",
-    "facts": [
-        "Lives in Portland",
-        "Loves gardening",
-        "Has a cat named Whiskers",
-        "Takes medication at 8am and 8pm",
-    ],
     "interactions": [
         {
             "date": "2026-02-20T14:00:00Z",
@@ -118,33 +102,62 @@ GRANDMA_ELEANOR = {
     "last_contact": "2026-02-20T14:00:00Z",
 }
 
-ALICE_MEMORY = {
-    "facts": [
-        "Vegetarian",
-        "Works Monday-Friday 9-5 at a marketing agency",
-        "Prefers morning reminders before 8am",
-        "Has a cat named Mochi",
-    ],
-    "preferences": {
-        "reminder_time": "7:30am",
-        "communication_style": "brief and friendly",
-        "dietary": "vegetarian",
-    },
-    "last_updated": "2026-03-15T10:00:00Z",
-}
+ALICE_MEMORY_PERSONAL = """\
+# personal
 
-BOB_MEMORY = {
-    "facts": [
-        "Runs on weekends, usually Saturday morning",
-        "Enjoys cooking, especially Italian food",
-        "Managing the kitchen renovation project",
-        "Works from home as a software engineer",
-    ],
-    "preferences": {
-        "reminder_time": "8:00am",
-        "communication_style": "detailed and thorough",
-    },
-    "last_updated": "2026-03-14T16:00:00Z",
+- [2026-03-10 09:00] Vegetarian
+- [2026-03-10 09:00] Works Monday-Friday 9-5 at a marketing agency
+- [2026-03-10 09:00] Prefers morning reminders before 8am
+- [2026-03-10 09:00] Has a cat named Mochi
+"""
+
+ALICE_MEMORY_PREFS = """\
+# preferences
+
+- [2026-03-10 09:00] Reminder time: 7:30am
+- [2026-03-10 09:00] Communication style: brief and friendly
+- [2026-03-10 09:00] Dietary: vegetarian
+"""
+
+BOB_MEMORY_PERSONAL = """\
+# personal
+
+- [2026-03-10 12:00] Runs on weekends, usually Saturday morning
+- [2026-03-10 12:00] Enjoys cooking, especially Italian food
+- [2026-03-10 12:00] Managing the kitchen renovation project
+- [2026-03-10 12:00] Works from home as a software engineer
+"""
+
+BOB_MEMORY_PREFS = """\
+# preferences
+
+- [2026-03-10 12:00] Reminder time: 8:00am
+- [2026-03-10 12:00] Communication style: detailed and thorough
+"""
+
+CONTACT_NOTES = {
+    "sarah-chen": """\
+# Sarah Chen
+
+- [2025-11-08 12:00] Lives in Brooklyn
+- [2025-11-08 12:00] Works as a UX designer at Figma
+- [2025-11-08 12:00] Has a golden retriever named Pixel
+- [2025-12-15 18:00] Allergic to shellfish
+""",
+    "james-ko": """\
+# James Ko
+
+- [2026-03-01 10:00] Team lead on the backend team
+- [2026-03-01 10:00] Into rock climbing
+""",
+    "grandma-eleanor": """\
+# Eleanor
+
+- [2026-01-10 11:00] Lives in Portland
+- [2026-01-10 11:00] Loves gardening
+- [2026-01-10 11:00] Has a cat named Whiskers
+- [2026-02-20 14:00] Takes medication at 8am and 8pm
+""",
 }
 
 # History — clean baseline with realistic exchanges (user/assistant only)
@@ -285,11 +298,17 @@ def _build_manifest() -> list[tuple[Path, str]]:
         (Path("household/notes/2026-03-10.md"), HOUSEHOLD_NOTE_0310),
         (Path("household/notes/2026-03-14.md"), HOUSEHOLD_NOTE_0314),
         (Path("household/ROUTINES.md"), ROUTINES_MD),
-        (Path("alice/memory.json"), _json(ALICE_MEMORY)),
+        (Path("alice/memory/personal.md"), ALICE_MEMORY_PERSONAL),
+        (Path("alice/memory/preferences.md"), ALICE_MEMORY_PREFS),
         (Path("alice/history.jsonl"), _jsonl(ALICE_HISTORY)),
         (Path("alice/notes/2026-03-12.md"), ALICE_NOTE_0312),
-        (Path("bob/memory.json"), _json(BOB_MEMORY)),
+        (Path("bob/memory/personal.md"), BOB_MEMORY_PERSONAL),
+        (Path("bob/memory/preferences.md"), BOB_MEMORY_PREFS),
         (Path("bob/history.jsonl"), _jsonl(BOB_HISTORY)),
+        *[
+            (Path(f"household/contacts/notes/{cid}.md"), content)
+            for cid, content in CONTACT_NOTES.items()
+        ],
         (Path("plugins/plants/plants.json"), _json(PLANTS)),
         (Path("plugins/plants/plugin.py"), PLANTS_PLUGIN_PY),
         (Path("cost_log.jsonl"), _jsonl(COST_LOG_ENTRIES)),

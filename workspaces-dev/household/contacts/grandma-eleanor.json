@@ -8,12 +8,6 @@
   ],
   "relationship": "family",
   "birthday": "1948-06-15",
-  "facts": [
-    "Lives in Portland",
-    "Loves gardening",
-    "Has a cat named Whiskers",
-    "Takes medication at 8am and 8pm"
-  ],
   "interactions": [
     {
       "date": "2026-02-20T14:00:00Z",
