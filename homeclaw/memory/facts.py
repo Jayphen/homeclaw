@@ -10,7 +10,7 @@ from homeclaw.locking import LockPool
 
 class HouseholdMemory(BaseModel):
     facts: list[str] = []
-    preferences: dict[str, str] = {}
+    preferences: dict[str, str | list[str]] = {}
     last_updated: datetime | None = None
 
 

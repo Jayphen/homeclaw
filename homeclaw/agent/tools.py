@@ -261,7 +261,7 @@ def register_builtin_tools(
         *,
         person: str,
         facts: list[str] | None = None,
-        preferences: dict[str, str] | None = None,
+        preferences: dict[str, str | list[str]] | None = None,
         **_: Any,
     ) -> dict[str, Any]:
         memory = load_memory(workspaces, person)
