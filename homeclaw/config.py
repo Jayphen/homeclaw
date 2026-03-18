@@ -95,6 +95,9 @@ class HomeclawConfig(BaseSettings):
     web_port: int = 8080
     web_password: str = ""
 
+    # Marketplace
+    marketplace_url: str | None = None
+
     # Paths
     workspaces_path: str = "./workspaces"
 
