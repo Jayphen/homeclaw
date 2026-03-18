@@ -15,6 +15,7 @@ from homeclaw.bookmarks.store import (
     list_bookmarks,
     save_bookmark,
     search_bookmarks,
+    update_bookmark,
 )
 from homeclaw.contacts.models import Contact, Interaction, InteractionType
 from homeclaw.contacts.store import (
@@ -704,6 +705,46 @@ def register_builtin_tools(
             },
         ),
         bookmark_delete,
+    )
+
+    async def bookmark_update(
+        *,
+        id: str,
+        url: str | None = None,
+        title: str | None = None,
+        category: str | None = None,
+        tags: list[str] | None = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        result = update_bookmark(workspaces, id, url=url, title=title, category=category, tags=tags)
+        if result is None:
+            return {"error": f"Bookmark '{id}' not found"}
+        return {"status": "updated", "id": result.id, "title": result.title, "url": result.url}
+
+    registry.register(
+        ToolDefinition(
+            name="bookmark_update",
+            description=(
+                "Update an existing bookmark. Use this to add or change the URL, title, "
+                "category, or tags on a saved bookmark. Only provide the fields to change."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "Bookmark ID"},
+                    "url": {"type": "string", "description": "New URL"},
+                    "title": {"type": "string", "description": "New title"},
+                    "category": {"type": "string", "description": "New category"},
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "New tags (replaces existing tags)",
+                    },
+                },
+                "required": ["id"],
+            },
+        ),
+        bookmark_update,
     )
 
     async def bookmark_categories(**_: Any) -> dict[str, Any]:

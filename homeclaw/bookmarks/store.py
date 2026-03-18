@@ -93,6 +93,31 @@ def get_categories(workspaces: Path) -> list[str]:
     return sorted({b.category for b in bookmarks if b.category})
 
 
+def update_bookmark(
+    workspaces: Path,
+    bookmark_id: str,
+    url: str | None = None,
+    title: str | None = None,
+    category: str | None = None,
+    tags: list[str] | None = None,
+) -> Bookmark | None:
+    """Update fields on an existing bookmark. Returns updated bookmark or None if not found."""
+    bookmarks = _load_all(workspaces)
+    for b in bookmarks:
+        if b.id == bookmark_id:
+            if url is not None:
+                b.url = url
+            if title is not None:
+                b.title = title
+            if category is not None:
+                b.category = category
+            if tags is not None:
+                b.tags = tags
+            _save_all(workspaces, bookmarks)
+            return b
+    return None
+
+
 def delete_bookmark(workspaces: Path, bookmark_id: str) -> bool:
     bookmarks = _load_all(workspaces)
     original_len = len(bookmarks)
