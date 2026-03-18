@@ -42,12 +42,25 @@ Run `make typecheck` before closing any issue. Zero errors required.
 - Tool schemas in `homeclaw/agent/tools.py` must mirror the Pydantic models they wrap — when you add/change a Literal, enum, or field on a model, update the corresponding tool schema `enum`/`properties` to match
 - **DM person enforcement**: Tools that write to a person's workspace (`_PERSONAL_WRITE_TOOLS` in `homeclaw/agent/loop.py`) have their `person` argument forced to the authenticated caller in DMs. If you add a new tool that writes to `workspaces/{person}/`, add it to `_PERSONAL_WRITE_TOOLS`. Read-only tools and cross-person tools like `message_send` are intentionally excluded.
 
-## Memory — two distinct layers
+## Memory — markdown + memsearch
 
-1. **Structured facts** (Layer 1, always on): `homeclaw/memory/facts.py`, stored as `workspaces/{person}/memory.json`
-2. **Semantic recall** (Layer 2, opt-in): `homeclaw/memory/semantic.py`, uses memsearch with Milvus Lite
+Memory is stored as **markdown files** at `workspaces/{person}/memory/{topic}.md`, one file per
+topic (e.g. `food.md`, `health.md`, `routines.md`). Entries are append-only with timestamps.
+Household-wide knowledge goes under `workspaces/household/memory/`.
 
-Do not conflate them. Layer 1 is injected in full into every context. Layer 2 returns top-k results only.
+[memsearch](https://github.com/zilliztech/memsearch) (`homeclaw/memory/semantic.py`) indexes all
+workspace content (notes, memory, contacts) into a Milvus Lite vector DB for semantic recall:
+
+- **On startup**: `index()` builds the initial index, then `watch()` monitors for file changes
+- **During conversation**: the context builder queries memsearch for top-k relevant chunks
+- **Privacy**: recall is scoped per-person — a member only sees their own workspace + household
+- **Source of truth**: markdown files on disk. The vector DB is a derived index that can be rebuilt
+
+The agent writes memory via `memory_save` (append to topic file) and reads via `memory_read`
+(list topics or read a specific one). No read-then-merge needed — writes are always appends.
+
+Structured data (bookmarks, contacts) stays as JSON with its own search tools — memsearch only
+indexes `.md` files.
 
 ## Plugin system — three tiers
 
@@ -63,7 +76,7 @@ All conform to the Plugin Protocol in `homeclaw/plugins/interface.py`.
 homeclaw/           # Main Python package
   agent/            # LLM loop, context builder, tools, providers
   channel/          # Telegram adapter
-  memory/           # Structured facts + semantic recall
+  memory/           # Markdown memory store + memsearch semantic recall
   contacts/         # Contact models and store
   scheduler/        # APScheduler + ROUTINES.md parser
   api/              # FastAPI app + routes

@@ -3,7 +3,6 @@
 from datetime import date, datetime, timezone
 
 from homeclaw.contacts.models import Contact, ContactReminder, Interaction
-from homeclaw.memory.facts import HouseholdMemory
 
 
 def test_contact_minimal():
@@ -36,21 +35,3 @@ def test_contact_full():
     assert c.birthday == date(1990, 5, 15)
     assert len(c.interactions) == 1
     assert c.last_contact == datetime(2026, 3, 1, tzinfo=timezone.utc)
-
-
-def test_household_memory_defaults():
-    """HouseholdMemory has sensible defaults."""
-    m = HouseholdMemory()
-    assert m.facts == []
-    assert m.preferences == {}
-    assert m.last_updated is None
-
-
-def test_household_memory_with_data():
-    """HouseholdMemory accepts facts and preferences."""
-    m = HouseholdMemory(
-        facts=["Vegetarian", "Has a cat"],
-        preferences={"reminder_time": "8am"},
-    )
-    assert len(m.facts) == 2
-    assert m.preferences["reminder_time"] == "8am"
