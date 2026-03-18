@@ -32,7 +32,6 @@ class Contact(BaseModel):
     nicknames: list[str] = []
     relationship: str
     birthday: date | None = None
-    facts: list[str] = []
     interactions: list[Interaction] = []
     reminders: list[ContactReminder] = []
     member: str | None = None  # workspace name if this contact is also a household member

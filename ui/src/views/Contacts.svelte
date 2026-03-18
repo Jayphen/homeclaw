@@ -30,11 +30,11 @@
     nicknames: string[];
     relationship: string;
     birthday: string | null;
-    facts: string[];
     interactions: Interaction[];
     reminders: ContactReminder[];
     last_contact: string | null;
     member: string | null;
+    notes_md: string | null;
   }
 
   let contacts: ContactSummary[] = $state([]);
@@ -201,15 +201,11 @@
             {/if}
           </section>
 
-          <!-- Facts -->
-          {#if selected.facts.length > 0}
+          <!-- Notes -->
+          {#if selected.notes_md}
             <section class="card">
-              <h3>Facts</h3>
-              <ul class="facts-list">
-                {#each selected.facts as fact}
-                  <li>{fact}</li>
-                {/each}
-              </ul>
+              <h3>Notes</h3>
+              <pre class="contact-notes">{selected.notes_md}</pre>
             </section>
           {/if}
 
@@ -683,26 +679,15 @@
     font-weight: 500;
   }
 
-  /* ---- Facts list ---- */
-  .facts-list li {
-    position: relative;
-    padding-left: 0.8rem;
-  }
-
-  .facts-list li::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 50%;
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: var(--sage);
-    transform: translateY(-50%);
-  }
-
-  .facts-list li:first-child {
-    padding-top: 0;
+  /* ---- Contact notes ---- */
+  .contact-notes {
+    font-family: var(--font-sans);
+    font-size: 0.84rem;
+    line-height: 1.5;
+    color: var(--text);
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
   }
 
   /* ---- Empty state ---- */

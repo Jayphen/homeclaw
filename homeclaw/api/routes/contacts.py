@@ -16,7 +16,14 @@ class ContactUpdate(BaseModel):
     name: str | None = None
     nicknames: list[str] | None = None
     relationship: str | None = None
-    facts: list[str] | None = None
+
+
+def _notes_for(workspaces: Any, contact_id: str) -> str | None:
+    """Read the markdown notes file for a contact, if it exists."""
+    path = workspaces / "household" / "contacts" / "notes" / f"{contact_id}.md"
+    if not path.is_file():
+        return None
+    return path.read_text()
 
 
 @router.get("", dependencies=[AuthDep])
@@ -44,7 +51,9 @@ async def contacts_detail(contact_id: str) -> dict[str, Any]:
     contact = get_contact(workspaces, contact_id)
     if not contact:
         raise HTTPException(status_code=404, detail=f"Contact '{contact_id}' not found")
-    return contact.model_dump(mode="json")
+    data = contact.model_dump(mode="json")
+    data["notes_md"] = _notes_for(workspaces, contact.id)
+    return data
 
 
 @router.put("/{contact_id}", dependencies=[AuthDep])
@@ -64,12 +73,6 @@ async def contacts_update(contact_id: str, body: ContactUpdate) -> dict[str, Any
         contact.nicknames = body.nicknames
     if body.relationship is not None:
         contact.relationship = body.relationship
-    if body.facts is not None:
-        existing = {f.lower() for f in contact.facts}
-        for f in body.facts:
-            if f.lower() not in existing:
-                contact.facts.append(f)
-                existing.add(f.lower())
 
     save_contact(workspaces, contact)
     return {"status": "updated", "id": contact.id}

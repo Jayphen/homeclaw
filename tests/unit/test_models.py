@@ -9,7 +9,6 @@ def test_contact_minimal():
     """Contact can be created with just required fields."""
     c = Contact(id="test", name="Test Person", relationship="friend")
     assert c.id == "test"
-    assert c.facts == []
     assert c.interactions == []
 
 
@@ -20,7 +19,6 @@ def test_contact_full():
         name="Jane Doe",
         relationship="family",
         birthday=date(1990, 5, 15),
-        facts=["Likes tea"],
         interactions=[
             Interaction(
                 date=datetime(2026, 3, 1, tzinfo=timezone.utc),

@@ -140,7 +140,6 @@ def register_builtin_tools(
         name: str | None = None,
         nicknames: list[str] | None = None,
         relationship: str | None = None,
-        facts: list[str] | None = None,
         **_: Any,
     ) -> dict[str, Any]:
         contact = get_contact(workspaces, id)
@@ -152,13 +151,6 @@ def register_builtin_tools(
             contact.nicknames = nicknames
         if relationship:
             contact.relationship = relationship
-        if facts is not None:
-            # Append new facts, deduplicating against existing ones
-            existing = {f.lower() for f in contact.facts}
-            for f in facts:
-                if f.lower() not in existing:
-                    contact.facts.append(f)
-                    existing.add(f.lower())
         save_contact(workspaces, contact)
         return {"status": "updated", "id": id}
 
@@ -182,16 +174,58 @@ def register_builtin_tools(
                             "Relationship (e.g. 'wife', 'mother', 'friend', 'pet')"
                         ),
                     },
-                    "facts": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "New facts to add (appended to existing, not replaced)",
-                    },
                 },
                 "required": ["id"],
             },
         ),
         contact_update,
+    )
+
+    async def contact_note(
+        *, contact_id: str, content: str, **_: Any
+    ) -> dict[str, Any]:
+        """Add a note about a contact — stored as markdown for semantic search."""
+        contact = get_contact(workspaces, contact_id)
+        if contact is None:
+            return {"error": f"Contact '{contact_id}' not found"}
+
+        notes_dir = workspaces / "household" / "contacts" / "notes"
+        notes_dir.mkdir(parents=True, exist_ok=True)
+        path = notes_dir / f"{contact.id}.md"
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+
+        if not path.exists():
+            path.write_text(f"# {contact.name}\n\n- [{timestamp}] {content}\n")
+        else:
+            with path.open("a") as f:
+                f.write(f"- [{timestamp}] {content}\n")
+
+        return {"status": "saved", "contact_id": contact.id, "name": contact.name}
+
+    registry.register(
+        ToolDefinition(
+            name="contact_note",
+            description=(
+                "Add a note about a contact — a fact, observation, preference, or "
+                "anything worth remembering about this person. Notes are searchable "
+                "via semantic memory. Use this instead of storing facts on the contact."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "contact_id": {
+                        "type": "string",
+                        "description": "Contact ID",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The note to add about this contact",
+                    },
+                },
+                "required": ["contact_id", "content"],
+            },
+        ),
+        contact_note,
     )
 
     async def interaction_log(

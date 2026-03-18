@@ -91,21 +91,42 @@ async def test_contact_update_creates_new(
 
 
 @pytest.mark.asyncio
-async def test_contact_update_modifies_facts(
+async def test_contact_note_creates_markdown(
     registry: ToolRegistry, dev_workspaces: Path
 ) -> None:
-    handler = registry.get_handler("contact_update")
+    handler = registry.get_handler("contact_note")
     assert handler is not None
-    new_facts = ["Loves hiking", "Has two dogs"]
-    result = await handler(id="james-ko", facts=new_facts)
-    assert result["status"] == "updated"
-    contact = get_contact(dev_workspaces, "james-ko")
-    assert contact is not None
-    # facts are appended, not replaced
-    assert "Team lead on the backend team" in contact.facts
-    assert "Into rock climbing" in contact.facts
-    assert "Loves hiking" in contact.facts
-    assert "Has two dogs" in contact.facts
+    result = await handler(contact_id="james-ko", content="Loves hiking")
+    assert result["status"] == "saved"
+
+    path = dev_workspaces / "household" / "contacts" / "notes" / "james-ko.md"
+    assert path.exists()
+    text = path.read_text()
+    assert "James Ko" in text
+    assert "Loves hiking" in text
+
+
+@pytest.mark.asyncio
+async def test_contact_note_appends(
+    registry: ToolRegistry, dev_workspaces: Path
+) -> None:
+    handler = registry.get_handler("contact_note")
+    assert handler is not None
+    await handler(contact_id="james-ko", content="First note")
+    await handler(contact_id="james-ko", content="Second note")
+
+    path = dev_workspaces / "household" / "contacts" / "notes" / "james-ko.md"
+    text = path.read_text()
+    assert "First note" in text
+    assert "Second note" in text
+
+
+@pytest.mark.asyncio
+async def test_contact_note_nonexistent(registry: ToolRegistry) -> None:
+    handler = registry.get_handler("contact_note")
+    assert handler is not None
+    result = await handler(contact_id="nobody", content="test")
+    assert "error" in result
 
 
 @pytest.mark.asyncio

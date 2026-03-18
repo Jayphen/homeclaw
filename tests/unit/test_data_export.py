@@ -28,7 +28,7 @@ def _seed_workspace(ws: Path) -> None:
         json.dumps({"facts": ["We have a cat named Mochi"], "preferences": {}})
     )
     (household / "contacts" / "james-ko.json").write_text(
-        json.dumps({"id": "james-ko", "name": "James Ko", "relationship": "friend", "facts": []})
+        json.dumps({"id": "james-ko", "name": "James Ko", "relationship": "friend"})
     )
     (household / "bookmarks" / "bookmarks.json").write_text(
         json.dumps([{"id": "b1", "title": "Pizza Place", "category": "place"}])
