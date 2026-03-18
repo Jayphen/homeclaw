@@ -577,8 +577,6 @@ def register_builtin_tools(
         category: str = "other",
         url: str | None = None,
         tags: list[str] | None = None,
-        neighborhood: str = "",
-        city: str = "",
         person: str = "",
         **_: Any,
     ) -> dict[str, Any]:
@@ -592,8 +590,6 @@ def register_builtin_tools(
             tags=tags or [],
             saved_by=person,
             saved_at=datetime.now(timezone.utc),
-            neighborhood=neighborhood,
-            city=city,
         )
         saved = save_bookmark(workspaces, bookmark)
         return {"status": "saved", "id": saved.id, "title": saved.title}
@@ -622,8 +618,6 @@ def register_builtin_tools(
                         "items": {"type": "string"},
                         "description": "Tags (e.g. 'italian', 'rooftop', 'brunch', 'vegan')",
                     },
-                    "neighborhood": {"type": "string", "description": "Neighborhood or area"},
-                    "city": {"type": "string", "description": "City"},
                     "person": {"type": "string", "description": "Who saved this"},
                 },
                 "required": ["title"],

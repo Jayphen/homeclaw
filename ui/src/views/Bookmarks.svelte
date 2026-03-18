@@ -9,8 +9,6 @@
     tags: string[];
     saved_by: string;
     saved_at: string | null;
-    neighborhood: string;
-    city: string;
     notes_md: string | null;
   }
 
@@ -32,9 +30,7 @@
       results = results.filter(
         (b) =>
           b.title.toLowerCase().includes(q) ||
-          b.tags.some((t) => t.toLowerCase().includes(q)) ||
-          b.neighborhood.toLowerCase().includes(q) ||
-          b.city.toLowerCase().includes(q),
+          b.tags.some((t) => t.toLowerCase().includes(q)),
       );
     }
     return results;
@@ -152,12 +148,6 @@
                 title="Delete bookmark"
               >&times;</button>
             </div>
-
-            {#if bm.neighborhood || bm.city}
-              <span class="bm-location">
-                {[bm.neighborhood, bm.city].filter(Boolean).join(", ")}
-              </span>
-            {/if}
 
             {#if bm.notes_md}
               <pre class="bm-notes">{bm.notes_md}</pre>
@@ -361,11 +351,6 @@
 
   .bookmark-card:hover .bm-delete { opacity: 1; }
   .bm-delete:hover { color: var(--terracotta); }
-
-  .bm-location {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-  }
 
   .bm-notes {
     font-family: var(--font-sans);

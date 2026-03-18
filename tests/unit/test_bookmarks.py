@@ -65,9 +65,9 @@ def test_filter_by_tag(workspaces: Path) -> None:
 
 
 def test_search(workspaces: Path) -> None:
-    save_bookmark(workspaces, _make_bookmark(id="a", title="Klunkerkranich", neighborhood="Kreuzberg", url=None))
+    save_bookmark(workspaces, _make_bookmark(id="a", title="Klunkerkranich", tags=["rooftop", "bar"], url=None))
     save_bookmark(workspaces, _make_bookmark(id="b", title="Pasta Carbonara", category="recipe", url=None))
-    results = search_bookmarks(workspaces, "kreuzberg")
+    results = search_bookmarks(workspaces, "rooftop")
     assert len(results) >= 1
     assert results[0].title == "Klunkerkranich"
 

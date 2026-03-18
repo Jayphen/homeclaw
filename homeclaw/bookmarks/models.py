@@ -13,5 +13,3 @@ class Bookmark(BaseModel):
     tags: list[str] = []
     saved_by: str = ""
     saved_at: datetime | None = None
-    neighborhood: str = ""
-    city: str = ""

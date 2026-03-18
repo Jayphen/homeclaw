@@ -40,8 +40,6 @@ def save_bookmark(workspaces: Path, bookmark: Bookmark) -> Bookmark:
                 existing.title = bookmark.title or existing.title
                 existing.category = bookmark.category
                 existing.tags = bookmark.tags or existing.tags
-                existing.neighborhood = bookmark.neighborhood or existing.neighborhood
-                existing.city = bookmark.city or existing.city
                 _save_all(workspaces, bookmarks)
                 return existing
     bookmarks.append(bookmark)
@@ -72,10 +70,6 @@ def search_bookmarks(workspaces: Path, query: str) -> list[Bookmark]:
     for b in bookmarks:
         candidates = [b.title.lower()]
         candidates.extend(t.lower() for t in b.tags)
-        if b.neighborhood:
-            candidates.append(b.neighborhood.lower())
-        if b.city:
-            candidates.append(b.city.lower())
         if b.category:
             candidates.append(b.category.lower())
 
