@@ -40,6 +40,7 @@ Run `make typecheck` before closing any issue. Zero errors required.
 - The agent loop is provider-agnostic — never import Anthropic/OpenAI SDK directly in the loop
 - Provider factory (`homeclaw/agent/providers/factory.py`) returns the correct provider from config
 - Tool schemas in `homeclaw/agent/tools.py` must mirror the Pydantic models they wrap — when you add/change a Literal, enum, or field on a model, update the corresponding tool schema `enum`/`properties` to match
+- **DM person enforcement**: Tools that write to a person's workspace (`_PERSONAL_WRITE_TOOLS` in `homeclaw/agent/loop.py`) have their `person` argument forced to the authenticated caller in DMs. If you add a new tool that writes to `workspaces/{person}/`, add it to `_PERSONAL_WRITE_TOOLS`. Read-only tools and cross-person tools like `message_send` are intentionally excluded.
 
 ## Memory — two distinct layers
 
