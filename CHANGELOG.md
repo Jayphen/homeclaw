@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.2.0](https://github.com/Jayphen/homeclaw/compare/v0.1.9...v0.2.0) (2026-03-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* facts field removed from Contact model.
+* memory_update tool replaced by memory_save, household_share now takes topic+content instead of fact.
+
+### Features
+
+* add bookmark_note tool, remove notes field from bookmarks ([6349c4e](https://github.com/Jayphen/homeclaw/commit/6349c4ec43624140a369e38f0b9fad04424a20ca))
+* add bookmarks API route and UI view ([b58dada](https://github.com/Jayphen/homeclaw/commit/b58dada025ef07b810d93cf8f6f9436aefb5b602))
+* replace contact facts with markdown notes ([6a64559](https://github.com/Jayphen/homeclaw/commit/6a64559175f2e1c3ce29009ba605d1fbc4fde66d))
+* replace JSON memory with markdown topics and semantic recall ([bcaf700](https://github.com/Jayphen/homeclaw/commit/bcaf7007c66f7646055a7355046aecd5263282b3))
+* show bookmark notes in the web UI ([7fd310b](https://github.com/Jayphen/homeclaw/commit/7fd310b852ca28e09ea7f9a060d3deaad3f8cc5e))
+* show typing indicator in Telegram while bot is processing ([c7d4630](https://github.com/Jayphen/homeclaw/commit/c7d4630585ad25285f097807ff7ec8c169022796))
+
+
+### Bug Fixes
+
+* allow list values in memory preferences to prevent 500 ([6e7159b](https://github.com/Jayphen/homeclaw/commit/6e7159b07e06a39911f95bc279db978ff62a8eee))
+* instruct agent to proactively store memory about household members ([e0055a4](https://github.com/Jayphen/homeclaw/commit/e0055a46c0d665f3f62d48fe17cf3386fbad40e5))
+* resolve 3 new P1 state drift issues from re-audit ([7cd796f](https://github.com/Jayphen/homeclaw/commit/7cd796f931d2c1d4cb5d0836fd7f74a3b54557cd))
+* use memsearch file watcher for live reindexing ([ca71bd7](https://github.com/Jayphen/homeclaw/commit/ca71bd7be0881f6bb67b9bc9b976deedfa3ba1b1))
+
 ## [0.1.9](https://github.com/Jayphen/homeclaw/compare/v0.1.8...v0.1.9) (2026-03-18)
 
 
