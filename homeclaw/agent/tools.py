@@ -1,13 +1,12 @@
 """Tool registry, built-in tool definitions, and handlers."""
 
-import asyncio
 import logging
 from collections.abc import Callable, Coroutine
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, get_args
 
-from homeclaw import HOUSEHOLD_WORKSPACE, SEMANTIC_INDEX_PATH
+from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.agent.providers.base import ToolDefinition
 from homeclaw.bookmarks.models import Bookmark
 from homeclaw.bookmarks.store import (
@@ -57,41 +56,11 @@ class ToolRegistry:
         return True
 
 
-async def _watch_for_index(
-    workspaces: Path,
-    on_ready: Callable[[str], Coroutine[Any, Any, None]],
-    poll_interval: float = 5.0,
-    timeout: float = 300.0,
-) -> None:
-    """Poll for the Milvus index file and notify when it appears."""
-    index_path = workspaces / SEMANTIC_INDEX_PATH
-    elapsed = 0.0
-    while elapsed < timeout:
-        await asyncio.sleep(poll_interval)
-        elapsed += poll_interval
-        if index_path.exists():
-            _logger.info("Semantic index ready at %s", index_path)
-            try:
-                await on_ready(
-                    "Semantic memory is now fully set up — the "
-                    "embedding model has been downloaded and your "
-                    "notes and contacts are indexed. Recall search "
-                    "is ready to use."
-                )
-            except Exception:
-                _logger.exception("Failed to send semantic ready notification")
-            return
-    _logger.warning(
-        "Timed out waiting for semantic index after %.0fs", timeout
-    )
-
-
 def register_builtin_tools(
     registry: ToolRegistry,
     workspaces: Path,
     on_routines_changed: Callable[[], None] | None = None,
     config: Any = None,
-    on_semantic_ready: Callable[[str], Coroutine[Any, Any, None]] | None = None,
 ) -> None:
     """Register all built-in tools with the registry."""
 
@@ -1021,82 +990,20 @@ def register_builtin_tools(
 
     # --- Settings tools ---
 
-    _index_watcher_running = False
-
     if config is not None:
 
         async def settings_get(**_: Any) -> dict[str, Any]:
             from homeclaw.memory.status import get_semantic_status
 
-            status = get_semantic_status(config.enhanced_memory, workspaces)
             return {
-                "enhanced_memory": config.enhanced_memory,
-                "semantic_status": status,
+                "semantic_status": get_semantic_status(workspaces),
             }
 
         registry.register(
             ToolDefinition(
                 name="settings_get",
-                description=(
-                    "Check current homeclaw settings, including whether "
-                    "semantic memory is enabled."
-                ),
+                description="Check current homeclaw settings and semantic memory status.",
                 parameters={"type": "object", "properties": {}},
             ),
             settings_get,
-        )
-
-        async def settings_update(
-            *, enhanced_memory: bool | None = None, **_: Any,
-        ) -> dict[str, Any]:
-            if enhanced_memory is not None:
-                config.enhanced_memory = enhanced_memory
-            from homeclaw.memory.status import get_semantic_status
-
-            semantic = get_semantic_status(config.enhanced_memory, workspaces)
-            result: dict[str, Any] = {
-                "enhanced_memory": config.enhanced_memory,
-                "semantic_status": semantic,
-            }
-            if semantic == "missing_memsearch":
-                result["note"] = (
-                    "Enhanced memory is toggled on but the "
-                    "memsearch package is not installed. "
-                    "Install it with: pip install homeclaw[semantic]"
-                )
-            elif semantic == "indexing":
-                nonlocal _index_watcher_running
-                if not _index_watcher_running and on_semantic_ready:
-                    _index_watcher_running = True
-                    asyncio.create_task(
-                        _watch_for_index(workspaces, on_semantic_ready)
-                    )
-                result["note"] = (
-                    "Semantic memory is now enabled. On the next "
-                    "message, the embedding model (~30-90 MB) will "
-                    "be downloaded and the index built. This is a "
-                    "one-time setup. Tell the user it's enabled and "
-                    "you'll let them know once the index is ready."
-                )
-            return result
-
-        registry.register(
-            ToolDefinition(
-                name="settings_update",
-                description=(
-                    "Update homeclaw settings. Currently supports toggling enhanced "
-                    "(semantic) memory on or off. Use when a user asks to enable or "
-                    "disable semantic memory / enhanced recall."
-                ),
-                parameters={
-                    "type": "object",
-                    "properties": {
-                        "enhanced_memory": {
-                            "type": "boolean",
-                            "description": "Enable or disable semantic memory",
-                        },
-                    },
-                },
-            ),
-            settings_update,
         )

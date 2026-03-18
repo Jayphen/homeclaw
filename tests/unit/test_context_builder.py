@@ -41,8 +41,8 @@ class TestBobContext:
 class TestEdgeCases:
     """Edge cases and general behaviour."""
 
-    async def test_missing_memory_json(self, dev_workspaces: Path) -> None:
-        # "nobody" has no directory or memory.json — should not raise
+    async def test_missing_person_workspace(self, dev_workspaces: Path) -> None:
+        # "nobody" has no workspace directory — should not raise
         ctx = await build_context("hello", "nobody", dev_workspaces)
         assert isinstance(ctx, str)
         assert "Current time:" in ctx

@@ -107,7 +107,6 @@ class HomeclawApp:
                 self.workspaces,
                 on_routines_changed=self._reload_routines,
                 config=self.config,
-                on_semantic_ready=self._notify_semantic_ready,
             )
 
         from homeclaw.memory.semantic import SemanticMemory
@@ -131,18 +130,6 @@ class HomeclawApp:
         """Called by routine tools when ROUTINES.md changes."""
         if self._scheduler:
             self._scheduler.reload_routines()
-
-    async def _notify_semantic_ready(self, message: str) -> None:
-        """Called when the semantic index is built for the first time."""
-        from homeclaw import HOUSEHOLD_WORKSPACE
-        from homeclaw.agent.routing import CallType
-
-        logger.info("Semantic memory ready — notifying household")
-        await self.loop.run(
-            f"[System notification] {message}",
-            HOUSEHOLD_WORKSPACE,
-            call_type=CallType.ROUTINE,
-        )
 
     def load_scheduler(self) -> None:
         """Parse ROUTINES.md and register routines (does not start the event loop)."""

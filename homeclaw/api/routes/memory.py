@@ -38,7 +38,7 @@ async def memory_list() -> dict[str, Any]:
         })
     return {
         "members": result,
-        "semantic_ready": get_semantic_status(config.enhanced_memory, workspaces) == "ready",
+        "semantic_ready": get_semantic_status(workspaces) == "ready",
     }
 
 

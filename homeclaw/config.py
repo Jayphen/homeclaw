@@ -30,7 +30,6 @@ _SAVEABLE_FIELDS = {
     "ha_url",
     "ha_token",
     "web_password",
-    "enhanced_memory",
 }
 
 # Routing model fields are saved/loaded via the nested RoutingConfig object.
@@ -98,9 +97,6 @@ class HomeclawConfig(BaseSettings):
 
     # Paths
     workspaces_path: str = "./workspaces"
-
-    # Memory mode
-    enhanced_memory: bool = True
 
     # Cost routing
     routing: RoutingConfig = RoutingConfig()
