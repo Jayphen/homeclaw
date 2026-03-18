@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/Jayphen/homeclaw/compare/v0.3.0...v0.3.1) (2026-03-18)
+
+
+### Features
+
+* add skill self-management tools (skill_list, skill_create, skill_remove, skill_migrate) ([afc30eb](https://github.com/Jayphen/homeclaw/commit/afc30eb4b3a465f3f0b42c53edc4e5b9346e8aee))
+
 ## [0.3.0](https://github.com/Jayphen/homeclaw/compare/v0.2.0...v0.3.0) (2026-03-18)
 
 
