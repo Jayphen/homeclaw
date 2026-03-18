@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.2](https://github.com/Jayphen/homeclaw/compare/v0.3.1...v0.3.2) (2026-03-18)
+
+
+### Features
+
+* add skill archive management API and web UI ([1dfd9d0](https://github.com/Jayphen/homeclaw/commit/1dfd9d0254166f69ec0f9a693e4f5ada6b9d9ade))
+
+
+### Bug Fixes
+
+* add bookmark_update tool so agent can edit URL, title, category, and tags ([88e13bc](https://github.com/Jayphen/homeclaw/commit/88e13bc760ca440ac384682df8b86f401f88ecce))
+
 ## [0.3.1](https://github.com/Jayphen/homeclaw/compare/v0.3.0...v0.3.1) (2026-03-18)
 
 

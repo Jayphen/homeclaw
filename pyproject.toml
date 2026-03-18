@@ -1,6 +1,6 @@
 [project]
 name = "homeclaw"
-version = "0.3.1"
+version = "0.3.2"
 description = "An AI that knows your whole household — your home, your family, and the people in your lives."
 requires-python = ">=3.12"
 license = "MIT"
