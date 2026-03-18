@@ -7,6 +7,7 @@ from fastapi import APIRouter, Query
 from homeclaw.api.deps import AuthDep, get_config, list_member_workspaces
 from homeclaw.memory.facts import HouseholdMemory, load_memory, save_memory
 from homeclaw.memory.semantic import SemanticMemory
+from homeclaw.memory.status import get_semantic_status
 
 router = APIRouter(prefix="/api/memory", tags=["memory"])
 
@@ -25,11 +26,9 @@ async def memory_list() -> dict[str, Any]:
             "preference_count": len(mem.preferences),
             "last_updated": mem.last_updated.isoformat() if mem.last_updated else None,
         })
-    semantic = SemanticMemory(str(workspaces))
-    await semantic.initialize()
     return {
         "members": result,
-        "semantic_ready": config.enhanced_memory and semantic.enabled,
+        "semantic_ready": get_semantic_status(config.enhanced_memory, workspaces) == "ready",
     }
 
 

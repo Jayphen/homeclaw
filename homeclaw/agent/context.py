@@ -121,8 +121,8 @@ async def build_context(
         )
         if recalled:
             parts.append("Relevant context from memory:")
-            for chunk in recalled:
-                parts.append(f"  {chunk}")
+            for item in recalled:
+                parts.append(f"  {item['text']}")
 
     result = "\n".join(parts)
     token_count = estimate_tokens(result)

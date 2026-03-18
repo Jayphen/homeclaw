@@ -1,48 +1,24 @@
 """Settings API routes — system configuration and feature flags."""
 
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from homeclaw import SEMANTIC_INDEX_PATH
 from homeclaw.api.deps import AuthDep, get_config
+from homeclaw.memory.status import get_semantic_status
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
-
-
-def _check_memsearch_available() -> bool:
-    """Check if the memsearch package is importable."""
-    try:
-        import memsearch  # type: ignore[import-not-found]  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
-
-
-def _check_index_exists(workspaces: Path) -> bool:
-    """Check if the Milvus Lite index file has been created."""
-    return (workspaces / SEMANTIC_INDEX_PATH).exists()
-
-
-def _semantic_status(config: Any, workspaces: Path) -> dict[str, Any]:
-    """Build the semantic memory status payload."""
-    memsearch_installed = _check_memsearch_available()
-    index_exists = _check_index_exists(workspaces) if memsearch_installed else False
-    return {
-        "enhanced_memory": config.enhanced_memory,
-        "memsearch_installed": memsearch_installed,
-        "index_exists": index_exists,
-        "semantic_ready": config.enhanced_memory and memsearch_installed,
-    }
 
 
 @router.get("", dependencies=[AuthDep])
 async def get_settings() -> dict[str, Any]:
     config = get_config()
-    return _semantic_status(config, config.workspaces.resolve())
+    status = get_semantic_status(config.enhanced_memory, config.workspaces.resolve())
+    return {
+        "enhanced_memory": config.enhanced_memory,
+        "semantic_status": status,
+    }
 
 
 class UpdateSettingsBody(BaseModel):
@@ -55,4 +31,8 @@ async def update_settings(body: UpdateSettingsBody) -> dict[str, Any]:
     if body.enhanced_memory is not None:
         config.enhanced_memory = body.enhanced_memory
     await config.save_async()
-    return _semantic_status(config, config.workspaces.resolve())
+    status = get_semantic_status(config.enhanced_memory, config.workspaces.resolve())
+    return {
+        "enhanced_memory": config.enhanced_memory,
+        "semantic_status": status,
+    }

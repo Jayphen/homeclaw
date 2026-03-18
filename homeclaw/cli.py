@@ -293,6 +293,8 @@ def _run_serve_with_deferred_telegram(
     app: Any, config: Any, workspaces: Path, port: int
 ) -> None:
     """Run uvicorn, starting Telegram later if configured via setup."""
+    import asyncio as _asyncio
+
     import uvicorn
 
     from homeclaw.api.deps import set_on_telegram_configured
@@ -300,28 +302,30 @@ def _run_serve_with_deferred_telegram(
 
     hc_app: HomeclawApp | None = None
     channel: TelegramChannel | None = None
+    _telegram_lock = _asyncio.Lock()
 
     async def _start_telegram(token: str) -> None:
         nonlocal hc_app, channel
-        if channel is not None:
-            logger.info("Telegram bot already running, skipping")
-            return
-        try:
-            hc_app = HomeclawApp(workspaces=workspaces, config=config)
-        except ValueError:
-            logger.warning("Cannot start Telegram bot — LLM provider not configured yet")
-            return
-        hc_app.load_scheduler()
-        channel = TelegramChannel(
-            token=token,
-            loop=hc_app.loop,
-            workspaces=workspaces,
-            on_scheduler_start=hc_app.start_scheduler,
-            allowed_user_ids=config.telegram_allowed_user_ids,
-        )
-        await channel.start()
-        hc_app.start_scheduler()
-        logger.info("Telegram bot started after setup")
+        async with _telegram_lock:
+            if channel is not None:
+                logger.info("Telegram bot already running, skipping")
+                return
+            try:
+                hc_app = HomeclawApp(workspaces=workspaces, config=config)
+            except ValueError:
+                logger.warning("Cannot start Telegram bot — LLM provider not configured yet")
+                return
+            hc_app.load_scheduler()
+            channel = TelegramChannel(
+                token=token,
+                loop=hc_app.loop,
+                workspaces=workspaces,
+                on_scheduler_start=hc_app.start_scheduler,
+                allowed_user_ids=config.telegram_allowed_user_ids,
+            )
+            await channel.start()
+            hc_app.start_scheduler()
+            logger.info("Telegram bot started after setup")
 
     set_on_telegram_configured(_start_telegram)
 

@@ -934,20 +934,10 @@ def register_builtin_tools(
 
     if config is not None:
 
-        def _semantic_status() -> str:
-            """Return a single status string for semantic memory state."""
-            if not config.enhanced_memory:
-                return "disabled"
-            try:
-                import memsearch  # type: ignore[import-not-found]  # noqa: F401
-            except ImportError:
-                return "missing_memsearch"
-            if not (workspaces / SEMANTIC_INDEX_PATH).exists():
-                return "indexing"
-            return "ready"
-
         async def settings_get(**_: Any) -> dict[str, Any]:
-            status = _semantic_status()
+            from homeclaw.memory.status import get_semantic_status
+
+            status = get_semantic_status(config.enhanced_memory, workspaces)
             return {
                 "enhanced_memory": config.enhanced_memory,
                 "semantic_status": status,
@@ -970,7 +960,9 @@ def register_builtin_tools(
         ) -> dict[str, Any]:
             if enhanced_memory is not None:
                 config.enhanced_memory = enhanced_memory
-            semantic = _semantic_status()
+            from homeclaw.memory.status import get_semantic_status
+
+            semantic = get_semantic_status(config.enhanced_memory, workspaces)
             result: dict[str, Any] = {
                 "enhanced_memory": config.enhanced_memory,
                 "semantic_status": semantic,

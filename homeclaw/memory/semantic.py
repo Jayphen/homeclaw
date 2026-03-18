@@ -32,8 +32,12 @@ class SemanticMemory:
         except Exception:
             self._enabled = False
 
-    async def recall(self, query: str, top_k: int = 3) -> list[str]:
+    async def recall(self, query: str, top_k: int = 3) -> list[dict[str, Any]]:
+        """Return recall results as {text, score} dicts."""
         if not self._enabled or self._mem is None:
             return []
         results: list[dict[str, Any]] = await self._mem.search(query, top_k=top_k)
-        return [r["content"] for r in results]
+        return [
+            {"text": r["content"], "score": r.get("score", 0.0)}
+            for r in results
+        ]
