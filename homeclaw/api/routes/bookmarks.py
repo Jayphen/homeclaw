@@ -1,10 +1,12 @@
 """Bookmarks API routes — household-shared saved links and places."""
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
 from homeclaw.api.deps import AuthDep, get_config
+from homeclaw.bookmarks.models import Bookmark
 from homeclaw.bookmarks.store import (
     delete_bookmark,
     get_categories,
@@ -13,6 +15,14 @@ from homeclaw.bookmarks.store import (
 )
 
 router = APIRouter(prefix="/api/bookmarks", tags=["bookmarks"])
+
+
+def _notes_for(workspaces: Path, bookmark: Bookmark) -> str | None:
+    """Read the markdown notes file for a bookmark, if it exists."""
+    path = workspaces / "household" / "bookmarks" / "notes" / f"{bookmark.id}.md"
+    if not path.is_file():
+        return None
+    return path.read_text()
 
 
 @router.get("", dependencies=[AuthDep])
@@ -27,8 +37,13 @@ async def bookmarks_index(
         results = search_bookmarks(workspaces, q)
     else:
         results = list_bookmarks(workspaces, category=category, tag=tag)
+    items: list[dict[str, Any]] = []
+    for b in results:
+        item = b.model_dump(mode="json")
+        item["notes_md"] = _notes_for(workspaces, b)
+        items.append(item)
     return {
-        "bookmarks": [b.model_dump(mode="json") for b in results],
+        "bookmarks": items,
         "categories": get_categories(workspaces),
     }
 

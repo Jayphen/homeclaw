@@ -11,6 +11,7 @@
     saved_at: string | null;
     neighborhood: string;
     city: string;
+    notes_md: string | null;
   }
 
   let bookmarks: Bookmark[] = $state([]);
@@ -156,6 +157,10 @@
               <span class="bm-location">
                 {[bm.neighborhood, bm.city].filter(Boolean).join(", ")}
               </span>
+            {/if}
+
+            {#if bm.notes_md}
+              <pre class="bm-notes">{bm.notes_md}</pre>
             {/if}
 
             <div class="bm-meta">
@@ -360,6 +365,20 @@
   .bm-location {
     font-size: 0.8rem;
     color: var(--text-muted);
+  }
+
+  .bm-notes {
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+    margin: 0.25rem 0 0;
+    padding: 0.5rem 0.75rem;
+    background: #fdfcfa;
+    border-left: 3px solid var(--sage);
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
   }
 
   .bm-meta {
