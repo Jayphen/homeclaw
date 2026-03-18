@@ -1,5 +1,6 @@
 """homeclaw configuration — loads from environment variables, .env, and config.json."""
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -12,6 +13,9 @@ from homeclaw.agent.context import ContextConfig
 from homeclaw.agent.routing import RoutingConfig
 
 logger = logging.getLogger(__name__)
+
+# Lock for config.json read-modify-write to prevent concurrent clobber.
+_config_save_lock = asyncio.Lock()
 
 # Fields that the web UI can persist to config.json.
 _SAVEABLE_FIELDS = {
@@ -182,3 +186,8 @@ class HomeclawConfig(BaseSettings):
 
         self.config_json_path.parent.mkdir(parents=True, exist_ok=True)
         self.config_json_path.write_text(json.dumps(existing, indent=2) + "\n")
+
+    async def save_async(self) -> None:
+        """Persist config with a lock to prevent concurrent write races."""
+        async with _config_save_lock:
+            self.save()

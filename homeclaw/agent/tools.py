@@ -25,7 +25,7 @@ from homeclaw.contacts.store import (
     list_contacts,
     save_contact,
 )
-from homeclaw.memory.facts import HouseholdMemory, load_memory, save_memory
+from homeclaw.memory.facts import HouseholdMemory, load_memory, save_memory, save_memory_safe
 
 ToolHandler = Callable[..., Coroutine[Any, Any, dict[str, Any]]]
 
@@ -268,7 +268,7 @@ def register_builtin_tools(
             memory.facts = facts
         if preferences is not None:
             memory.preferences = preferences
-        save_memory(workspaces, person, memory)
+        await save_memory_safe(workspaces, person, memory)
         return {"status": "updated", "person": person}
 
     registry.register(
@@ -299,7 +299,7 @@ def register_builtin_tools(
         """Share a fact with the entire household."""
         memory = load_memory(workspaces, "household")
         memory.facts.append(fact)
-        save_memory(workspaces, "household", memory)
+        await save_memory_safe(workspaces, "household", memory)
         return {"status": "shared", "fact": fact}
 
     registry.register(
@@ -396,9 +396,9 @@ def register_builtin_tools(
 
     # --- Reminder tools ---
 
-    from homeclaw.reminders.store import add_reminder as _add_reminder
-    from homeclaw.reminders.store import complete_reminder as _complete_reminder
-    from homeclaw.reminders.store import delete_reminder as _delete_reminder
+    from homeclaw.reminders.store import add_reminder_safe as _add_reminder
+    from homeclaw.reminders.store import complete_reminder_safe as _complete_reminder
+    from homeclaw.reminders.store import delete_reminder_safe as _delete_reminder
     from homeclaw.reminders.store import load_reminders as _load_reminders
 
     async def reminder_add(
@@ -427,7 +427,7 @@ def register_builtin_tools(
             interval_days=interval_days,
             created_at=datetime.now(datetime.now().astimezone().tzinfo),
         )
-        _add_reminder(workspaces, reminder)
+        await _add_reminder(workspaces, reminder)
         return {
             "status": "set",
             "id": reminder.id,
@@ -501,7 +501,7 @@ def register_builtin_tools(
     async def reminder_complete(
         *, person: str, reminder_id: str, **_: Any
     ) -> dict[str, Any]:
-        result = _complete_reminder(workspaces, person, reminder_id)
+        result = await _complete_reminder(workspaces, person, reminder_id)
         if not result:
             return {"error": f"Reminder '{reminder_id}' not found"}
         return {
@@ -534,7 +534,7 @@ def register_builtin_tools(
     async def reminder_delete(
         *, person: str, reminder_id: str, **_: Any
     ) -> dict[str, Any]:
-        if _delete_reminder(workspaces, person, reminder_id):
+        if await _delete_reminder(workspaces, person, reminder_id):
             return {"status": "deleted", "id": reminder_id}
         return {"error": f"Reminder '{reminder_id}' not found"}
 

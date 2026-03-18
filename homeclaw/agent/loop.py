@@ -1,5 +1,6 @@
 """Core agent loop — receive message, build context, call LLM, dispatch tools."""
 
+import asyncio
 import json
 import logging
 from collections.abc import Callable
@@ -73,6 +74,14 @@ class AgentLoop:
         self._semantic_memory = semantic_memory
         self._on_tool_call = on_tool_call
         self._routing = routing
+        # Per-key lock prevents concurrent runs for the same person/channel
+        # from racing on history file reads/writes.
+        self._run_locks: dict[str, asyncio.Lock] = {}
+
+    def _lock_for(self, key: str) -> asyncio.Lock:
+        if key not in self._run_locks:
+            self._run_locks[key] = asyncio.Lock()
+        return self._run_locks[key]
 
     async def run(
         self,
@@ -91,6 +100,18 @@ class AgentLoop:
                      and restrict context to household-level facts only.
             call_type: The type of call for model routing.
         """
+        history_key = channel or person
+        async with self._lock_for(history_key):
+            return await self._run_inner(user_message, person, channel, call_type, history_key)
+
+    async def _run_inner(
+        self,
+        user_message: str | list[Any],
+        person: str,
+        channel: str | None,
+        call_type: CallType,
+        history_key: str,
+    ) -> str:
         # Extract text portion for context building
         if isinstance(user_message, str):
             text_for_context = user_message
@@ -110,7 +131,6 @@ class AgentLoop:
         )
         system = SYSTEM_PROMPT.format(context=context)
 
-        history_key = channel or person
         history = _load_history(self._workspaces, history_key)
         history.append(Message(role="user", content=user_message))
 

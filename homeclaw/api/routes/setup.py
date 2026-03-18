@@ -114,7 +114,7 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
     if body.web_password is not None:
         config.web_password = body.web_password
 
-    config.save()
+    await config.save_async()
 
     # If a password was just set, invalidate the setup token.
     if body.web_password and get_setup_token() is not None:

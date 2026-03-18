@@ -1,8 +1,18 @@
 """Reminder JSON store — one file per person at workspaces/{person}/reminders.json."""
 
+import asyncio
 from pathlib import Path
 
 from homeclaw.reminders.models import Reminder
+
+# Per-person lock prevents concurrent read-modify-write races on reminders.json.
+_locks: dict[str, asyncio.Lock] = {}
+
+
+def _lock_for(person: str) -> asyncio.Lock:
+    if person not in _locks:
+        _locks[person] = asyncio.Lock()
+    return _locks[person]
 
 
 def _reminders_path(workspaces: Path, person: str) -> Path:
@@ -35,6 +45,12 @@ def add_reminder(workspaces: Path, reminder: Reminder) -> Reminder:
     return reminder
 
 
+async def add_reminder_safe(workspaces: Path, reminder: Reminder) -> Reminder:
+    """Add a reminder with per-person locking to prevent concurrent races."""
+    async with _lock_for(reminder.person):
+        return add_reminder(workspaces, reminder)
+
+
 def get_reminder(workspaces: Path, person: str, reminder_id: str) -> Reminder | None:
     for r in load_reminders(workspaces, person):
         if r.id == reminder_id:
@@ -59,6 +75,12 @@ def complete_reminder(workspaces: Path, person: str, reminder_id: str) -> Remind
     return None
 
 
+async def complete_reminder_safe(workspaces: Path, person: str, reminder_id: str) -> Reminder | None:
+    """Complete a reminder with per-person locking."""
+    async with _lock_for(person):
+        return complete_reminder(workspaces, person, reminder_id)
+
+
 def delete_reminder(workspaces: Path, person: str, reminder_id: str) -> bool:
     reminders = load_reminders(workspaces, person)
     filtered = [r for r in reminders if r.id != reminder_id]
@@ -66,3 +88,9 @@ def delete_reminder(workspaces: Path, person: str, reminder_id: str) -> bool:
         return False
     save_reminders(workspaces, person, filtered)
     return True
+
+
+async def delete_reminder_safe(workspaces: Path, person: str, reminder_id: str) -> bool:
+    """Delete a reminder with per-person locking."""
+    async with _lock_for(person):
+        return delete_reminder(workspaces, person, reminder_id)

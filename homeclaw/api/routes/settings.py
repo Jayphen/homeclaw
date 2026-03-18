@@ -53,4 +53,5 @@ async def update_settings(body: UpdateSettingsBody) -> dict[str, Any]:
     config = get_config()
     if body.enhanced_memory is not None:
         config.enhanced_memory = body.enhanced_memory
+    await config.save_async()
     return _semantic_status(config, config.workspaces.resolve())
