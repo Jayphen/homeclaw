@@ -11,7 +11,6 @@ class Bookmark(BaseModel):
     title: str
     category: str = "other"
     tags: list[str] = []
-    notes: str = ""
     saved_by: str = ""
     saved_at: datetime | None = None
     neighborhood: str = ""

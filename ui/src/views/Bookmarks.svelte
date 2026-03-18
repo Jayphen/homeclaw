@@ -7,7 +7,6 @@
     title: string;
     category: string;
     tags: string[];
-    notes: string;
     saved_by: string;
     saved_at: string | null;
     neighborhood: string;
@@ -32,7 +31,6 @@
       results = results.filter(
         (b) =>
           b.title.toLowerCase().includes(q) ||
-          b.notes.toLowerCase().includes(q) ||
           b.tags.some((t) => t.toLowerCase().includes(q)) ||
           b.neighborhood.toLowerCase().includes(q) ||
           b.city.toLowerCase().includes(q),
@@ -158,10 +156,6 @@
               <span class="bm-location">
                 {[bm.neighborhood, bm.city].filter(Boolean).join(", ")}
               </span>
-            {/if}
-
-            {#if bm.notes}
-              <p class="bm-notes">{bm.notes}</p>
             {/if}
 
             <div class="bm-meta">
@@ -366,13 +360,6 @@
   .bm-location {
     font-size: 0.8rem;
     color: var(--text-muted);
-  }
-
-  .bm-notes {
-    font-size: 0.84rem;
-    color: var(--text);
-    line-height: 1.4;
-    margin: 0.15rem 0 0;
   }
 
   .bm-meta {

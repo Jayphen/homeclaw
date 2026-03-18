@@ -574,7 +574,6 @@ def register_builtin_tools(
         category: str = "other",
         url: str | None = None,
         tags: list[str] | None = None,
-        notes: str = "",
         neighborhood: str = "",
         city: str = "",
         person: str = "",
@@ -588,7 +587,6 @@ def register_builtin_tools(
             title=title,
             category=category,
             tags=tags or [],
-            notes=notes,
             saved_by=person,
             saved_at=datetime.now(timezone.utc),
             neighborhood=neighborhood,
@@ -621,7 +619,6 @@ def register_builtin_tools(
                         "items": {"type": "string"},
                         "description": "Tags (e.g. 'italian', 'rooftop', 'brunch', 'vegan')",
                     },
-                    "notes": {"type": "string", "description": "Extra context or description"},
                     "neighborhood": {"type": "string", "description": "Neighborhood or area"},
                     "city": {"type": "string", "description": "City"},
                     "person": {"type": "string", "description": "Who saved this"},
@@ -721,6 +718,55 @@ def register_builtin_tools(
             parameters={"type": "object", "properties": {}},
         ),
         bookmark_categories,
+    )
+
+    async def bookmark_note(
+        *, bookmark_id: str, content: str, **_: Any
+    ) -> dict[str, Any]:
+        """Add a note to a bookmark — stored as markdown for semantic search."""
+        # Verify the bookmark exists
+        all_bookmarks = list_bookmarks(workspaces)
+        bookmark = next((b for b in all_bookmarks if b.id == bookmark_id), None)
+        if bookmark is None:
+            return {"error": f"Bookmark '{bookmark_id}' not found"}
+
+        notes_dir = workspaces / "household" / "bookmarks" / "notes"
+        notes_dir.mkdir(parents=True, exist_ok=True)
+        path = notes_dir / f"{bookmark_id}.md"
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+
+        if not path.exists():
+            path.write_text(f"# {bookmark.title}\n\n- [{timestamp}] {content}\n")
+        else:
+            with path.open("a") as f:
+                f.write(f"- [{timestamp}] {content}\n")
+
+        return {"status": "saved", "bookmark_id": bookmark_id, "title": bookmark.title}
+
+    registry.register(
+        ToolDefinition(
+            name="bookmark_note",
+            description=(
+                "Add a note to a saved bookmark — a review, tip, experience, or "
+                "any context that helps recall it later. Notes are searchable via "
+                "semantic memory."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "bookmark_id": {
+                        "type": "string",
+                        "description": "ID of the bookmark to annotate",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The note to add (review, tip, experience)",
+                    },
+                },
+                "required": ["bookmark_id", "content"],
+            },
+        ),
+        bookmark_note,
     )
 
     # --- Web tools (via Jina) ---
