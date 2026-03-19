@@ -6,6 +6,7 @@ Requires the optional [whatsapp] extra:  pip install homeclaw[whatsapp]
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import json
 import logging
@@ -43,6 +44,12 @@ def _extract_text(ev: Any) -> str | None:
         or ev.Message.extendedTextMessage.text
         or None
     )
+
+
+def _has_image(ev: Any) -> bool:
+    """Return True if the message contains an image."""
+    img = ev.Message.imageMessage
+    return bool(img and img.url)
 
 
 class WhatsAppChannel:
@@ -115,10 +122,14 @@ class WhatsAppChannel:
             return
 
         phone: str = ev.Info.MessageSource.Sender.User
-        chat: Any = ev.Info.MessageSource.Chat
 
         if not self._is_allowed(phone):
             logger.warning("Rejected message from unauthorized phone %s", phone)
+            return
+
+        # Image messages are handled separately
+        if _has_image(ev):
+            await self._handle_photo(ev, phone)
             return
 
         text = _extract_text(ev)
@@ -138,6 +149,7 @@ class WhatsAppChannel:
             return
 
         is_group: bool = ev.Info.MessageSource.IsGroup
+        chat: Any = ev.Info.MessageSource.Chat
         if is_group:
             user_text = f"[{person}] {text}"
             channel: str | None = f"group-{chat.User}"
@@ -147,6 +159,60 @@ class WhatsAppChannel:
 
         logger.info("[%s%s] %s", person, f" in {channel}" if channel else "", user_text)
         await self._run_and_reply(ev, user_text, person, channel)
+
+    async def _handle_photo(self, ev: Any, phone: str) -> None:
+        """Handle incoming image — download, base64-encode, send as multimodal."""
+        person = self._resolve_person(phone)
+        if person is None:
+            await self._client.reply_message(
+                "I don't know who you are. Send /register <name> first.", ev
+            )
+            return
+
+        try:
+            image_bytes = await self._client.download_any(ev.Message)
+        except Exception:
+            logger.exception("Failed to download WhatsApp image from %s", person)
+            await self._client.reply_message(
+                "Sorry, I couldn't download that image.", ev
+            )
+            return
+
+        b64_data = base64.b64encode(image_bytes).decode("ascii")
+        mimetype = ev.Message.imageMessage.mimetype or "image/jpeg"
+        caption = ev.Message.imageMessage.caption or ""
+
+        is_group: bool = ev.Info.MessageSource.IsGroup
+        chat: Any = ev.Info.MessageSource.Chat
+        if is_group:
+            caption = f"[{person}] {caption}" if caption else f"[{person}]"
+            channel: str | None = f"group-{chat.User}"
+        else:
+            channel = None
+
+        content: list[dict[str, Any]] = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": mimetype,
+                    "data": b64_data,
+                },
+            },
+        ]
+        if caption:
+            content.append({"type": "text", "text": caption})
+        else:
+            content.append({"type": "text", "text": "[shared a photo]"})
+
+        logger.info(
+            "[%s%s] photo (%d KB)%s",
+            person,
+            f" in {channel}" if channel else "",
+            len(image_bytes) // 1024,
+            f": {caption}" if caption else "",
+        )
+        await self._run_and_reply(ev, content, person, channel)
 
     async def _handle_register(self, phone: str, text: str, ev: Any) -> None:
         """Handle /register <name> — link this WhatsApp number to a household member."""
