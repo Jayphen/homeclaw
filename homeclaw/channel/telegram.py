@@ -344,10 +344,56 @@ class TelegramChannel:
             await self._app.shutdown()
 
 
+def _clean_markdown_for_telegram(text: str) -> str:
+    """Normalise standard markdown so it renders well in Telegram's legacy Markdown.
+
+    1. Collapse redundant links where the text equals the URL:
+       [https://example.com](https://example.com) → https://example.com
+    2. Rewrite numbered-list links so the title is the link text:
+       "1. Title\n   [url](url)" → "1. [Title](url)"
+       "1. Title\n   url"       → "1. [Title](url)"
+    """
+    import re
+
+    # Collapse [url](same-url) → bare url
+    text = re.sub(
+        r"\[(?P<url>https?://[^\]]+)\]\((?P=url)\)",
+        r"\g<url>",
+        text,
+    )
+
+    # Rewrite numbered-list items: "N. Title\n   url" → "N. [Title](url)"
+    def _rewrite_list_item(m: re.Match[str]) -> str:
+        num = m.group("num")
+        title = m.group("title").strip()
+        url = m.group("url").strip()
+        return f"{num}. [{title}]({url})"
+
+    text = re.sub(
+        r"(?P<num>\d+)\.\s+(?P<title>[^\n]+?)\n\s+(?P<url>https?://\S+)",
+        _rewrite_list_item,
+        text,
+    )
+
+    return text
+
+
+def _to_telegram_markdown(text: str) -> str:
+    """Convert standard markdown to Telegram MarkdownV2.
+
+    1. Clean up redundant links and rewrite numbered-list URLs
+    2. Convert to MarkdownV2 via telegramify-markdown
+    """
+    import telegramify_markdown
+
+    text = _clean_markdown_for_telegram(text)
+    return telegramify_markdown.markdownify(text)
+
+
 async def _send_markdown(
     message: Any, text: str, *, chat_id: int | None = None
 ) -> None:
-    """Send a message with Markdown formatting, falling back to plain text.
+    """Send a message with MarkdownV2 formatting, falling back to plain text.
 
     If *chat_id* is provided, *message* is treated as a Bot and
     ``send_message`` is used (for proactive outbound messages).
@@ -355,14 +401,16 @@ async def _send_markdown(
     """
     from telegram.constants import ParseMode
 
+    formatted = _to_telegram_markdown(text)
+
     if chat_id is not None:
         try:
-            await message.send_message(chat_id, text, parse_mode=ParseMode.MARKDOWN)
+            await message.send_message(chat_id, formatted, parse_mode=ParseMode.MARKDOWN_V2)
         except Exception:
             await message.send_message(chat_id, text)
     else:
         try:
-            await message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+            await message.reply_text(formatted, parse_mode=ParseMode.MARKDOWN_V2)
         except Exception:
             await message.reply_text(text)
 

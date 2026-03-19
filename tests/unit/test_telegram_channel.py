@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from homeclaw.channel.telegram import TelegramChannel, _split_message
+from homeclaw.channel.telegram import TelegramChannel, _split_message, _clean_markdown_for_telegram
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +71,46 @@ class TestSplitMessage:
         chunks = _split_message(text, max_len=40)
         assert "".join(chunks) == text
         assert all(len(c) <= 40 for c in chunks)
+
+
+class TestCleanMarkdownForTelegram:
+    def test_collapses_redundant_links(self) -> None:
+        text = "[https://example.com/page](https://example.com/page)"
+        assert _clean_markdown_for_telegram(text) == "https://example.com/page"
+
+    def test_preserves_meaningful_links(self) -> None:
+        text = "[My Article](https://example.com/page)"
+        assert _clean_markdown_for_telegram(text) == text
+
+    def test_rewrites_numbered_list_bare_urls(self) -> None:
+        text = "1. JPEG Compression\n   https://example.com/jpeg"
+        result = _clean_markdown_for_telegram(text)
+        assert result == "1. [JPEG Compression](https://example.com/jpeg)"
+
+    def test_rewrites_numbered_list_redundant_link(self) -> None:
+        text = (
+            "3. Python 3.15's JIT is now back on track\n"
+            "   [https://fidget.github.io/jit.html](https://fidget.github.io/jit.html)"
+        )
+        result = _clean_markdown_for_telegram(text)
+        assert result == "3. [Python 3.15's JIT is now back on track](https://fidget.github.io/jit.html)"
+
+    def test_handles_mixed_list(self) -> None:
+        text = (
+            "1. First Item\n"
+            "   https://example.com/1\n"
+            "2. Second Item\n"
+            "   [https://example.com/2](https://example.com/2)\n"
+            "3. [Good Link](https://example.com/3)"
+        )
+        result = _clean_markdown_for_telegram(text)
+        assert "[First Item](https://example.com/1)" in result
+        assert "[Second Item](https://example.com/2)" in result
+        assert "[Good Link](https://example.com/3)" in result
+
+    def test_no_links_unchanged(self) -> None:
+        text = "Just some plain text with no links."
+        assert _clean_markdown_for_telegram(text) == text
 
 
 class TestRegistration:
@@ -159,7 +199,7 @@ class TestMessageHandling:
         from telegram.constants import ParseMode
 
         update.message.reply_text.assert_awaited_once_with(
-            "I'm homeclaw.", parse_mode=ParseMode.MARKDOWN,
+            "I'm homeclaw\\.", parse_mode=ParseMode.MARKDOWN_V2,
         )
 
     @pytest.mark.asyncio
