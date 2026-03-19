@@ -17,8 +17,9 @@ RUN pip install --no-cache-dir \
     torch --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir ".[semantic,whatsapp]"
 
-# Copy application code (changes often, but deps already cached)
+# Copy full application code then reinstall (deps cached, only code changes)
 COPY homeclaw/ homeclaw/
+RUN pip install --no-cache-dir --no-deps .
 
 COPY --from=ui-build /build/dist/ ui/dist/
 ENV HOMECLAW_UI_DIST=/app/ui/dist
