@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import sys
@@ -21,6 +22,7 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command")
 
     sub.add_parser("telegram", help="Start the Telegram bot")
+    sub.add_parser("whatsapp", help="Start the WhatsApp bot (requires homeclaw[whatsapp])")
 
     serve = sub.add_parser("serve", help="Start the web UI and API server")
     serve.add_argument("--workspaces", default="./workspaces", help="Path to workspaces directory")
@@ -171,6 +173,10 @@ def main() -> None:
         _run_telegram()
         return
 
+    if args.command == "whatsapp":
+        _run_whatsapp()
+        return
+
     if args.command == "serve":
         _run_serve(Path(args.workspaces).resolve(), args.port)
         return
@@ -252,15 +258,15 @@ def _run_serve(workspaces: Path, port: int) -> None:
         generate_setup_token()
 
     if config.telegram_token and config.is_provider_configured:
-        _run_serve_with_telegram(app, config, workspaces, port)
+        _run_serve_with_channels(app, config, workspaces, port)
     else:
         _run_serve_with_deferred_telegram(app, config, workspaces, port)
 
 
-def _run_serve_with_telegram(
+def _run_serve_with_channels(
     app: Any, config: Any, workspaces: Path, port: int
 ) -> None:
-    """Run uvicorn + Telegram bot concurrently in one event loop."""
+    """Run uvicorn + Telegram (and optionally WhatsApp) concurrently in one event loop."""
     import uvicorn
 
     from homeclaw.channel.telegram import TelegramChannel
@@ -268,7 +274,7 @@ def _run_serve_with_telegram(
     hc_app = HomeclawApp(workspaces=workspaces, config=config)
     hc_app.load_scheduler()
 
-    channel = TelegramChannel(
+    tg_channel = TelegramChannel(
         token=config.telegram_token,
         loop=hc_app.loop,
         workspaces=workspaces,
@@ -276,22 +282,42 @@ def _run_serve_with_telegram(
         allowed_user_ids=config.telegram_allowed_user_ids,
     )
 
+    wa_channel = None
+    if config.whatsapp_enabled:
+        try:
+            from homeclaw.channel.whatsapp import WhatsAppChannel
+            wa_channel = WhatsAppChannel(
+                loop=hc_app.loop,
+                workspaces=workspaces,
+                allowed_phones=config.whatsapp_allowed_phone_numbers,
+            )
+        except ImportError:
+            logger.warning(
+                "whatsapp_enabled=true but neonize is not installed; "
+                "install with: pip install homeclaw[whatsapp]"
+            )
+
     async def _serve() -> None:
         await hc_app.initialize()
-        await channel.start()
+        await tg_channel.start()
+        if wa_channel:
+            await wa_channel.start()
         hc_app.start_scheduler()
 
         uv_config = uvicorn.Config(app, host="0.0.0.0", port=port)
         server = uvicorn.Server(uv_config)
 
+        channels_desc = "Telegram" + (" + WhatsApp" if wa_channel else "")
         logger.info(
-            "Starting web server on port %d + Telegram bot (workspaces: %s)",
-            port, workspaces,
+            "Starting web server on port %d + %s (workspaces: %s)",
+            port, channels_desc, workspaces,
         )
         try:
             await server.serve()
         finally:
-            await channel.stop()
+            await tg_channel.stop()
+            if wa_channel:
+                await wa_channel.stop()
             hc_app.shutdown()
 
     asyncio.run(_serve())
@@ -300,7 +326,10 @@ def _run_serve_with_telegram(
 def _run_serve_with_deferred_telegram(
     app: Any, config: Any, workspaces: Path, port: int
 ) -> None:
-    """Run uvicorn, starting Telegram later if configured via setup."""
+    """Run uvicorn, starting Telegram later if configured via setup.
+
+    WhatsApp (if enabled) starts immediately since it needs no token.
+    """
     import asyncio as _asyncio
 
     import uvicorn
@@ -309,44 +338,75 @@ def _run_serve_with_deferred_telegram(
     from homeclaw.channel.telegram import TelegramChannel
 
     hc_app: HomeclawApp | None = None
-    channel: TelegramChannel | None = None
+    hc_app_ready: bool = False  # True once initialize()+load_scheduler() have run
+    tg_channel: TelegramChannel | None = None
     _telegram_lock = _asyncio.Lock()
 
+    # WhatsApp can start right away — no token needed, just a DB file.
+    wa_channel = None
+    if config.whatsapp_enabled and config.is_provider_configured:
+        try:
+            from homeclaw.channel.whatsapp import WhatsAppChannel
+            hc_app = HomeclawApp(workspaces=workspaces, config=config)
+            wa_channel = WhatsAppChannel(
+                loop=hc_app.loop,
+                workspaces=workspaces,
+                allowed_phones=config.whatsapp_allowed_phone_numbers,
+            )
+        except ImportError:
+            logger.warning(
+                "whatsapp_enabled=true but neonize is not installed; "
+                "install with: pip install homeclaw[whatsapp]"
+            )
+
     async def _start_telegram(token: str) -> None:
-        nonlocal hc_app, channel
+        nonlocal hc_app, hc_app_ready, tg_channel
         async with _telegram_lock:
-            if channel is not None:
+            if tg_channel is not None:
                 logger.info("Telegram bot already running, skipping")
                 return
             try:
-                hc_app = HomeclawApp(workspaces=workspaces, config=config)
+                if hc_app is None:
+                    hc_app = HomeclawApp(workspaces=workspaces, config=config)
             except ValueError:
                 logger.warning("Cannot start Telegram bot — LLM provider not configured yet")
                 return
-            await hc_app.initialize()
-            hc_app.load_scheduler()
-            channel = TelegramChannel(
+            if not hc_app_ready:
+                await hc_app.initialize()
+                hc_app.load_scheduler()
+                hc_app_ready = True
+            tg_channel = TelegramChannel(
                 token=token,
                 loop=hc_app.loop,
                 workspaces=workspaces,
                 on_scheduler_start=hc_app.start_scheduler,
                 allowed_user_ids=config.telegram_allowed_user_ids,
             )
-            await channel.start()
+            await tg_channel.start()
             hc_app.start_scheduler()
             logger.info("Telegram bot started after setup")
 
     set_on_telegram_configured(_start_telegram)
 
     async def _serve() -> None:
+        nonlocal hc_app_ready
+        if wa_channel and hc_app:
+            await hc_app.initialize()
+            await wa_channel.start()
+            hc_app.load_scheduler()
+            hc_app.start_scheduler()
+            hc_app_ready = True
+
         uv_config = uvicorn.Config(app, host="0.0.0.0", port=port)
         server = uvicorn.Server(uv_config)
         logger.info("Starting web server on port %d (workspaces: %s)", port, workspaces)
         try:
             await server.serve()
         finally:
-            if channel:
-                await channel.stop()
+            if tg_channel:
+                await tg_channel.stop()
+            if wa_channel:
+                await wa_channel.stop()
             if hc_app:
                 hc_app.shutdown()
 
@@ -376,3 +436,41 @@ def _run_telegram() -> None:
         channel.run()
     finally:
         app.shutdown()
+
+
+def _run_whatsapp() -> None:
+    """Load config, create provider + loop, and start the WhatsApp bot."""
+    try:
+        from homeclaw.channel.whatsapp import WhatsAppChannel
+    except ImportError:
+        print(
+            "Error: neonize is not installed. "
+            "Install WhatsApp support with: pip install homeclaw[whatsapp]"
+        )
+        sys.exit(1)
+
+    app = HomeclawApp()
+    app.load_scheduler()
+
+    channel = WhatsAppChannel(
+        loop=app.loop,
+        workspaces=app.workspaces,
+        allowed_phones=app.config.whatsapp_allowed_phone_numbers,
+    )
+
+    async def _run() -> None:
+        await app.initialize()
+        await channel.start()
+        app.start_scheduler()
+        logger.info("WhatsApp bot running — press Ctrl+C to stop")
+        try:
+            # Wait until interrupted
+            await asyncio.get_running_loop().create_future()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await channel.stop()
+            app.shutdown()
+
+    with contextlib.suppress(KeyboardInterrupt):
+        asyncio.run(_run())

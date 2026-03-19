@@ -26,6 +26,8 @@ _SAVEABLE_FIELDS = {
     "model",
     "telegram_token",
     "telegram_allowed_users",
+    "whatsapp_enabled",
+    "whatsapp_allowed_users",
     "jina_api_key",
     "ha_url",
     "ha_token",
@@ -83,6 +85,22 @@ class HomeclawConfig(BaseSettings):
             if part:
                 ids.add(int(part))
         return ids if ids else None
+
+    # WhatsApp (via neonize / whatsmeow)
+    whatsapp_enabled: bool = False
+    whatsapp_allowed_users: str | None = None  # Comma-separated phone numbers (e.g. "14155551234")
+
+    @property
+    def whatsapp_allowed_phone_numbers(self) -> set[str] | None:
+        """Parse allowed phone numbers, or None if unrestricted."""
+        if not self.whatsapp_allowed_users:
+            return None
+        numbers: set[str] = set()
+        for part in self.whatsapp_allowed_users.split(","):
+            part = part.strip()
+            if part:
+                numbers.add(part)
+        return numbers if numbers else None
 
     # Web search (Jina)
     jina_api_key: str | None = None
