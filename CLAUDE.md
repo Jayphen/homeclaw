@@ -62,6 +62,29 @@ The agent writes memory via `memory_save` (append to topic file) and reads via `
 Structured data (bookmarks, contacts) stays as JSON with its own search tools — memsearch only
 indexes `.md` files.
 
+## Channel adapters
+
+Channel adapters live in `homeclaw/channel/` and bridge messaging platforms to the agent loop.
+
+- **Telegram** (`telegram.py`): Uses `python-telegram-bot`. Requires `TELEGRAM_TOKEN`. Supports
+  text, photos, group chats, `/register` and `/start` commands.
+- **WhatsApp** (`whatsapp.py`): Uses [neonize](https://github.com/krypton-byte/neonize) (Python
+  bindings for whatsmeow). Optional dep: `pip install homeclaw[whatsapp]`. Connects as a linked
+  device via QR code or pair code — no Meta Business API needed. Auth stored in
+  `workspaces/household/whatsapp.db`. Supports text, photos, groups, `/register`.
+- **REPL** (`repl.py`): Terminal chat for development.
+
+**Channel dispatcher** (`dispatcher.py`): Routes outbound messages (from `message_send` tool and
+scheduler) to the right channel. Each adapter registers a send callback on start. Per-person
+channel preferences stored in `workspaces/household/channel_preferences.json`. Auto-set on
+`/register`, changeable via `channel_preference_set` tool.
+
+Config fields for WhatsApp: `whatsapp_enabled`, `whatsapp_phone_number` (for pair-code auth),
+`whatsapp_allowed_users` (comma-separated phone numbers). All configurable via web UI Settings.
+
+The QR code for WhatsApp pairing is available at `GET /api/setup/whatsapp/qr` (PNG) and in
+container logs. Connection status exposed in the setup API as `whatsapp_connected`.
+
 ## Plugin system — three tiers
 
 1. **Python plugins**: `workspaces/plugins/{name}/plugin.py`, loaded via importlib
@@ -90,7 +113,7 @@ Views live in `ui/src/views/` and are wired to routes in `App.svelte` via `svelt
 ```
 homeclaw/           # Main Python package
   agent/            # LLM loop, context builder, tools, providers
-  channel/          # Telegram adapter
+  channel/          # Telegram, WhatsApp adapters + channel dispatcher
   memory/           # Markdown memory store + memsearch semantic recall
   contacts/         # Contact models and store
   scheduler/        # APScheduler + ROUTINES.md parser
