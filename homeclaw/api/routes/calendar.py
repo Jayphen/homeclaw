@@ -1,11 +1,11 @@
 """Calendar API route — unified monthly view."""
 
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
 
-from homeclaw.api.deps import AuthDep, get_config, list_member_workspaces
+from homeclaw.api.deps import MemberDep, get_config, list_member_workspaces, visible_members
 from homeclaw.contacts.store import list_contacts
 
 router = APIRouter(prefix="/api/calendar", tags=["calendar"])
@@ -125,8 +125,9 @@ def _collect_interactions(workspaces_path: str, start: date, end: date) -> list[
     return events
 
 
-@router.get("", dependencies=[AuthDep])
+@router.get("")
 async def calendar_month(
+    member: Annotated[str | None, MemberDep],
     month: str = Query(
         default=None,
         description="Month in YYYY-MM format (defaults to current month)",
@@ -139,7 +140,8 @@ async def calendar_month(
         month = datetime.now().strftime("%Y-%m")
 
     start, end = _parse_month(month)
-    members = list_member_workspaces(workspaces)
+    all_members = list_member_workspaces(workspaces)
+    members = visible_members(member, all_members)
 
     events: list[dict[str, Any]] = []
     events.extend(_collect_notes(ws_str, members, start, end))

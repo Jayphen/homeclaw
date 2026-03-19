@@ -1,11 +1,17 @@
 """Memory API routes — serves markdown-based memory topics."""
 
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
 
-from homeclaw.api.deps import AuthDep, get_config, list_member_workspaces
+from homeclaw.api.deps import (
+    MemberDep,
+    get_config,
+    list_member_workspaces,
+    require_person_access,
+    visible_members,
+)
 from homeclaw.memory.markdown import memory_list_topics, memory_read_topic, memory_save_topic
 from homeclaw.memory.semantic import SemanticMemory
 from homeclaw.memory.status import get_semantic_status
@@ -13,11 +19,14 @@ from homeclaw.memory.status import get_semantic_status
 router = APIRouter(prefix="/api/memory", tags=["memory"])
 
 
-@router.get("", dependencies=[AuthDep])
-async def memory_list() -> dict[str, Any]:
+@router.get("")
+async def memory_list(
+    member: Annotated[str | None, MemberDep],
+) -> dict[str, Any]:
     config = get_config()
     workspaces = config.workspaces.resolve()
-    members = list_member_workspaces(workspaces)
+    all_members = list_member_workspaces(workspaces)
+    members = visible_members(member, all_members)
     result: list[dict[str, Any]] = []
     for person in members:
         topics = memory_list_topics(workspaces, person)
@@ -42,8 +51,12 @@ async def memory_list() -> dict[str, Any]:
     }
 
 
-@router.get("/{person}", dependencies=[AuthDep])
-async def memory_detail(person: str) -> dict[str, Any]:
+@router.get("/{person}")
+async def memory_detail(
+    person: str,
+    member: Annotated[str | None, MemberDep],
+) -> dict[str, Any]:
+    require_person_access(member, person)
     workspaces = get_config().workspaces.resolve()
     topics = memory_list_topics(workspaces, person)
     topic_contents: dict[str, str] = {}
@@ -54,9 +67,15 @@ async def memory_detail(person: str) -> dict[str, Any]:
     return {"person": person, "topics": topic_contents}
 
 
-@router.post("/{person}/{topic}", dependencies=[AuthDep])
-async def memory_append(person: str, topic: str, body: dict[str, str]) -> dict[str, Any]:
+@router.post("/{person}/{topic}")
+async def memory_append(
+    person: str,
+    topic: str,
+    body: dict[str, str],
+    member: Annotated[str | None, MemberDep],
+) -> dict[str, Any]:
     """Append an entry to a memory topic."""
+    require_person_access(member, person)
     content = body.get("content", "").strip()
     if not content:
         return {"error": "content is required"}
@@ -65,12 +84,14 @@ async def memory_append(person: str, topic: str, body: dict[str, str]) -> dict[s
     return {"status": "saved", "person": person, "topic": topic}
 
 
-@router.get("/{person}/recall", dependencies=[AuthDep])
+@router.get("/{person}/recall")
 async def memory_recall(
     person: str,
+    member: Annotated[str | None, MemberDep],
     q: str = Query(..., description="Search query"),
     top_k: int = Query(default=5, ge=1, le=20),
 ) -> dict[str, Any]:
+    require_person_access(member, person)
     config = get_config()
     workspaces = config.workspaces.resolve()
     embedding_provider = "openai" if config.openai_api_key else "local"

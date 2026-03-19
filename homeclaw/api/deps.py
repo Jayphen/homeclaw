@@ -135,14 +135,82 @@ def list_member_workspaces(workspaces: Path) -> list[str]:
     )
 
 
+def _parse_auth(request: Request) -> tuple[str | None, bool]:
+    """Parse the Authorization header and return (member_name, is_admin).
+
+    Token formats:
+    - ``Bearer <web_password>`` → admin (sees all data)
+    - ``Bearer <member>:<password>`` → specific member
+
+    Returns (None, False) if auth is invalid.
+    """
+    config = get_config()
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None, False
+
+    token = auth.removeprefix("Bearer ")
+
+    # Admin auth: matches web_password directly
+    if config.web_password and secrets.compare_digest(token, config.web_password):
+        return None, True
+
+    # Member auth: "member:password"
+    if ":" in token:
+        member, password = token.split(":", 1)
+        expected = config.member_passwords.get(member)
+        if expected is not None and secrets.compare_digest(password, expected):
+            return member, False
+
+    return None, False
+
+
 async def require_auth(request: Request) -> None:
     config = get_config()
-    if not config.web_password:
+    # No password and no member passwords → open access
+    if not config.web_password and not config.member_passwords:
         return
-    auth = request.headers.get("Authorization", "")
-    expected = f"Bearer {config.web_password}"
-    if not secrets.compare_digest(auth, expected):
+    member, is_admin = _parse_auth(request)
+    if not is_admin and member is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+async def get_current_member(request: Request) -> str | None:
+    """Return the authenticated member name, or None for admin/open access.
+
+    Admin users get None — callers should treat this as "all members visible".
+    Raises 401 if passwords are configured but auth is invalid.
+    """
+    config = get_config()
+    if not config.web_password and not config.member_passwords:
+        return None
+    member, is_admin = _parse_auth(request)
+    if not is_admin and member is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if is_admin:
+        return None  # Admin sees everything
+    return member
+
+
+def require_person_access(member: str | None, person: str) -> None:
+    """Raise 403 if *member* cannot access *person*'s data.
+
+    Admins (member=None) can access everything.
+    Members can only access their own workspace.
+    """
+    if member is not None and member != person:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access denied to {person}'s data",
+        )
+
+
+def visible_members(member: str | None, all_members: list[str]) -> list[str]:
+    """Return the members visible to the current user."""
+    if member is None:
+        return all_members
+    return [member] if member in all_members else []
+
+
 AuthDep = Depends(require_auth)
+MemberDep = Depends(get_current_member)

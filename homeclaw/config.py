@@ -33,6 +33,7 @@ _SAVEABLE_FIELDS = {
     "ha_url",
     "ha_token",
     "web_password",
+    "member_passwords",
 }
 
 # Routing model fields are saved/loaded via the nested RoutingConfig object.
@@ -114,6 +115,7 @@ class HomeclawConfig(BaseSettings):
     # Web UI
     web_port: int = 8080
     web_password: str = ""
+    member_passwords: dict[str, str] = {}  # {member_name: password}
 
     # Embedding provider for semantic memory ("local" or "openai")
     embedding_provider: str | None = None

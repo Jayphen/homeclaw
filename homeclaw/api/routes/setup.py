@@ -1,14 +1,11 @@
 """Setup API routes — first-run onboarding and configuration."""
 
+import secrets
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
-
-import secrets
-
-from fastapi import Depends
 
 from homeclaw.api.deps import (
     AuthDep,
@@ -16,6 +13,7 @@ from homeclaw.api.deps import (
     get_config,
     get_on_telegram_configured,
     get_setup_token,
+    list_member_workspaces,
     require_auth,
     verify_setup_token,
 )
@@ -49,13 +47,21 @@ async def setup_status(request: Request) -> dict[str, Any]:
     except Exception:
         app_version = "dev"
 
+    workspaces = config.workspaces.resolve()
+    members = list_member_workspaces(workspaces)
+    members_with_passwords = [
+        m for m in members if m in config.member_passwords
+    ]
+
     # Minimal info is always available without auth — the UI needs this
     # to decide whether to show the login screen or onboarding flow.
     base: dict[str, Any] = {
         "version": app_version,
-        "has_password": bool(config.web_password),
+        "has_password": bool(config.web_password) or bool(config.member_passwords),
         "needs_setup_token": get_setup_token() is not None,
         "provider_configured": config.is_provider_configured,
+        "members": members_with_passwords,
+        "has_member_accounts": bool(config.member_passwords),
     }
 
     # Full config details require auth (when a password is set).
@@ -184,6 +190,41 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
             await on_tg(config.telegram_token)
 
     return await setup_status(request)
+
+
+class MemberPasswordBody(BaseModel):
+    member: str
+    password: str
+
+
+@router.post("/members/password", dependencies=[AuthDep])
+async def set_member_password(
+    request: Request, body: MemberPasswordBody,
+) -> dict[str, Any]:
+    """Set or update a member's web UI password. Admin only."""
+    config = get_config()
+    workspaces = config.workspaces.resolve()
+    members = list_member_workspaces(workspaces)
+
+    if body.member not in members:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown member '{body.member}'. "
+            f"Available: {', '.join(members)}",
+        )
+
+    if not body.password.strip():
+        # Remove password (disable account)
+        config.member_passwords.pop(body.member, None)
+    else:
+        config.member_passwords[body.member] = body.password
+
+    await config.save_async()
+    return {
+        "status": "updated",
+        "member": body.member,
+        "has_password": body.member in config.member_passwords,
+    }
 
 
 @router.get("/whatsapp/qr", dependencies=[AuthDep])

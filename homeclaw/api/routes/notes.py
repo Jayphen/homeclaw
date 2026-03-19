@@ -1,21 +1,30 @@
 """Notes API routes — per-person, per-date markdown notes."""
 
 from datetime import date, datetime
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from homeclaw.api.deps import AuthDep, get_config, list_member_workspaces
+from homeclaw.api.deps import (
+    MemberDep,
+    get_config,
+    list_member_workspaces,
+    require_person_access,
+    visible_members,
+)
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
 
 
-@router.get("", dependencies=[AuthDep])
-async def notes_index() -> list[dict[str, Any]]:
-    """List all notes across all members, newest first."""
+@router.get("")
+async def notes_index(
+    member: Annotated[str | None, MemberDep],
+) -> list[dict[str, Any]]:
+    """List all notes across visible members, newest first."""
     workspaces = get_config().workspaces.resolve()
-    members = list_member_workspaces(workspaces)
+    all_members = list_member_workspaces(workspaces)
+    members = visible_members(member, all_members)
     notes: list[dict[str, Any]] = []
 
     for person in members:
@@ -43,9 +52,13 @@ async def notes_index() -> list[dict[str, Any]]:
     return notes
 
 
-@router.get("/{person}", dependencies=[AuthDep])
-async def notes_by_person(person: str) -> list[dict[str, Any]]:
+@router.get("/{person}")
+async def notes_by_person(
+    person: str,
+    member: Annotated[str | None, MemberDep],
+) -> list[dict[str, Any]]:
     """List all notes for a specific person, newest first."""
+    require_person_access(member, person)
     workspaces = get_config().workspaces.resolve()
     notes_dir = workspaces / person / "notes"
     if not notes_dir.is_dir():
@@ -72,9 +85,14 @@ async def notes_by_person(person: str) -> list[dict[str, Any]]:
     return notes
 
 
-@router.get("/{person}/{note_date}", dependencies=[AuthDep])
-async def note_detail(person: str, note_date: str) -> dict[str, Any]:
+@router.get("/{person}/{note_date}")
+async def note_detail(
+    person: str,
+    note_date: str,
+    member: Annotated[str | None, MemberDep],
+) -> dict[str, Any]:
     """Get the full content of a specific note."""
+    require_person_access(member, person)
     workspaces = get_config().workspaces.resolve()
     try:
         date.fromisoformat(note_date)
@@ -98,9 +116,15 @@ class NoteUpdate(BaseModel):
     content: str
 
 
-@router.put("/{person}/{note_date}", dependencies=[AuthDep])
-async def note_save(person: str, note_date: str, body: NoteUpdate) -> dict[str, Any]:
+@router.put("/{person}/{note_date}")
+async def note_save(
+    person: str,
+    note_date: str,
+    body: NoteUpdate,
+    member: Annotated[str | None, MemberDep],
+) -> dict[str, Any]:
     """Create or update a note's content."""
+    require_person_access(member, person)
     workspaces = get_config().workspaces.resolve()
     try:
         date.fromisoformat(note_date)

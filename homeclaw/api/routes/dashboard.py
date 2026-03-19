@@ -2,11 +2,11 @@
 
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter
 
-from homeclaw.api.deps import AuthDep, get_config, list_member_workspaces
+from homeclaw.api.deps import MemberDep, get_config, list_member_workspaces, visible_members
 from homeclaw.contacts.store import list_contacts
 from homeclaw.reminders.store import load_reminders
 
@@ -121,11 +121,14 @@ def _overdue_checkins(workspaces_path: str) -> list[dict[str, Any]]:
     return overdue
 
 
-@router.get("", dependencies=[AuthDep])
-async def dashboard() -> dict[str, Any]:
+@router.get("")
+async def dashboard(
+    member: Annotated[str | None, MemberDep],
+) -> dict[str, Any]:
     workspaces = get_config().workspaces.resolve()
     ws_str = str(workspaces)
-    members = list_member_workspaces(workspaces)
+    all_members = list_member_workspaces(workspaces)
+    members = visible_members(member, all_members)
     today = date.today().isoformat()
 
     return {
