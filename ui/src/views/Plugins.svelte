@@ -40,6 +40,7 @@
   let confirmingDelete: string | null = $state(null);
   let deleting: Set<string> = $state(new Set());
   let restoring: Set<string> = $state(new Set());
+  let toggling: Set<string> = $state(new Set());
   let actionError: string | null = $state(null);
 
   function formatDate(iso: string): string {
@@ -116,6 +117,18 @@
     const next = new Set(restoring); next.delete(archive.id); restoring = next;
   }
 
+  async function togglePlugin(plugin: InstalledPlugin) {
+    toggling = new Set([...toggling, plugin.name]); actionError = null;
+    const action = plugin.status === "active" ? "disable" : "enable";
+    try {
+      const r = await api(`/api/plugins/${plugin.name}/${action}`, { method: "POST" });
+      if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail ?? `${r.status}`); }
+      const data = await r.json();
+      plugins = plugins.map(p => p.name === plugin.name ? data.plugin : p);
+    } catch (e: any) { actionError = `Failed to ${action} "${plugin.name}": ${e.message}`; }
+    const next = new Set(toggling); next.delete(plugin.name); toggling = next;
+  }
+
   $effect(() => { fetchAll(); });
 </script>
 
@@ -131,11 +144,15 @@
     <p class="subtitle">Manage installed plugins, skills, and browse the marketplace</p>
   </header>
 
+  {#if actionError}
+    <div class="action-error">{actionError}</div>
+  {/if}
+
   <!-- Installed plugins -->
   <section class="section" style="animation-delay: 60ms">
     <div class="section-header">
       <h2>Installed</h2>
-      <p class="section-desc">Active plugins providing tools and routines to the assistant.</p>
+      <p class="section-desc">Plugins installed in your workspace. Enable a plugin to expose its tools to the assistant.</p>
     </div>
 
     {#if plugins.length === 0}
@@ -155,6 +172,22 @@
                 </span>
                 <span class="status-dot" class:active={plugin.status === "active"} class:error={plugin.status === "error"} class:disabled={plugin.status === "disabled"}></span>
               </div>
+              {#if plugin.type === "python"}
+                <button
+                  class="btn toggle-btn"
+                  class:active={plugin.status === "active"}
+                  disabled={toggling.has(plugin.name)}
+                  onclick={() => togglePlugin(plugin)}
+                >
+                  {#if toggling.has(plugin.name)}
+                    …
+                  {:else if plugin.status === "active"}
+                    Enabled
+                  {:else}
+                    Disabled
+                  {/if}
+                </button>
+              {/if}
             </div>
             {#if plugin.description}
               <p class="plugin-desc">{plugin.description}</p>
@@ -233,10 +266,6 @@
       <h2>Skill archives</h2>
       <p class="section-desc">Skills removed via chat are archived here. Restore them to bring them back, or delete permanently to free up space.</p>
     </div>
-
-    {#if actionError}
-      <div class="action-error">{actionError}</div>
-    {/if}
 
     {#if archives.length === 0}
       <div class="empty">
@@ -348,6 +377,10 @@
 
   .toggle-arrow { display: inline-block; transition: transform 0.2s ease; font-size: 0.7rem; }
   .toggle-arrow.open { transform: rotate(180deg); }
+
+  .toggle-btn { font-size: 0.72rem; padding: 0.2rem 0.55rem; border-radius: 12px; background: #f0ebe5; color: var(--text-muted); border: 1px solid var(--border); transition: background 0.15s, color 0.15s, border-color 0.15s; }
+  .toggle-btn.active { background: #eef4ef; color: var(--sage); border-color: #c5dac8; }
+  .toggle-btn:not(:disabled):hover { border-color: #c0b8ae; }
 
   .tool-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: #fdfcfa; border-left: 3px solid var(--border); border-radius: 4px; display: flex; flex-direction: column; gap: 0.15rem; }
   .tool-item { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }

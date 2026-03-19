@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import logging
 import sys
 from pathlib import Path
@@ -12,6 +13,29 @@ from homeclaw.plugins.interface import Plugin as PluginProtocol
 from homeclaw.plugins.registry import PluginEntry, PluginRegistry, PluginType
 
 logger = logging.getLogger(__name__)
+
+_ENABLED_FILE = "enabled.json"
+
+
+def _read_enabled(plugins_dir: Path) -> set[str]:
+    """Read the set of explicitly enabled plugin names."""
+    path = plugins_dir / _ENABLED_FILE
+    if not path.is_file():
+        return set()
+    try:
+        data = json.loads(path.read_text())
+        if isinstance(data, list):
+            return set(data)
+    except (json.JSONDecodeError, OSError):
+        logger.warning("Could not read %s — treating all plugins as disabled", path)
+    return set()
+
+
+def _write_enabled(plugins_dir: Path, enabled: set[str]) -> None:
+    """Persist the set of enabled plugin names."""
+    path = plugins_dir / _ENABLED_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(sorted(enabled), indent=2) + "\n")
 
 
 class PluginLoadError(Exception):
@@ -98,11 +122,12 @@ def load_all_plugins(
 ) -> list[PluginEntry]:
     """Discover, load, and register all Python plugins found in *plugins_dir*.
 
-    Errors for individual plugins are logged but do not prevent other plugins
-    from loading. Returns the list of :class:`PluginEntry` objects for
-    successfully registered plugins.
+    Plugins are disabled by default. Only plugins listed in ``enabled.json``
+    have their tools exposed to the agent. Errors for individual plugins are
+    logged but do not prevent other plugins from loading.
     """
     names = discover_plugins(plugins_dir)
+    enabled = _read_enabled(plugins_dir)
     entries: list[PluginEntry] = []
 
     for name in names:
@@ -114,9 +139,35 @@ def load_all_plugins(
 
         try:
             entry = registry.register(plugin, PluginType.PYTHON)
+            if entry.name not in enabled:
+                registry.disable(entry.name)
             entries.append(entry)
         except Exception:
             logger.exception("Skipping plugin '%s' — failed to register", name)
 
-    logger.info("Plugin loading complete: %d/%d plugins loaded", len(entries), len(names))
+    active = sum(1 for e in entries if e.status.value == "active")
+    logger.info(
+        "Plugin loading complete: %d discovered, %d active, %d disabled",
+        len(entries), active, len(entries) - active,
+    )
     return entries
+
+
+def enable_plugin(plugins_dir: Path, registry: PluginRegistry, name: str) -> bool:
+    """Enable a plugin and persist the change."""
+    if not registry.enable(name):
+        return False
+    enabled = _read_enabled(plugins_dir)
+    enabled.add(name)
+    _write_enabled(plugins_dir, enabled)
+    return True
+
+
+def disable_plugin(plugins_dir: Path, registry: PluginRegistry, name: str) -> bool:
+    """Disable a plugin and persist the change."""
+    if not registry.disable(name):
+        return False
+    enabled = _read_enabled(plugins_dir)
+    enabled.discard(name)
+    _write_enabled(plugins_dir, enabled)
+    return True

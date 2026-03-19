@@ -106,6 +106,29 @@ def test_list_plugins_no_registry() -> None:
     assert resp.json()["plugins"] == []
 
 
+def test_disable_plugin(client: TestClient) -> None:
+    resp = client.post("/api/plugins/plants/disable")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "disabled"
+    assert data["plugin"]["status"] == "disabled"
+
+
+def test_enable_plugin(client: TestClient) -> None:
+    # First disable, then re-enable
+    client.post("/api/plugins/plants/disable")
+    resp = client.post("/api/plugins/plants/enable")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "enabled"
+    assert data["plugin"]["status"] == "active"
+
+
+def test_disable_nonexistent(client: TestClient) -> None:
+    resp = client.post("/api/plugins/nonexistent/disable")
+    assert resp.status_code == 404
+
+
 def test_marketplace_not_configured(client: TestClient) -> None:
     resp = client.get("/api/plugins/marketplace/browse")
     assert resp.status_code == 200

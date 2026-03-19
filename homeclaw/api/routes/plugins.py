@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 
 from homeclaw.api.deps import AuthDep, get_config, get_plugin_registry
+from homeclaw.plugins.loader import disable_plugin, enable_plugin
 from homeclaw.plugins.marketplace.index import MarketplaceClient
 from homeclaw.plugins.marketplace.models import MarketplacePluginType
 from homeclaw.plugins.registry import PluginStatus, PluginType
@@ -28,6 +29,10 @@ def _entry_to_dict(entry: Any) -> dict[str, Any]:
         "routine_count": entry.routine_count,
         "error": entry.error,
     }
+
+
+def _plugins_dir() -> Any:
+    return get_config().workspaces.resolve() / "plugins"
 
 
 @router.get("", dependencies=[AuthDep])
@@ -67,20 +72,7 @@ async def list_plugins(
     return {"plugins": [_entry_to_dict(e) for e in entries]}
 
 
-@router.get("/{name}", dependencies=[AuthDep])
-async def get_plugin(name: str) -> dict[str, Any]:
-    """Get details for a single installed plugin."""
-    registry = get_plugin_registry()
-    if registry is None:
-        raise HTTPException(status_code=404, detail="Plugin not found")
-
-    entry = registry.get_entry(name)
-    if entry is None:
-        raise HTTPException(status_code=404, detail="Plugin not found")
-
-    return {"plugin": _entry_to_dict(entry)}
-
-
+# NOTE: static paths must come before /{name} to avoid being captured
 @router.get("/marketplace/browse", dependencies=[AuthDep])
 async def browse_marketplace(
     plugin_type: str | None = None,
@@ -113,3 +105,51 @@ async def browse_marketplace(
         "plugins": [p.model_dump() for p in plugins],
         "configured": True,
     }
+
+
+@router.get("/{name}", dependencies=[AuthDep])
+async def get_plugin(name: str) -> dict[str, Any]:
+    """Get details for a single installed plugin."""
+    registry = get_plugin_registry()
+    if registry is None:
+        raise HTTPException(status_code=404, detail="Plugin not found")
+
+    entry = registry.get_entry(name)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Plugin not found")
+
+    return {"plugin": _entry_to_dict(entry)}
+
+
+@router.post("/{name}/enable", dependencies=[AuthDep])
+async def enable_plugin_route(name: str) -> dict[str, Any]:
+    """Enable a disabled plugin, exposing its tools to the agent."""
+    registry = get_plugin_registry()
+    if registry is None or registry.get_entry(name) is None:
+        raise HTTPException(status_code=404, detail="Plugin not found")
+
+    if not enable_plugin(_plugins_dir(), registry, name):
+        entry = registry.get_entry(name)
+        if entry and entry.status == PluginStatus.ACTIVE:
+            return {"status": "already_active", "plugin": _entry_to_dict(entry)}
+        raise HTTPException(status_code=400, detail="Could not enable plugin")
+
+    entry = registry.get_entry(name)
+    return {"status": "enabled", "plugin": _entry_to_dict(entry)}
+
+
+@router.post("/{name}/disable", dependencies=[AuthDep])
+async def disable_plugin_route(name: str) -> dict[str, Any]:
+    """Disable an active plugin, removing its tools from the agent."""
+    registry = get_plugin_registry()
+    if registry is None or registry.get_entry(name) is None:
+        raise HTTPException(status_code=404, detail="Plugin not found")
+
+    if not disable_plugin(_plugins_dir(), registry, name):
+        entry = registry.get_entry(name)
+        if entry and entry.status == PluginStatus.DISABLED:
+            return {"status": "already_disabled", "plugin": _entry_to_dict(entry)}
+        raise HTTPException(status_code=400, detail="Could not disable plugin")
+
+    entry = registry.get_entry(name)
+    return {"status": "disabled", "plugin": _entry_to_dict(entry)}

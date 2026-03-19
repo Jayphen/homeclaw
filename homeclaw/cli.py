@@ -103,6 +103,7 @@ class HomeclawApp:
         self._scheduler: Scheduler | None = None
 
         from homeclaw.channel.dispatcher import ChannelDispatcher
+        from homeclaw.plugins.loader import load_all_plugins
         from homeclaw.plugins.registry import PluginRegistry
         from homeclaw.plugins.skills.loader import load_all_skills
 
@@ -112,6 +113,9 @@ class HomeclawApp:
 
         # Load household-wide skills at startup (private skills hot-loaded on skill_create)
         load_all_skills(self.workspaces, "household", self.plugin_registry)
+
+        # Load user-installed Python plugins (disabled by default, opt-in via enabled.json)
+        load_all_plugins(self.workspaces / "plugins", self.plugin_registry)
 
         if register_tools:
             register_builtin_tools(

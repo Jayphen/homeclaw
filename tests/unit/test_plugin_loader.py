@@ -11,6 +11,7 @@ from homeclaw.plugins.interface import Plugin
 from homeclaw.plugins.loader import (
     PluginLoadError,
     discover_plugins,
+    enable_plugin,
     load_all_plugins,
     load_plugin,
 )
@@ -188,18 +189,22 @@ class TestLoadAllPlugins:
         assert len(entries) == 1
         assert entries[0].name == "fake"
         assert entries[0].plugin_type == PluginType.PYTHON
-        assert entries[0].status == PluginStatus.ACTIVE
+        assert entries[0].status == PluginStatus.DISABLED  # disabled by default
 
     def test_registers_tools_in_agent_registry(self, tmp_path: Path) -> None:
+        import json
+
         _write_plugin(tmp_path, "tooled", VALID_PLUGIN_SRC)
+        # Enable the plugin so its tools are exposed
+        (tmp_path / "enabled.json").write_text(json.dumps(["fake"]))
 
         tool_reg = ToolRegistry()
         registry = PluginRegistry(tool_registry=tool_reg)
 
         load_all_plugins(tmp_path, registry)
 
-        # The valid plugin exposes a "greet" tool, namespaced as "fake.greet"
-        assert tool_reg.has_tool("fake.greet")
+        # The valid plugin exposes a "greet" tool, namespaced as "fake__greet"
+        assert tool_reg.has_tool("fake__greet")
 
     def test_empty_dir_returns_empty_list(self, tmp_path: Path) -> None:
         tool_reg = ToolRegistry()
@@ -220,3 +225,36 @@ class TestLoadAllPlugins:
 
         assert len(entries) == 1
         assert entries[0].name == "fake"
+
+    def test_enabled_json_activates_plugin(self, tmp_path: Path) -> None:
+        import json
+
+        _write_plugin(tmp_path, "myplugin", VALID_PLUGIN_SRC)
+        (tmp_path / "enabled.json").write_text(json.dumps(["fake"]))
+
+        tool_reg = ToolRegistry()
+        registry = PluginRegistry(tool_registry=tool_reg)
+
+        entries = load_all_plugins(tmp_path, registry)
+
+        assert len(entries) == 1
+        assert entries[0].status == PluginStatus.ACTIVE
+
+    def test_enable_plugin_persists(self, tmp_path: Path) -> None:
+        import json
+
+        _write_plugin(tmp_path, "myplugin", VALID_PLUGIN_SRC)
+
+        tool_reg = ToolRegistry()
+        registry = PluginRegistry(tool_registry=tool_reg)
+        load_all_plugins(tmp_path, registry)
+
+        entry = registry.get_entry("fake")
+        assert entry is not None
+        assert entry.status == PluginStatus.DISABLED
+
+        assert enable_plugin(tmp_path, registry, "fake") is True
+        assert entry.status == PluginStatus.ACTIVE
+
+        enabled = json.loads((tmp_path / "enabled.json").read_text())
+        assert "fake" in enabled
