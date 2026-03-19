@@ -42,6 +42,7 @@ async def build_context(
 
     # Current time (local timezone so the LLM gives time-aware answers)
     now = datetime.now().astimezone()
+    parts.append(f"You are talking to: {person}")
     parts.append(f"Current time: {now.strftime('%Y-%m-%d %H:%M %Z')}")
 
     # Household profile — inject a compact summary from household memory topics

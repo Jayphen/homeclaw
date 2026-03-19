@@ -73,3 +73,7 @@ class TestEdgeCases:
     async def test_includes_current_time(self, dev_workspaces: Path) -> None:
         ctx = await build_context("hello", "alice", dev_workspaces)
         assert "Current time:" in ctx
+
+    async def test_includes_speaker_name(self, dev_workspaces: Path) -> None:
+        ctx = await build_context("hello", "alice", dev_workspaces)
+        assert "You are talking to: alice" in ctx
