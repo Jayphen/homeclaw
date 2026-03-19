@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.0](https://github.com/Jayphen/homeclaw/compare/v0.3.14...v0.4.0) (2026-03-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* harden web API auth — bcrypt, JWT sessions, authorization fixes
+
+### Features
+
+* add install/uninstall API routes for marketplace plugins ([5941e01](https://github.com/Jayphen/homeclaw/commit/5941e01a2842879e0c4620e5d7d956f64ee02dbf))
+* add marketplace plugin installer with install/uninstall API ([93e9683](https://github.com/Jayphen/homeclaw/commit/93e96830320a6da1c807bb2dcaff2e8bc800708a))
+* add per-member authentication and access control to web API ([15c7d62](https://github.com/Jayphen/homeclaw/commit/15c7d626be9d020fe4ce65331e9953ffe3c08a11))
+* harden web API auth — bcrypt, JWT sessions, authorization fixes ([35befe5](https://github.com/Jayphen/homeclaw/commit/35befe57295593fee3aa48da1a9ec33242d8bf44))
+
+
+### Bug Fixes
+
+* strengthen system prompt to save info the user expects remembered ([7365a42](https://github.com/Jayphen/homeclaw/commit/7365a42a1ab3426bb1b6f0d8065f6e725a177b29))
+
 ## [0.3.14](https://github.com/Jayphen/homeclaw/compare/v0.3.13...v0.3.14) (2026-03-19)
 
 
