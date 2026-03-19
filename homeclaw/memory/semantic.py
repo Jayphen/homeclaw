@@ -70,7 +70,22 @@ class SemanticMemory:
             }
             if self._embedding_api_key:
                 kwargs["embedding_api_key"] = self._embedding_api_key
-            self._mem = MemSearch(**kwargs)
+            try:
+                self._mem = MemSearch(**kwargs)
+            except ValueError as ve:
+                if "dimension mismatch" in str(ve).lower():
+                    logger.warning(
+                        "Embedding dimension changed — dropping old index and re-indexing"
+                    )
+                    from pymilvus import MilvusClient  # type: ignore[import-not-found]
+
+                    milvus_uri = kwargs["milvus_uri"]
+                    client = MilvusClient(uri=milvus_uri)
+                    client.drop_collection("memsearch_chunks")
+                    client.close()
+                    self._mem = MemSearch(**kwargs)
+                else:
+                    raise
 
             logger.info("Indexing %d workspace paths…", len(paths))
             n = await self._mem.index()
