@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from homeclaw.api.deps import AuthDep, get_config, get_plugin_registry
+from homeclaw.api.deps import AdminDep, AuthDep, get_config, get_plugin_registry
 from homeclaw.plugins.loader import disable_plugin, enable_plugin
 from homeclaw.plugins.marketplace.index import MarketplaceClient
 from homeclaw.plugins.marketplace.installer import (
@@ -112,7 +112,7 @@ async def browse_marketplace(
     }
 
 
-@router.post("/marketplace/install", dependencies=[AuthDep])
+@router.post("/marketplace/install", dependencies=[AdminDep])
 async def install_marketplace_plugin(
     name: str,
     enable: bool = True,
@@ -152,7 +152,7 @@ async def install_marketplace_plugin(
     return {"status": "installed", "plugin": _entry_to_dict(entry)}
 
 
-@router.post("/marketplace/uninstall", dependencies=[AuthDep])
+@router.post("/marketplace/uninstall", dependencies=[AdminDep])
 async def uninstall_marketplace_plugin(name: str) -> dict[str, Any]:
     """Uninstall a plugin by name."""
     config = get_config()
@@ -184,7 +184,7 @@ async def get_plugin(name: str) -> dict[str, Any]:
     return {"plugin": _entry_to_dict(entry)}
 
 
-@router.post("/{name}/enable", dependencies=[AuthDep])
+@router.post("/{name}/enable", dependencies=[AdminDep])
 async def enable_plugin_route(name: str) -> dict[str, Any]:
     """Enable a disabled plugin, exposing its tools to the agent."""
     registry = get_plugin_registry()
@@ -201,7 +201,7 @@ async def enable_plugin_route(name: str) -> dict[str, Any]:
     return {"status": "enabled", "plugin": _entry_to_dict(entry)}
 
 
-@router.post("/{name}/disable", dependencies=[AuthDep])
+@router.post("/{name}/disable", dependencies=[AdminDep])
 async def disable_plugin_route(name: str) -> dict[str, Any]:
     """Disable an active plugin, removing its tools from the agent."""
     registry = get_plugin_registry()

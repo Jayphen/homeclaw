@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from homeclaw.api.deps import AuthDep as AuthDep  # noqa: F401
 from homeclaw.api.deps import get_config as get_config  # noqa: F401
 from homeclaw.api.deps import set_config as set_config  # noqa: F401
+from homeclaw.api.routes.auth import router as auth_router
 from homeclaw.api.routes.bookmarks import router as bookmarks_router
 from homeclaw.api.routes.calendar import router as calendar_router
 from homeclaw.api.routes.contacts import router as contacts_router
@@ -31,6 +32,7 @@ except Exception:
     _version = "dev"
 
 app = FastAPI(title="homeclaw", version=_version)
+app.include_router(auth_router)
 app.include_router(bookmarks_router)
 app.include_router(plugins_router)
 app.include_router(skills_router)
@@ -44,19 +46,19 @@ app.include_router(notes_router)
 app.include_router(settings_router)
 app.include_router(setup_router)
 
-# CORS: in production, restrict allow_origins to your actual domain.
-# allow_credentials=True + allow_origins=["*"] is rejected by browsers,
-# so we use allow_credentials=False for safety.  Override HOMECLAW_CORS_ORIGINS
-# (comma-separated) to lock down further.
+# CORS: Set HOMECLAW_CORS_ORIGINS (comma-separated) to your domain(s).
+# Defaults to same-origin only (no cross-origin requests allowed) for security.
+# Set to "*" explicitly if you need open access (e.g. development).
 _cors_origins_env = os.environ.get("HOMECLAW_CORS_ORIGINS", "")
-_cors_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()] if _cors_origins_env else ["*"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_credentials=_cors_origins != ["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+_cors_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
+if _cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_credentials=_cors_origins != ["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Mount static files for web UI if dist/ exists.
 # In Docker the package is installed to site-packages, so __file__-relative

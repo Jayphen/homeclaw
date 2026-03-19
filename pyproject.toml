@@ -17,6 +17,8 @@ dependencies = [
     "docker>=7.0",
     "python-multipart>=0.0.22",
     "telegramify-markdown>=1.1.1",
+    "bcrypt>=4.0",
+    "PyJWT>=2.0",
 ]
 
 [project.optional-dependencies]

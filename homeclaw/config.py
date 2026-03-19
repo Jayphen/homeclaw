@@ -34,6 +34,7 @@ _SAVEABLE_FIELDS = {
     "ha_token",
     "web_password",
     "member_passwords",
+    "jwt_secret",
 }
 
 # Routing model fields are saved/loaded via the nested RoutingConfig object.
@@ -116,6 +117,7 @@ class HomeclawConfig(BaseSettings):
     web_port: int = 8080
     web_password: str = ""
     member_passwords: dict[str, str] = {}  # {member_name: password}
+    jwt_secret: str = ""  # Auto-generated on first login; signs session tokens
 
     # Embedding provider for semantic memory ("local" or "openai")
     embedding_provider: str | None = None

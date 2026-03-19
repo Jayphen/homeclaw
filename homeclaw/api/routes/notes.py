@@ -11,6 +11,7 @@ from homeclaw.api.deps import (
     get_config,
     list_member_workspaces,
     require_person_access,
+    validate_person,
     visible_members,
 )
 
@@ -58,8 +59,9 @@ async def notes_by_person(
     member: Annotated[str | None, MemberDep],
 ) -> list[dict[str, Any]]:
     """List all notes for a specific person, newest first."""
-    require_person_access(member, person)
     workspaces = get_config().workspaces.resolve()
+    validate_person(person, workspaces)
+    require_person_access(member, person)
     notes_dir = workspaces / person / "notes"
     if not notes_dir.is_dir():
         return []
@@ -92,8 +94,9 @@ async def note_detail(
     member: Annotated[str | None, MemberDep],
 ) -> dict[str, Any]:
     """Get the full content of a specific note."""
-    require_person_access(member, person)
     workspaces = get_config().workspaces.resolve()
+    validate_person(person, workspaces)
+    require_person_access(member, person)
     try:
         date.fromisoformat(note_date)
     except ValueError:
@@ -124,18 +127,15 @@ async def note_save(
     member: Annotated[str | None, MemberDep],
 ) -> dict[str, Any]:
     """Create or update a note's content."""
-    require_person_access(member, person)
     workspaces = get_config().workspaces.resolve()
+    validate_person(person, workspaces)
+    require_person_access(member, person)
     try:
         date.fromisoformat(note_date)
     except ValueError as err:
         raise HTTPException(
             status_code=400, detail="Invalid date format, expected YYYY-MM-DD"
         ) from err
-
-    members = list_member_workspaces(workspaces)
-    if person not in members:
-        raise HTTPException(status_code=404, detail="Unknown person")
 
     notes_dir = workspaces / person / "notes"
     notes_dir.mkdir(parents=True, exist_ok=True)

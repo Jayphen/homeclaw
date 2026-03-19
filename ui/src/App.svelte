@@ -27,9 +27,11 @@
   type AppState = "loading" | "setup" | "login" | "ready" | "error";
   let state: AppState = $state("loading");
   let loginPassword: string = $state("");
+  let loginMember: string = $state("");
   let loginError: string | null = $state(null);
   let loggingIn: boolean = $state(false);
   let setupError: string | null = $state(null);
+  let hasMemberAccounts: boolean = $state(false);
 
   async function checkSetup() {
     try {
@@ -46,6 +48,8 @@
         return;
       }
 
+      hasMemberAccounts = !!data.has_member_accounts;
+
       // Provider + password configured. Check if we have a valid token.
       if (getToken()) {
         const check = await api("/api/settings");
@@ -53,7 +57,8 @@
           state = "ready";
           return;
         }
-        // Token invalid/expired — fall through to login.
+        // Token invalid/expired — clear and fall through to login.
+        clearToken();
       }
 
       state = "login";
@@ -66,18 +71,25 @@
   async function handleLogin() {
     loginError = null;
     loggingIn = true;
-    setToken(loginPassword);
     try {
-      const r = await api("/api/settings");
+      const body: Record<string, string> = { password: loginPassword };
+      if (loginMember.trim()) {
+        body.member = loginMember.trim();
+      }
+      const r = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       if (r.ok) {
+        const data = await r.json();
+        setToken(data.token);
         state = "ready";
       } else {
         loginError = "Wrong password.";
-        setToken("");
       }
     } catch {
       loginError = "Couldn't reach the server.";
-      setToken("");
     }
     loggingIn = false;
   }
@@ -120,8 +132,12 @@
         <div class="login-error">{loginError}</div>
       {/if}
       <form onsubmit={(e) => { e.preventDefault(); handleLogin(); }}>
+        {#if hasMemberAccounts}
+          <label for="login-member">Name</label>
+          <input id="login-member" type="text" bind:value={loginMember} placeholder="Your name (or leave blank for admin)" autofocus />
+        {/if}
         <label for="login-pw">Password</label>
-        <input id="login-pw" type="password" bind:value={loginPassword} placeholder="Enter password" autofocus />
+        <input id="login-pw" type="password" bind:value={loginPassword} placeholder="Enter password" autofocus={!hasMemberAccounts} />
         <button type="submit" disabled={loggingIn}>
           {loggingIn ? "Signing in..." : "Sign in"}
         </button>

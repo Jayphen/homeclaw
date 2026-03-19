@@ -10,6 +10,7 @@ from homeclaw.api.deps import (
     get_config,
     list_member_workspaces,
     require_person_access,
+    validate_person,
     visible_members,
 )
 from homeclaw.memory.markdown import memory_list_topics, memory_read_topic, memory_save_topic
@@ -56,8 +57,9 @@ async def memory_detail(
     person: str,
     member: Annotated[str | None, MemberDep],
 ) -> dict[str, Any]:
-    require_person_access(member, person)
     workspaces = get_config().workspaces.resolve()
+    validate_person(person, workspaces)
+    require_person_access(member, person)
     topics = memory_list_topics(workspaces, person)
     topic_contents: dict[str, str] = {}
     for topic in topics:
@@ -75,11 +77,12 @@ async def memory_append(
     member: Annotated[str | None, MemberDep],
 ) -> dict[str, Any]:
     """Append an entry to a memory topic."""
+    workspaces = get_config().workspaces.resolve()
+    validate_person(person, workspaces)
     require_person_access(member, person)
     content = body.get("content", "").strip()
     if not content:
         return {"error": "content is required"}
-    workspaces = get_config().workspaces.resolve()
     memory_save_topic(workspaces, person, topic, content)
     return {"status": "saved", "person": person, "topic": topic}
 
@@ -91,9 +94,10 @@ async def memory_recall(
     q: str = Query(..., description="Search query"),
     top_k: int = Query(default=5, ge=1, le=20),
 ) -> dict[str, Any]:
-    require_person_access(member, person)
     config = get_config()
     workspaces = config.workspaces.resolve()
+    validate_person(person, workspaces)
+    require_person_access(member, person)
     embedding_provider = "openai" if config.openai_api_key else "local"
     semantic = SemanticMemory(
         str(workspaces),

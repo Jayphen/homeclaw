@@ -3,15 +3,96 @@
 import logging
 import secrets
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import bcrypt
+import jwt
 from fastapi import Depends, HTTPException, Request
 
 from homeclaw import HOUSEHOLD_WORKSPACE, PLUGINS_DIR
 from homeclaw.config import HomeclawConfig
 
 logger = logging.getLogger(__name__)
+
+# Session tokens expire after 7 days.
+_SESSION_TOKEN_TTL = timedelta(days=7)
+
+
+# ---------------------------------------------------------------------------
+# Password hashing
+# ---------------------------------------------------------------------------
+
+def hash_password(plain: str) -> str:
+    """Hash a plaintext password with bcrypt."""
+    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    """Check a plaintext password against a bcrypt hash.
+
+    Also accepts legacy plaintext passwords (no ``$2`` prefix) so that
+    existing config.json files keep working until the password is re-set.
+    """
+    if hashed.startswith("$2"):
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    # Legacy plaintext comparison — constant-time to avoid timing attacks.
+    return secrets.compare_digest(plain, hashed)
+
+
+# ---------------------------------------------------------------------------
+# JWT session tokens
+# ---------------------------------------------------------------------------
+
+def _ensure_jwt_secret(config: HomeclawConfig) -> str:
+    """Return the JWT signing secret, generating and persisting one if needed."""
+    if config.jwt_secret:
+        return config.jwt_secret
+    config.jwt_secret = secrets.token_urlsafe(32)
+    config.save()
+    return config.jwt_secret
+
+
+def create_session_token(
+    member: str | None, *, is_admin: bool,
+) -> dict[str, Any]:
+    """Create a signed JWT session token.
+
+    Returns ``{"token": "...", "expires_at": "...", "member": ..., "is_admin": ...}``.
+    """
+    config = get_config()
+    secret = _ensure_jwt_secret(config)
+    now = datetime.now(UTC)
+    exp = now + _SESSION_TOKEN_TTL
+    payload = {
+        "sub": member or "__admin__",
+        "adm": is_admin,
+        "iat": now,
+        "exp": exp,
+    }
+    token = jwt.encode(payload, secret, algorithm="HS256")
+    return {
+        "token": token,
+        "member": member,
+        "is_admin": is_admin,
+        "expires_at": exp.isoformat(),
+    }
+
+
+def _parse_jwt(token: str) -> tuple[str | None, bool] | None:
+    """Validate a JWT and return (member, is_admin), or None if invalid."""
+    config = get_config()
+    if not config.jwt_secret:
+        return None
+    try:
+        payload = jwt.decode(token, config.jwt_secret, algorithms=["HS256"])
+    except jwt.InvalidTokenError:
+        return None
+    sub = payload.get("sub")
+    is_admin = bool(payload.get("adm", False))
+    member = None if sub == "__admin__" else sub
+    return member, is_admin
 
 _config: HomeclawConfig | None = None
 _setup_token: str | None = None
@@ -138,9 +219,10 @@ def list_member_workspaces(workspaces: Path) -> list[str]:
 def _parse_auth(request: Request) -> tuple[str | None, bool]:
     """Parse the Authorization header and return (member_name, is_admin).
 
-    Token formats:
-    - ``Bearer <web_password>`` → admin (sees all data)
-    - ``Bearer <member>:<password>`` → specific member
+    Token formats (tried in order):
+    - ``Bearer <jwt>``              → decoded from signed session token
+    - ``Bearer <web_password>``     → admin (legacy / CLI)
+    - ``Bearer <member>:<password>``→ specific member (legacy / CLI)
 
     Returns (None, False) if auth is invalid.
     """
@@ -151,15 +233,21 @@ def _parse_auth(request: Request) -> tuple[str | None, bool]:
 
     token = auth.removeprefix("Bearer ")
 
-    # Admin auth: matches web_password directly
-    if config.web_password and secrets.compare_digest(token, config.web_password):
+    # Try JWT first (tokens always start with "eyJ")
+    if token.startswith("eyJ"):
+        result = _parse_jwt(token)
+        if result is not None:
+            return result
+
+    # Admin auth: matches web_password (hashed or legacy plaintext)
+    if config.web_password and verify_password(token, config.web_password):
         return None, True
 
     # Member auth: "member:password"
     if ":" in token:
         member, password = token.split(":", 1)
         expected = config.member_passwords.get(member)
-        if expected is not None and secrets.compare_digest(password, expected):
+        if expected is not None and verify_password(password, expected):
             return member, False
 
     return None, False
@@ -192,6 +280,26 @@ async def get_current_member(request: Request) -> str | None:
     return member
 
 
+async def require_admin(request: Request) -> None:
+    """Require admin authentication (web_password). Members are rejected."""
+    config = get_config()
+    if not config.web_password and not config.member_passwords:
+        return  # Open access
+    _, is_admin = _parse_auth(request)
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+
+def validate_person(person: str, workspaces: Path) -> None:
+    """Validate that *person* is a known member workspace.
+
+    Prevents path traversal via crafted ``person`` URL parameters.
+    """
+    members = list_member_workspaces(workspaces)
+    if person not in members:
+        raise HTTPException(status_code=404, detail=f"Unknown member: {person}")
+
+
 def require_person_access(member: str | None, person: str) -> None:
     """Raise 403 if *member* cannot access *person*'s data.
 
@@ -213,4 +321,5 @@ def visible_members(member: str | None, all_members: list[str]) -> list[str]:
 
 
 AuthDep = Depends(require_auth)
+AdminDep = Depends(require_admin)
 MemberDep = Depends(get_current_member)

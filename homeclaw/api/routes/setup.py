@@ -1,6 +1,5 @@
 """Setup API routes — first-run onboarding and configuration."""
 
-import secrets
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -8,13 +7,16 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from homeclaw.api.deps import (
+    AdminDep,
     AuthDep,
     clear_setup_token,
     get_config,
     get_on_telegram_configured,
     get_setup_token,
+    hash_password,
     list_member_workspaces,
     require_auth,
+    verify_password,
     verify_setup_token,
 )
 from homeclaw.api.deps import (
@@ -55,12 +57,13 @@ async def setup_status(request: Request) -> dict[str, Any]:
 
     # Minimal info is always available without auth — the UI needs this
     # to decide whether to show the login screen or onboarding flow.
+    # NOTE: Do NOT leak member names here — only expose a count so the
+    # UI knows whether to show the member login flow.
     base: dict[str, Any] = {
         "version": app_version,
         "has_password": bool(config.web_password) or bool(config.member_passwords),
         "needs_setup_token": get_setup_token() is not None,
         "provider_configured": config.is_provider_configured,
-        "members": members_with_passwords,
         "has_member_accounts": bool(config.member_passwords),
     }
 
@@ -72,6 +75,7 @@ async def setup_status(request: Request) -> dict[str, Any]:
             return base
 
     base.update({
+        "members": members_with_passwords,
         "provider": config.provider,
         "model": config.model,
         "anthropic_api_key": _mask(config.anthropic_api_key),
@@ -136,8 +140,10 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
     else:
         # After initial setup, accept Bearer auth OR the password in setup_token.
         auth = request.headers.get("Authorization", "")
-        bearer_ok = secrets.compare_digest(auth, f"Bearer {config.web_password}")
-        token_ok = body.setup_token is not None and secrets.compare_digest(
+        bearer_ok = auth.startswith("Bearer ") and verify_password(
+            auth.removeprefix("Bearer "), config.web_password
+        )
+        token_ok = body.setup_token is not None and verify_password(
             body.setup_token, config.web_password
         )
         if not bearer_ok and not token_ok:
@@ -175,7 +181,7 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
     if body.routine_model is not None:
         config.routing.routine_model = body.routine_model
     if body.web_password is not None:
-        config.web_password = body.web_password
+        config.web_password = hash_password(body.web_password) if body.web_password else ""
 
     await config.save_async()
 
@@ -197,7 +203,7 @@ class MemberPasswordBody(BaseModel):
     password: str
 
 
-@router.post("/members/password", dependencies=[AuthDep])
+@router.post("/members/password", dependencies=[AdminDep])
 async def set_member_password(
     request: Request, body: MemberPasswordBody,
 ) -> dict[str, Any]:
@@ -217,7 +223,7 @@ async def set_member_password(
         # Remove password (disable account)
         config.member_passwords.pop(body.member, None)
     else:
-        config.member_passwords[body.member] = body.password
+        config.member_passwords[body.member] = hash_password(body.password)
 
     await config.save_async()
     return {

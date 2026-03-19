@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from homeclaw import HOUSEHOLD_WORKSPACE
-from homeclaw.api.deps import SKIP_EXPORT_NAMES, AuthDep, get_config, list_member_workspaces
+from homeclaw.api.deps import SKIP_EXPORT_NAMES, AdminDep, get_config, list_member_workspaces
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ def _restore_zip(workspaces: Path, zf: zipfile.ZipFile) -> dict[str, Any]:
     }
 
 
-@router.get("/export", dependencies=[AuthDep])
+@router.get("/export", dependencies=[AdminDep])
 async def export_data() -> StreamingResponse:
     """Export all household data as a ZIP archive."""
     workspaces = get_config().workspaces.resolve()
@@ -124,7 +124,7 @@ async def export_data() -> StreamingResponse:
     )
 
 
-@router.post("/import", dependencies=[AuthDep])
+@router.post("/import", dependencies=[AdminDep])
 async def import_data(file: UploadFile) -> dict[str, Any]:
     """Import household data from a previously exported ZIP archive.
 
