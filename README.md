@@ -91,6 +91,66 @@ homeclaw telegram
 Users register via `/register <name>` in Telegram to link their account to a
 household member.
 
+### Docker
+
+The easiest way to run homeclaw in production. Images are published to GitHub
+Container Registry on every release (linux/amd64 + linux/arm64).
+
+**Quick start with `docker run`:**
+
+```bash
+docker run -d \
+  --name homeclaw \
+  -p 8080:8080 \
+  -v ./workspaces:/data/workspaces \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  ghcr.io/jayphen/homeclaw:latest
+```
+
+Then open `http://localhost:8080` to complete setup in the web UI.
+
+**With docker-compose (recommended):**
+
+Create a `.env` file with your config:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...
+# Optional:
+TELEGRAM_TOKEN=123456:ABC-...
+TELEGRAM_ALLOWED_USERS=123456789
+JINA_API_KEY=jina_...
+```
+
+Then use the included `docker-compose.yml`:
+
+```bash
+docker compose up -d
+```
+
+This maps port 7399 → 8080 and bind-mounts `./workspaces` for persistent data.
+
+**Key environment variables:**
+
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | Anthropic API key (or use `OPENAI_API_KEY` + `OPENAI_BASE_URL`) |
+| `TELEGRAM_TOKEN` | Telegram bot token (optional) |
+| `TELEGRAM_ALLOWED_USERS` | Comma-separated Telegram user IDs (optional) |
+| `WHATSAPP_ENABLED` | Set to `true` to enable WhatsApp (optional) |
+| `JINA_API_KEY` | Jina API key for web search (optional) |
+| `WEB_PASSWORD` | Web UI password (or set via first-run setup) |
+| `HOMECLAW_CORS_ORIGINS` | Comma-separated allowed origins, e.g. `https://home.example.com` |
+
+**Volume:** Mount `/data/workspaces` to persist all household data (contacts,
+notes, memory, bookmarks, config). Back this up regularly.
+
+**Building locally:**
+
+```bash
+docker build -t homeclaw .
+docker run -d -p 8080:8080 -v ./workspaces:/data/workspaces homeclaw
+```
+
 ### Development shortcuts
 
 ```bash
