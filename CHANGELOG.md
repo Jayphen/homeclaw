@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.8](https://github.com/Jayphen/homeclaw/compare/v0.3.7...v0.3.8) (2026-03-19)
+
+
+### Bug Fixes
+
+* password timing attack, unauthenticated endpoints, unbounded writes ([9c33dab](https://github.com/Jayphen/homeclaw/commit/9c33dabfa3dfc4f7d5e45a6f736bcae76500a03b))
+
 ## [0.3.7](https://github.com/Jayphen/homeclaw/compare/v0.3.6...v0.3.7) (2026-03-19)
 
 
