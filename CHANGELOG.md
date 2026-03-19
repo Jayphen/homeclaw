@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.10](https://github.com/Jayphen/homeclaw/compare/v0.3.9...v0.3.10) (2026-03-19)
+
+
+### Features
+
+* add installed plugins and marketplace sections to Plugins view ([a92a875](https://github.com/Jayphen/homeclaw/commit/a92a8757d7b44724da2001ab140fa0f3059699ca))
+* add plugins API routes (GET /api/plugins, GET /api/plugins/{name}, marketplace browse) ([ccef3ff](https://github.com/Jayphen/homeclaw/commit/ccef3ff90e7b3ece86df2ffd3039affb0ce64d67))
+* show app version in Settings page and fix FastAPI version ([0796114](https://github.com/Jayphen/homeclaw/commit/07961141bf6164dccff28b94a4645c234931439a))
+* user-installed plugins are opt-in, disabled by default ([2d0bd28](https://github.com/Jayphen/homeclaw/commit/2d0bd287be5f7de42e6a15a3a8b511fdc0e051e3))
+
+
+### Bug Fixes
+
+* pin pymilvus &lt;2.6, fix memsearch[local] extra, and add startup logging ([c2e220a](https://github.com/Jayphen/homeclaw/commit/c2e220a5fffd7baeffa719316b30fad73cf16cd3))
+
 ## [0.3.9](https://github.com/Jayphen/homeclaw/compare/v0.3.8...v0.3.9) (2026-03-19)
 
 
