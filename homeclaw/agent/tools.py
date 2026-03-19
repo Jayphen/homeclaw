@@ -8,6 +8,7 @@ from typing import Any, get_args
 
 from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.agent.providers.base import ToolDefinition
+from homeclaw.pathutil import safe_date, safe_slug
 from homeclaw.bookmarks.models import Bookmark
 from homeclaw.bookmarks.store import (
     delete_bookmark,
@@ -163,7 +164,8 @@ def register_builtin_tools(
 
         notes_dir = workspaces / "household" / "contacts" / "notes"
         notes_dir.mkdir(parents=True, exist_ok=True)
-        path = notes_dir / f"{contact.id}.md"
+        safe_id = safe_slug(contact.id)
+        path = notes_dir / f"{safe_id}.md"
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
         if not path.exists():
@@ -388,6 +390,10 @@ def register_builtin_tools(
     ) -> dict[str, Any]:
         if date is None:
             date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        try:
+            date = safe_date(date)
+        except ValueError:
+            return {"error": f"Invalid date format: {date}"}
         path = workspaces / person / "notes" / f"{date}.md"
         if not path.exists():
             return {"content": "", "date": date}
@@ -434,8 +440,10 @@ def register_builtin_tools(
 
         due_date = None
         if date:
-            parts = date.split("-")
-            due_date = date_type(int(parts[0]), int(parts[1]), int(parts[2]))
+            try:
+                due_date = date_type.fromisoformat(safe_date(date))
+            except ValueError:
+                return {"error": f"Invalid date: {date}. Use YYYY-MM-DD format."}
 
         reminder = Reminder(
             id=uuid4().hex[:8],
@@ -772,7 +780,8 @@ def register_builtin_tools(
 
         notes_dir = workspaces / "household" / "bookmarks" / "notes"
         notes_dir.mkdir(parents=True, exist_ok=True)
-        path = notes_dir / f"{bookmark_id}.md"
+        safe_id = safe_slug(bookmark_id)
+        path = notes_dir / f"{safe_id}.md"
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
         if not path.exists():
@@ -814,7 +823,8 @@ def register_builtin_tools(
     ) -> dict[str, Any]:
         """Edit an existing note on a bookmark by its 1-based index."""
         notes_dir = workspaces / "household" / "bookmarks" / "notes"
-        path = notes_dir / f"{bookmark_id}.md"
+        safe_id = safe_slug(bookmark_id)
+        path = notes_dir / f"{safe_id}.md"
         if not path.exists():
             return {"error": f"No notes found for bookmark '{bookmark_id}'"}
 
@@ -1491,7 +1501,7 @@ def register_builtin_tools(
         import shutil
         from datetime import datetime, timezone
 
-        skill_dir = workspaces / owner / "skills" / name
+        skill_dir = workspaces / safe_slug(owner) / "skills" / safe_slug(name)
         if not skill_dir.exists():
             return {"error": f"Skill '{name}' not found under '{owner}'"}
 
@@ -1560,13 +1570,13 @@ def register_builtin_tools(
         if to_scope == "private" and not to_person:
             return {"error": "to_person is required when to_scope is 'private'"}
 
-        new_owner = "household" if to_scope == "household" else (to_person or person)
+        new_owner = "household" if to_scope == "household" else safe_slug(to_person or person)
 
-        src_dir = workspaces / current_owner / "skills" / name
+        src_dir = workspaces / safe_slug(current_owner) / "skills" / safe_slug(name)
         if not src_dir.exists():
             return {"error": f"Skill '{name}' not found under '{current_owner}'"}
 
-        dst_dir = workspaces / new_owner / "skills" / name
+        dst_dir = workspaces / new_owner / "skills" / safe_slug(name)
         if dst_dir.exists():
             return {"error": f"A skill named '{name}' already exists under '{new_owner}'"}
 
@@ -1641,7 +1651,7 @@ def register_builtin_tools(
     # --- Decision tools ---
 
     def _decisions_path(scope: str, person: str = "") -> Path:
-        owner = "household" if scope == "household" else person
+        owner = "household" if scope == "household" else safe_slug(person)
         return workspaces / owner / "decisions.md"
 
     async def decision_log(

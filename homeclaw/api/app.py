@@ -36,10 +36,16 @@ app.include_router(notes_router)
 app.include_router(settings_router)
 app.include_router(setup_router)
 
+# CORS: in production, restrict allow_origins to your actual domain.
+# allow_credentials=True + allow_origins=["*"] is rejected by browsers,
+# so we use allow_credentials=False for safety.  Override HOMECLAW_CORS_ORIGINS
+# (comma-separated) to lock down further.
+_cors_origins_env = os.environ.get("HOMECLAW_CORS_ORIGINS", "")
+_cors_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()] if _cors_origins_env else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_origins != ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

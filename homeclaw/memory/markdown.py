@@ -17,7 +17,9 @@ def _memory_dir(workspaces: Path, person: str) -> Path:
 
 def _slugify(topic: str) -> str:
     """Turn a topic name into a safe filename slug."""
-    return topic.lower().replace(" ", "-").strip("-")
+    from homeclaw.pathutil import safe_slug
+
+    return safe_slug(topic)
 
 
 def memory_save_topic(
