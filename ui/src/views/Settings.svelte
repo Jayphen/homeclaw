@@ -33,6 +33,51 @@
   let dataResult: string | null = $state(null);
   let dataError: string | null = $state(null);
 
+  // Log viewer state
+  interface LogEntry {
+    ts: string;
+    level: string;
+    logger: string;
+    message: string;
+  }
+  let logEntries: LogEntry[] = $state([]);
+  let logLevel: string = $state("all");
+  let logExpanded: boolean = $state(false);
+  let logLoading: boolean = $state(false);
+  let logSearch: string = $state("");
+  let logPollTimer: ReturnType<typeof setInterval> | null = $state(null);
+
+  let filteredLogEntries = $derived(
+    logSearch
+      ? logEntries.filter(e =>
+          e.message.toLowerCase().includes(logSearch.toLowerCase()) ||
+          e.logger.toLowerCase().includes(logSearch.toLowerCase())
+        )
+      : logEntries
+  );
+
+  async function fetchLogs() {
+    logLoading = true;
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "200");
+      if (logLevel !== "all") params.set("level", logLevel);
+      const r = await api(`/api/settings/logs?${params}`);
+      if (r.ok) logEntries = (await r.json()).entries;
+    } catch {}
+    logLoading = false;
+  }
+
+  function startLogPolling() {
+    fetchLogs();
+    if (logPollTimer) clearInterval(logPollTimer);
+    logPollTimer = setInterval(fetchLogs, 5000);
+  }
+
+  function stopLogPolling() {
+    if (logPollTimer) { clearInterval(logPollTimer); logPollTimer = null; }
+  }
+
   // Editable config fields
   let selectedProvider: "anthropic" | "openai" = $state("anthropic");
   let conversationModel: string = $state("");
@@ -376,6 +421,48 @@
         <p class="import-err">{dataError}</p>
       {/if}
     </section>
+
+    <section class="card">
+      <h2
+        class="collapsible"
+        onclick={() => { logExpanded = !logExpanded; if (logExpanded) startLogPolling(); else stopLogPolling(); }}
+        onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { logExpanded = !logExpanded; if (logExpanded) startLogPolling(); else stopLogPolling(); } }}
+        role="button"
+        tabindex="0"
+      >
+        <span class="collapse-arrow" class:open={logExpanded}>&#9654;</span>
+        Application logs
+      </h2>
+      {#if logExpanded}
+        <div class="log-controls">
+          <input type="text" class="log-search" bind:value={logSearch} placeholder="Filter logs..." />
+          <select bind:value={logLevel} onchange={fetchLogs}>
+            <option value="all">All levels</option>
+            <option value="DEBUG">DEBUG</option>
+            <option value="INFO">INFO</option>
+            <option value="WARNING">WARNING</option>
+            <option value="ERROR">ERROR</option>
+          </select>
+          <button class="btn secondary" onclick={fetchLogs} disabled={logLoading}>
+            {logLoading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+        <div class="log-viewer">
+          {#if filteredLogEntries.length === 0}
+            <p class="log-empty">{logEntries.length === 0 ? "No log entries." : "No matching entries."}</p>
+          {:else}
+            {#each filteredLogEntries as entry}
+              <div class="log-line">
+                <span class="log-ts">{entry.ts.slice(11, 19)}</span>
+                <span class="log-level" class:log-error={entry.level === "ERROR"} class:log-warn={entry.level === "WARNING"} class:log-debug={entry.level === "DEBUG"}>{entry.level.slice(0, 4)}</span>
+                <span class="log-name">{entry.logger}</span>
+                <span class="log-msg">{entry.message}</span>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      {/if}
+    </section>
   {/if}
 </div>
 
@@ -682,5 +769,114 @@
     color: var(--terracotta);
     font-weight: 500;
     margin: 0.75rem 0 0;
+  }
+
+  /* ---- Log viewer ---- */
+  .collapsible {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .collapse-arrow {
+    font-size: 0.7rem;
+    transition: transform 0.15s;
+    color: var(--text-muted);
+  }
+
+  .collapse-arrow.open {
+    transform: rotate(90deg);
+  }
+
+  .log-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .log-search {
+    flex: 1;
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-family: var(--font-sans);
+    background: #fdfcfa;
+    color: var(--text);
+    min-width: 0;
+  }
+
+  .log-search:focus {
+    outline: none;
+    border-color: var(--terracotta);
+  }
+
+  .log-controls select {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-family: var(--font-sans);
+    background: #fdfcfa;
+    color: var(--text);
+  }
+
+  .log-viewer {
+    max-height: 400px;
+    overflow-y: auto;
+    background: #1e1e1e;
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+    font-size: 0.72rem;
+    line-height: 1.6;
+  }
+
+  .log-empty {
+    color: #888;
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+  }
+
+  .log-line {
+    display: flex;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .log-line:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .log-ts {
+    color: #666;
+    flex-shrink: 0;
+  }
+
+  .log-level {
+    color: #8bc48a;
+    flex-shrink: 0;
+    width: 3.2em;
+  }
+
+  .log-level.log-error { color: #f07070; }
+  .log-level.log-warn { color: #e0a840; }
+  .log-level.log-debug { color: #666; }
+
+  .log-name {
+    color: #6a9fb5;
+    flex-shrink: 0;
+    max-width: 18em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .log-msg {
+    color: #d4d4d4;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 </style>

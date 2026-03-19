@@ -257,6 +257,9 @@ def _run_serve(workspaces: Path, port: int) -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
+    from homeclaw.api.logbuffer import install_log_buffer
+    install_log_buffer()
+
     if not config.web_password:
         generate_setup_token()
 
