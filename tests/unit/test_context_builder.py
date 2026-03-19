@@ -31,11 +31,34 @@ class TestBobContext:
     """Tests for Bob's context output."""
 
     async def test_no_cross_person_facts(self, dev_workspaces: Path) -> None:
-        """No person's facts should appear in any context (Layer 1 removed)."""
+        """Per-person facts should not leak into another person's context.
+
+        Household-wide info (like pet names in household memory) is expected
+        to appear for all members.
+        """
         ctx = await build_context("hello", "bob", dev_workspaces)
         assert "Vegetarian" not in ctx
-        assert "Mochi" not in ctx
         assert "Runs on weekends" not in ctx
+
+
+class TestHouseholdProfile:
+    """Tests for household profile injection."""
+
+    async def test_includes_household_profile(self, dev_workspaces: Path) -> None:
+        ctx = await build_context("hello", "alice", dev_workspaces)
+        assert "Household profile:" in ctx
+        assert "[about]" in ctx
+        assert "Family of four" in ctx
+        assert "Mochi and Biscuit" in ctx
+
+    async def test_household_profile_in_shared_context(self, dev_workspaces: Path) -> None:
+        ctx = await build_context("hello", "alice", dev_workspaces, shared_only=True)
+        assert "Household profile:" in ctx
+        assert "Family of four" in ctx
+
+    async def test_no_profile_without_household_memory(self, tmp_path: Path) -> None:
+        ctx = await build_context("hello", "alice", tmp_path)
+        assert "Household profile:" not in ctx
 
 
 class TestEdgeCases:

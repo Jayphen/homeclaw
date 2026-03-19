@@ -7,8 +7,12 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from homeclaw.contacts.store import list_contacts
+from homeclaw.memory.markdown import memory_list_topics, memory_read_topic
 from homeclaw.memory.semantic import SemanticMemory
 from homeclaw.reminders.store import load_reminders
+
+HOUSEHOLD_WORKSPACE = "household"
+_PROFILE_MAX_LINES = 8
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +43,13 @@ async def build_context(
     # Current time (local timezone so the LLM gives time-aware answers)
     now = datetime.now().astimezone()
     parts.append(f"Current time: {now.strftime('%Y-%m-%d %H:%M %Z')}")
+
+    # Household profile — inject a compact summary from household memory topics
+    # so the LLM knows who this family is in every conversation.
+    profile_lines = _build_household_profile(workspaces)
+    if profile_lines:
+        parts.append("Household profile:")
+        parts.extend(profile_lines)
 
     # Active reminders due today (never dropped)
     contacts = list_contacts(workspaces)
@@ -109,6 +120,31 @@ async def build_context(
     token_count = estimate_tokens(result)
     logger.debug("Context built: %d estimated tokens", token_count)
     return result
+
+
+def _build_household_profile(workspaces: Path) -> list[str]:
+    """Build a compact household profile from household memory topics.
+
+    Reads the first few lines of each household memory file to give the
+    LLM grounding about who this family is without blowing the token budget.
+    """
+    topics = memory_list_topics(workspaces, HOUSEHOLD_WORKSPACE)
+    if not topics:
+        return []
+    lines: list[str] = []
+    for topic in topics:
+        content = memory_read_topic(workspaces, HOUSEHOLD_WORKSPACE, topic)
+        if not content:
+            continue
+        # Take the first _PROFILE_MAX_LINES non-empty lines (skip the # heading)
+        topic_lines = [
+            ln.strip() for ln in content.splitlines()
+            if ln.strip() and not ln.strip().startswith("#")
+        ][:_PROFILE_MAX_LINES]
+        if topic_lines:
+            lines.append(f"  [{topic}]")
+            lines.extend(f"    {ln}" for ln in topic_lines)
+    return lines
 
 
 def estimate_tokens(text: str) -> int:
