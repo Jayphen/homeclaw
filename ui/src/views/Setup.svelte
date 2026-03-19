@@ -43,6 +43,7 @@
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
   let whatsappEnabled: boolean = $state(false);
+  let whatsappPhoneNumber: string = $state("");
   let whatsappAllowedUsers: string = $state("");
   let webPassword: string = $state("");
   let webPasswordConfirm: string = $state("");
@@ -112,6 +113,9 @@
         }
         if (whatsappEnabled) {
           body.whatsapp_enabled = true;
+          if (whatsappPhoneNumber.trim()) {
+            body.whatsapp_phone_number = whatsappPhoneNumber;
+          }
           if (whatsappAllowedUsers.trim()) {
             body.whatsapp_allowed_users = whatsappAllowedUsers;
           }
@@ -233,8 +237,11 @@
           <input type="checkbox" bind:checked={whatsappEnabled} />
           <span>Enable WhatsApp channel</span>
         </label>
-        <p class="hint">Connects as a linked device. Scan the QR code in container logs on first start.</p>
+        <p class="hint">Connects as a linked device via QR code or pair code.</p>
         {#if whatsappEnabled}
+          <label for="wa-phone">Your phone number</label>
+          <input id="wa-phone" type="text" bind:value={whatsappPhoneNumber} placeholder="14155551234" />
+          <p class="hint">For pair-code auth (no camera needed). Leave blank to use QR code.</p>
           <label for="wa-users">Allowed phone numbers</label>
           <input id="wa-users" type="text" bind:value={whatsappAllowedUsers} placeholder="14155551234, 447911123456" />
           <p class="hint">Comma-separated, no + prefix. Leave blank for unrestricted.</p>

@@ -67,11 +67,13 @@ class WhatsAppChannel:
         workspaces: Path,
         allowed_phones: set[str] | None = None,
         dispatcher: ChannelDispatcher | None = None,
+        phone_number: str | None = None,
     ) -> None:
         # Runtime import — neonize is an optional dependency.
         from neonize.aioze.client import NewAClient  # type: ignore[import-untyped]
         from neonize.aioze.events import (  # type: ignore[import-untyped]
             ConnectedEv,
+            DisconnectedEv,
             MessageEv,
             PairStatusEv,
         )
@@ -88,17 +90,69 @@ class WhatsAppChannel:
         self._connect_task: asyncio.Task[None] | None = None
         self._dispatcher = dispatcher
 
+        self._connected = False
+        self._last_qr: bytes | None = None  # Raw QR data for web UI
+
         # Store event types so _register_handlers can reference them
         self._ConnectedEv = ConnectedEv
+        self._DisconnectedEv = DisconnectedEv
         self._MessageEv = MessageEv
         self._PairStatusEv = PairStatusEv
 
         self._register_handlers()
 
+        # QR code capture: neonize passes raw QR bytes via the qr callback.
+        # We store them so the web UI can serve the QR as an image.
+        @self._client.event.qr
+        async def _on_qr(_: Any, qr_data: bytes) -> None:
+            self._last_qr = qr_data
+            logger.info("WhatsApp QR code received — scan it or view at /api/whatsapp/qr")
+
+        # Pair-code auth: if a phone number is configured, register the
+        # paircode callback so neonize uses numeric code auth instead of QR.
+        # The user enters the code on their phone — no camera needed.
+        if phone_number:
+            @self._client.paircode
+            async def _on_paircode(
+                _: Any, code: str, connected: bool = False,
+            ) -> None:
+                if connected:
+                    logger.info("WhatsApp pair code accepted")
+                else:
+                    logger.info(
+                        "\n"
+                        "╔══════════════════════════════════════╗\n"
+                        "║  WhatsApp pair code: %-16s ║\n"
+                        "║                                     ║\n"
+                        "║  Enter this on your phone:           ║\n"
+                        "║  Settings → Linked Devices → Link    ║\n"
+                        "║  → Link with phone number instead    ║\n"
+                        "╚══════════════════════════════════════╝",
+                        code,
+                    )
+
+    @property
+    def connected(self) -> bool:
+        """Whether the WhatsApp client is currently connected."""
+        return self._connected
+
+    @property
+    def pending_qr(self) -> bytes | None:
+        """Raw QR code data if awaiting scan, or None if already paired."""
+        if self._connected:
+            return None
+        return self._last_qr
+
     def _register_handlers(self) -> None:
         @self._client.event(self._ConnectedEv)
         async def _on_connected(_: Any, __: Any) -> None:
+            self._connected = True
             logger.info("WhatsApp connected")
+
+        @self._client.event(self._DisconnectedEv)
+        async def _on_disconnected(_: Any, __: Any) -> None:
+            self._connected = False
+            logger.warning("WhatsApp disconnected — will reconnect automatically")
 
         @self._client.event(self._PairStatusEv)
         async def _on_pair_status(_: Any, ev: Any) -> None:

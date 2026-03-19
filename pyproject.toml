@@ -24,6 +24,7 @@ semantic = [
 ]
 whatsapp = [
     "neonize>=0.3",
+    "qrcode[pil]>=7.0",
 ]
 dev = [
     "pyright>=1.1",

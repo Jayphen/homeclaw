@@ -295,6 +295,7 @@ def _run_serve_with_channels(
                 workspaces=workspaces,
                 allowed_phones=config.whatsapp_allowed_phone_numbers,
                 dispatcher=hc_app.dispatcher,
+                phone_number=config.whatsapp_phone_number,
             )
         except ImportError:
             logger.warning(
@@ -307,6 +308,10 @@ def _run_serve_with_channels(
         await tg_channel.start()
         if wa_channel:
             await wa_channel.start()
+            from homeclaw.api.deps import set_whatsapp_connected_fn, set_whatsapp_qr_fn
+            _wa = wa_channel  # capture for lambda
+            set_whatsapp_connected_fn(lambda: _wa.connected)
+            set_whatsapp_qr_fn(lambda: _wa.pending_qr)
         hc_app.start_scheduler()
 
         uv_config = uvicorn.Config(app, host="0.0.0.0", port=port)
@@ -358,6 +363,7 @@ def _run_serve_with_deferred_telegram(
                 workspaces=workspaces,
                 allowed_phones=config.whatsapp_allowed_phone_numbers,
                 dispatcher=hc_app.dispatcher,
+                phone_number=config.whatsapp_phone_number,
             )
         except ImportError:
             logger.warning(
@@ -400,6 +406,10 @@ def _run_serve_with_deferred_telegram(
         if wa_channel and hc_app:
             await hc_app.initialize()
             await wa_channel.start()
+            from homeclaw.api.deps import set_whatsapp_connected_fn, set_whatsapp_qr_fn
+            _wa = wa_channel  # capture for lambda
+            set_whatsapp_connected_fn(lambda: _wa.connected)  # type: ignore[union-attr]
+            set_whatsapp_qr_fn(lambda: _wa.pending_qr)  # type: ignore[union-attr]
             hc_app.load_scheduler()
             hc_app.start_scheduler()
             hc_app_ready = True
@@ -465,6 +475,7 @@ def _run_whatsapp() -> None:
         workspaces=app.workspaces,
         allowed_phones=app.config.whatsapp_allowed_phone_numbers,
         dispatcher=app.dispatcher,
+        phone_number=app.config.whatsapp_phone_number,
     )
 
     async def _run() -> None:

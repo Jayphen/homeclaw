@@ -27,6 +27,7 @@ _SAVEABLE_FIELDS = {
     "telegram_token",
     "telegram_allowed_users",
     "whatsapp_enabled",
+    "whatsapp_phone_number",
     "whatsapp_allowed_users",
     "jina_api_key",
     "ha_url",
@@ -88,6 +89,7 @@ class HomeclawConfig(BaseSettings):
 
     # WhatsApp (via neonize / whatsmeow)
     whatsapp_enabled: bool = False
+    whatsapp_phone_number: str | None = None  # Phone number for pair-code auth
     whatsapp_allowed_users: str | None = None  # Comma-separated phone numbers (e.g. "14155551234")
 
     @property

@@ -3,6 +3,7 @@
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from homeclaw.api.deps import (
@@ -11,6 +12,12 @@ from homeclaw.api.deps import (
     get_on_telegram_configured,
     get_setup_token,
     verify_setup_token,
+)
+from homeclaw.api.deps import (
+    get_whatsapp_connected as _get_whatsapp_connected,
+)
+from homeclaw.api.deps import (
+    get_whatsapp_qr as _get_whatsapp_qr,
 )
 
 router = APIRouter(prefix="/api/setup", tags=["setup"])
@@ -40,6 +47,8 @@ async def setup_status() -> dict[str, Any]:
         "telegram_configured": config.telegram_token is not None,
         "telegram_allowed_users": config.telegram_allowed_users,
         "whatsapp_configured": config.whatsapp_enabled,
+        "whatsapp_connected": _get_whatsapp_connected(),
+        "whatsapp_phone_number": config.whatsapp_phone_number,
         "whatsapp_allowed_users": config.whatsapp_allowed_users,
         "jina_api_key": _mask(config.jina_api_key),
         "ha_configured": config.ha_url is not None,
@@ -64,6 +73,7 @@ class SetupBody(BaseModel):
 
     # WhatsApp
     whatsapp_enabled: bool | None = None
+    whatsapp_phone_number: str | None = None
     whatsapp_allowed_users: str | None = None
 
     # Web search
@@ -114,6 +124,8 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         config.telegram_allowed_users = body.telegram_allowed_users or None
     if body.whatsapp_enabled is not None:
         config.whatsapp_enabled = body.whatsapp_enabled
+    if body.whatsapp_phone_number is not None:
+        config.whatsapp_phone_number = body.whatsapp_phone_number or None
     if body.whatsapp_allowed_users is not None:
         config.whatsapp_allowed_users = body.whatsapp_allowed_users or None
     if body.ha_url is not None:
@@ -142,3 +154,31 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
             await on_tg(config.telegram_token)
 
     return await setup_status()
+
+
+@router.get("/whatsapp/qr")
+async def whatsapp_qr() -> Response:
+    """Serve the WhatsApp QR code as a PNG image for scanning in the browser.
+
+    Returns 204 if no QR is pending (already paired or WhatsApp not enabled).
+    """
+    qr_data = _get_whatsapp_qr()
+    if qr_data is None:
+        return Response(status_code=204)
+
+    # neonize provides raw QR string data — generate a PNG via qrcode lib
+    try:
+        import io
+
+        import qrcode  # type: ignore[import-untyped]
+
+        img = qrcode.make(qr_data.decode("utf-8") if isinstance(qr_data, bytes) else qr_data)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")  # type: ignore[call-arg]
+        return Response(content=buf.getvalue(), media_type="image/png")
+    except ImportError:
+        # qrcode not installed — return the raw data as text
+        return Response(
+            content=qr_data if isinstance(qr_data, bytes) else qr_data.encode(),
+            media_type="text/plain",
+        )

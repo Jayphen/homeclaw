@@ -12,6 +12,7 @@
     telegram_configured: boolean;
     telegram_allowed_users: string | null;
     whatsapp_configured: boolean;
+    whatsapp_phone_number: string | null;
     whatsapp_allowed_users: string | null;
     jina_api_key: string | null;
     ha_configured: boolean;
@@ -43,6 +44,7 @@
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
   let whatsappEnabled: boolean = $state(false);
+  let whatsappPhoneNumber: string = $state("");
   let whatsappAllowedUsers: string = $state("");
   let newPassword: string = $state("");
   let newPasswordConfirm: string = $state("");
@@ -110,6 +112,7 @@
       openaiBaseUrl = setup!.openai_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
       whatsappEnabled = setup!.whatsapp_configured;
+      whatsappPhoneNumber = setup!.whatsapp_phone_number || "";
       whatsappAllowedUsers = setup!.whatsapp_allowed_users || "";
       pageState = "ready";
     } catch (e: any) {
@@ -143,6 +146,9 @@
       body.telegram_allowed_users = telegramAllowedUsers || null;
     }
     if (whatsappEnabled !== setup?.whatsapp_configured) body.whatsapp_enabled = whatsappEnabled;
+    if (whatsappPhoneNumber !== (setup?.whatsapp_phone_number || "")) {
+      body.whatsapp_phone_number = whatsappPhoneNumber || null;
+    }
     if (whatsappAllowedUsers !== (setup?.whatsapp_allowed_users || "")) {
       body.whatsapp_allowed_users = whatsappAllowedUsers || null;
     }
@@ -170,6 +176,7 @@
       openaiBaseUrl = setup!.openai_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
       whatsappEnabled = setup!.whatsapp_configured;
+      whatsappPhoneNumber = setup!.whatsapp_phone_number || "";
       whatsappAllowedUsers = setup!.whatsapp_allowed_users || "";
 
       // Clear secret inputs after save
@@ -314,6 +321,13 @@
         </small>
       </div>
       {#if whatsappEnabled}
+        <div class="field">
+          <label for="wa-phone">Your phone number</label>
+          <input id="wa-phone" type="text" bind:value={whatsappPhoneNumber} placeholder="14155551234" />
+          <small class="field-hint">
+            For pair-code auth (no QR scan needed). Leave blank to use QR code instead.
+          </small>
+        </div>
         <div class="field">
           <label for="wa-users">Allowed phone numbers</label>
           <input id="wa-users" type="text" bind:value={whatsappAllowedUsers} placeholder="14155551234, 447911123456" />
