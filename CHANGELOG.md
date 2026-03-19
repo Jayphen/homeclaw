@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.11](https://github.com/Jayphen/homeclaw/compare/v0.3.10...v0.3.11) (2026-03-19)
+
+
+### Bug Fixes
+
+* use CPU-only torch in Docker and improve layer caching ([016daea](https://github.com/Jayphen/homeclaw/commit/016daeab51e0a6dacebaa4aa1264e35792361c96))
+
 ## [0.3.10](https://github.com/Jayphen/homeclaw/compare/v0.3.9...v0.3.10) (2026-03-19)
 
 
