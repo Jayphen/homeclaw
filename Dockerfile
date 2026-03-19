@@ -10,9 +10,15 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 
+# Install deps first (cached unless pyproject.toml changes)
 COPY pyproject.toml .
+COPY homeclaw/__init__.py homeclaw/__init__.py
+RUN pip install --no-cache-dir \
+    torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir ".[semantic,whatsapp]"
+
+# Copy application code (changes often, but deps already cached)
 COPY homeclaw/ homeclaw/
-RUN pip install --no-cache-dir ".[semantic,whatsapp]"
 
 COPY --from=ui-build /build/dist/ ui/dist/
 ENV HOMECLAW_UI_DIST=/app/ui/dist
