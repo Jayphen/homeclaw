@@ -11,6 +11,8 @@
     openai_base_url: string | null;
     telegram_configured: boolean;
     telegram_allowed_users: string | null;
+    whatsapp_configured: boolean;
+    whatsapp_allowed_users: string | null;
     jina_api_key: string | null;
     ha_configured: boolean;
     conversation_model: string;
@@ -40,6 +42,8 @@
   let jinaKey: string = $state("");
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
+  let whatsappEnabled: boolean = $state(false);
+  let whatsappAllowedUsers: string = $state("");
   let newPassword: string = $state("");
   let newPasswordConfirm: string = $state("");
 
@@ -105,6 +109,8 @@
       routineModel = setup!.routine_model;
       openaiBaseUrl = setup!.openai_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
+      whatsappEnabled = setup!.whatsapp_configured;
+      whatsappAllowedUsers = setup!.whatsapp_allowed_users || "";
       pageState = "ready";
     } catch (e: any) {
       error = e.message;
@@ -123,7 +129,7 @@
     }
 
     saveState = "saving";
-    const body: Record<string, string | null> = {};
+    const body: Record<string, string | boolean | null> = {};
 
     if (selectedProvider !== setup?.provider) body.provider = selectedProvider;
     if (conversationModel !== setup?.conversation_model) body.conversation_model = conversationModel;
@@ -135,6 +141,10 @@
     if (telegramToken) body.telegram_token = telegramToken;
     if (telegramAllowedUsers !== (setup?.telegram_allowed_users || "")) {
       body.telegram_allowed_users = telegramAllowedUsers || null;
+    }
+    if (whatsappEnabled !== setup?.whatsapp_configured) body.whatsapp_enabled = whatsappEnabled;
+    if (whatsappAllowedUsers !== (setup?.whatsapp_allowed_users || "")) {
+      body.whatsapp_allowed_users = whatsappAllowedUsers || null;
     }
     if (newPassword) body.web_password = newPassword;
 
@@ -159,6 +169,8 @@
       routineModel = setup!.routine_model;
       openaiBaseUrl = setup!.openai_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
+      whatsappEnabled = setup!.whatsapp_configured;
+      whatsappAllowedUsers = setup!.whatsapp_allowed_users || "";
 
       // Clear secret inputs after save
       anthropicKey = "";
@@ -287,6 +299,27 @@
         <input id="tg-users" type="text" bind:value={telegramAllowedUsers} placeholder="12345678, 87654321" />
         <small class="field-hint">Comma-separated. Leave blank for unrestricted.</small>
       </div>
+    </section>
+
+    <section class="card">
+      <h2>WhatsApp</h2>
+      <div class="field">
+        <label class="toggle-row">
+          <input type="checkbox" bind:checked={whatsappEnabled} />
+          <span>Enable WhatsApp channel</span>
+        </label>
+        <small class="field-hint">
+          Connects as a linked device via QR code. Requires <code>homeclaw[whatsapp]</code>.
+          Scan the QR code in container logs on first start.
+        </small>
+      </div>
+      {#if whatsappEnabled}
+        <div class="field">
+          <label for="wa-users">Allowed phone numbers</label>
+          <input id="wa-users" type="text" bind:value={whatsappAllowedUsers} placeholder="14155551234, 447911123456" />
+          <small class="field-hint">Comma-separated, no + prefix. Leave blank for unrestricted.</small>
+        </div>
+      {/if}
     </section>
 
     <section class="card">
@@ -472,6 +505,35 @@
     border-color: var(--terracotta);
     color: var(--terracotta);
     background: #fff;
+  }
+
+  /* ---- Toggle ---- */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    margin-bottom: 0;
+  }
+
+  .toggle-row input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--terracotta);
+    cursor: pointer;
+  }
+
+  .toggle-row span {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  code {
+    font-size: 0.78rem;
+    background: rgba(45, 41, 38, 0.06);
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
   }
 
   /* ---- Save row ---- */

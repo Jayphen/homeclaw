@@ -39,6 +39,8 @@ async def setup_status() -> dict[str, Any]:
         "openai_base_url": config.openai_base_url,
         "telegram_configured": config.telegram_token is not None,
         "telegram_allowed_users": config.telegram_allowed_users,
+        "whatsapp_configured": config.whatsapp_enabled,
+        "whatsapp_allowed_users": config.whatsapp_allowed_users,
         "jina_api_key": _mask(config.jina_api_key),
         "ha_configured": config.ha_url is not None,
         "conversation_model": config.routing.conversation_model,
@@ -59,6 +61,10 @@ class SetupBody(BaseModel):
     # Telegram
     telegram_token: str | None = None
     telegram_allowed_users: str | None = None
+
+    # WhatsApp
+    whatsapp_enabled: bool | None = None
+    whatsapp_allowed_users: str | None = None
 
     # Web search
     jina_api_key: str | None = None
@@ -106,6 +112,10 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         config.telegram_token = body.telegram_token or None
     if body.telegram_allowed_users is not None:
         config.telegram_allowed_users = body.telegram_allowed_users or None
+    if body.whatsapp_enabled is not None:
+        config.whatsapp_enabled = body.whatsapp_enabled
+    if body.whatsapp_allowed_users is not None:
+        config.whatsapp_allowed_users = body.whatsapp_allowed_users or None
     if body.ha_url is not None:
         config.ha_url = body.ha_url or None
     if body.ha_token is not None:

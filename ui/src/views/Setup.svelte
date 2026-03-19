@@ -42,6 +42,8 @@
   }
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
+  let whatsappEnabled: boolean = $state(false);
+  let whatsappAllowedUsers: string = $state("");
   let webPassword: string = $state("");
   let webPasswordConfirm: string = $state("");
 
@@ -85,7 +87,7 @@
       saving = true;
       try {
         const defaults = providerDefaults[provider];
-        const body: Record<string, string | null> = {
+        const body: Record<string, string | boolean | null> = {
           setup_token: setupToken || null,
           provider,
           model,
@@ -106,6 +108,12 @@
           body.telegram_token = telegramToken;
           if (telegramAllowedUsers.trim()) {
             body.telegram_allowed_users = telegramAllowedUsers;
+          }
+        }
+        if (whatsappEnabled) {
+          body.whatsapp_enabled = true;
+          if (whatsappAllowedUsers.trim()) {
+            body.whatsapp_allowed_users = whatsappAllowedUsers;
           }
         }
 
@@ -219,7 +227,20 @@
         <label for="tg-users">Allowed user IDs</label>
         <input id="tg-users" type="text" bind:value={telegramAllowedUsers} placeholder="12345678, 87654321" />
         <p class="hint">Comma-separated Telegram user IDs. Leave blank for unrestricted.</p>
-        <p class="hint skip-hint">No Telegram? Just click Next.</p>
+
+        <h2 class="section-gap">WhatsApp (optional)</h2>
+        <label class="toggle-row">
+          <input type="checkbox" bind:checked={whatsappEnabled} />
+          <span>Enable WhatsApp channel</span>
+        </label>
+        <p class="hint">Connects as a linked device. Scan the QR code in container logs on first start.</p>
+        {#if whatsappEnabled}
+          <label for="wa-users">Allowed phone numbers</label>
+          <input id="wa-users" type="text" bind:value={whatsappAllowedUsers} placeholder="14155551234, 447911123456" />
+          <p class="hint">Comma-separated, no + prefix. Leave blank for unrestricted.</p>
+        {/if}
+
+        <p class="hint skip-hint">No messaging channels? Just click Next.</p>
       </div>
 
     {:else if step === 3}
@@ -376,6 +397,30 @@
   .skip-hint {
     margin-top: 0.5rem;
     font-style: italic;
+  }
+
+  .section-gap {
+    margin-top: 1.25rem;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+  }
+
+  .toggle-row input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--terracotta);
+    cursor: pointer;
+  }
+
+  .toggle-row span {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text);
   }
 
   .presets {
