@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.12](https://github.com/Jayphen/homeclaw/compare/v0.3.11...v0.3.12) (2026-03-19)
+
+
+### Bug Fixes
+
+* reinstall package after copying full source in Dockerfile ([f585c38](https://github.com/Jayphen/homeclaw/commit/f585c3829c61574048b9562a16c5c78b112a2401))
+
 ## [0.3.11](https://github.com/Jayphen/homeclaw/compare/v0.3.10...v0.3.11) (2026-03-19)
 
 
