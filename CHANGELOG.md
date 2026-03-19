@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.6](https://github.com/Jayphen/homeclaw/compare/v0.3.5...v0.3.6) (2026-03-19)
+
+
+### Features
+
+* add agent personality and household profile injection ([1684190](https://github.com/Jayphen/homeclaw/commit/16841904d4f2eaea01ad71aa7e2810124565feb9))
+* add application log viewer to Settings page ([04af7a3](https://github.com/Jayphen/homeclaw/commit/04af7a3699c4ccbe575931faec0687cf61f6800c))
+
+
+### Bug Fixes
+
+* inject current speaker's name into system prompt context ([574e4f1](https://github.com/Jayphen/homeclaw/commit/574e4f17ffa81d8d81ffe364add01004e579a35b))
+
 ## [0.3.5](https://github.com/Jayphen/homeclaw/compare/v0.3.4...v0.3.5) (2026-03-19)
 
 
