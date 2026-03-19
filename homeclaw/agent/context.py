@@ -10,6 +10,7 @@ from homeclaw.contacts.store import list_contacts
 from homeclaw.memory.markdown import memory_list_topics, memory_read_topic
 from homeclaw.memory.semantic import SemanticMemory
 from homeclaw.reminders.store import load_reminders
+from homeclaw.scheduler.routines import parse_routines_md
 
 HOUSEHOLD_WORKSPACE = "household"
 _PROFILE_MAX_LINES = 8
@@ -23,8 +24,10 @@ class ContextConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     max_contacts_in_context: int = 5
-    max_semantic_chunks: int = 3
+    max_semantic_chunks: int = 8
     max_ha_entities: int = 20
+    max_recent_notes_days: int = 3
+    max_note_lines: int = 10
 
 
 async def build_context(
@@ -104,6 +107,26 @@ async def build_context(
             parts.append("Your upcoming reminders:")
             parts.extend(due_soon)
 
+    # --- Priority 2b: recent notes (personal) ---
+    if not shared_only:
+        recent_notes = _build_recent_notes(workspaces, person, cfg)
+        if recent_notes:
+            parts.append("Your recent notes:")
+            parts.extend(recent_notes)
+
+    # --- Priority 2c: person's memory topics ---
+    if not shared_only:
+        person_topics = _build_person_memory_summary(workspaces, person)
+        if person_topics:
+            parts.append("Your memory topics:")
+            parts.extend(person_topics)
+
+    # --- Priority 2d: scheduled routines ---
+    routines = _build_routines_summary(workspaces)
+    if routines:
+        parts.append("Household routines:")
+        parts.extend(routines)
+
     # --- Priority 3: semantic memory chunks (dropped second) ---
     if semantic_memory and semantic_memory.enabled:
         recalled = await semantic_memory.recall(
@@ -146,6 +169,45 @@ def _build_household_profile(workspaces: Path) -> list[str]:
             lines.append(f"  [{topic}]")
             lines.extend(f"    {ln}" for ln in topic_lines)
     return lines
+
+
+def _build_recent_notes(
+    workspaces: Path, person: str, cfg: ContextConfig,
+) -> list[str]:
+    """Collect the last N days of daily notes for a person."""
+    notes_dir = workspaces / person / "notes"
+    if not notes_dir.is_dir():
+        return []
+    today = datetime.now().date()
+    lines: list[str] = []
+    for day_offset in range(cfg.max_recent_notes_days):
+        date = today - timedelta(days=day_offset)
+        path = notes_dir / f"{date}.md"
+        if not path.exists():
+            continue
+        content_lines = [
+            ln.strip() for ln in path.read_text().splitlines() if ln.strip()
+        ][:cfg.max_note_lines]
+        if content_lines:
+            lines.append(f"  [{date}]")
+            lines.extend(f"    {ln}" for ln in content_lines)
+    return lines
+
+
+def _build_person_memory_summary(workspaces: Path, person: str) -> list[str]:
+    """List the person's memory topics so the LLM knows what's available."""
+    topics = memory_list_topics(workspaces, person)
+    if not topics:
+        return []
+    return [f"  - {topic}" for topic in topics]
+
+
+def _build_routines_summary(workspaces: Path) -> list[str]:
+    """Build a compact list of scheduled household routines."""
+    routines = parse_routines_md(workspaces)
+    if not routines:
+        return []
+    return [f"  - {r.name}: {r.description}" for r in routines]
 
 
 def estimate_tokens(text: str) -> int:
