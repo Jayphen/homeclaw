@@ -1638,6 +1638,90 @@ def register_builtin_tools(
         skill_migrate,
     )
 
+    # --- Decision tools ---
+
+    def _decisions_path(scope: str, person: str = "") -> Path:
+        owner = "household" if scope == "household" else person
+        return workspaces / owner / "decisions.md"
+
+    async def decision_log(
+        *, person: str, decision: str, scope: str = "household", **_: Any
+    ) -> dict[str, Any]:
+        if scope not in ("household", "personal"):
+            return {"error": f"Invalid scope '{scope}' — must be 'household' or 'personal'"}
+        path = _decisions_path(scope, person)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+        entry = f"- [{timestamp}] {decision} — {person}"
+        if not path.exists():
+            path.write_text(f"# Decisions\n\n{entry}\n")
+        else:
+            with path.open("a") as f:
+                f.write(f"{entry}\n")
+        return {"status": "logged", "scope": scope, "decision": decision}
+
+    registry.register(
+        ToolDefinition(
+            name="decision_log",
+            description=(
+                "Record a settled household or personal decision so it is not "
+                "re-litigated. Use this when someone says 'we decided', 'let's go with', "
+                "'from now on', or otherwise settles on a choice. Examples: 'Piano lessons "
+                "on Tuesdays', 'Switching to oat milk', 'No screens after 8pm'."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Who made or reported this decision"},
+                    "decision": {"type": "string", "description": "The decision that was made"},
+                    "scope": {
+                        "type": "string",
+                        "enum": ["household", "personal"],
+                        "description": "Whether this applies to the whole household or just this person (default: household)",
+                    },
+                },
+                "required": ["person", "decision"],
+            },
+        ),
+        decision_log,
+    )
+
+    async def decision_list(
+        *, scope: str = "household", person: str = "", **_: Any
+    ) -> dict[str, Any]:
+        if scope not in ("household", "personal"):
+            return {"error": f"Invalid scope '{scope}' — must be 'household' or 'personal'"}
+        path = _decisions_path(scope, person)
+        if not path.exists():
+            return {"decisions": [], "scope": scope}
+        lines = [
+            ln.strip() for ln in path.read_text().splitlines()
+            if ln.strip().startswith("- [")
+        ]
+        return {"decisions": lines, "scope": scope, "count": len(lines)}
+
+    registry.register(
+        ToolDefinition(
+            name="decision_list",
+            description="List recorded decisions for the household or a person.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "scope": {
+                        "type": "string",
+                        "enum": ["household", "personal"],
+                        "description": "Which decisions to list (default: household)",
+                    },
+                    "person": {
+                        "type": "string",
+                        "description": "Person name (required for personal scope)",
+                    },
+                },
+            },
+        ),
+        decision_list,
+    )
+
     # --- Settings tools ---
 
     if config is not None:

@@ -28,6 +28,7 @@ class ContextConfig(BaseSettings):
     max_ha_entities: int = 20
     max_recent_notes_days: int = 3
     max_note_lines: int = 10
+    max_decisions: int = 15
 
 
 async def build_context(
@@ -127,6 +128,12 @@ async def build_context(
         parts.append("Household routines:")
         parts.extend(routines)
 
+    # --- Priority 2e: recent decisions ---
+    decisions = _build_decisions_summary(workspaces, person, cfg, shared_only)
+    if decisions:
+        parts.append("Settled decisions (do not re-litigate):")
+        parts.extend(decisions)
+
     # --- Priority 3: semantic memory chunks (dropped second) ---
     if semantic_memory and semantic_memory.enabled:
         recalled = await semantic_memory.recall(
@@ -208,6 +215,34 @@ def _build_routines_summary(workspaces: Path) -> list[str]:
     if not routines:
         return []
     return [f"  - {r.name}: {r.description}" for r in routines]
+
+
+def _build_decisions_summary(
+    workspaces: Path, person: str, cfg: ContextConfig, shared_only: bool,
+) -> list[str]:
+    """Collect recent decisions — household always, personal in DMs only."""
+    lines: list[str] = []
+
+    # Household decisions (always included)
+    hh_path = workspaces / HOUSEHOLD_WORKSPACE / "decisions.md"
+    if hh_path.exists():
+        entries = [
+            ln.strip() for ln in hh_path.read_text().splitlines()
+            if ln.strip().startswith("- [")
+        ]
+        lines.extend(f"  {ln}" for ln in entries[-cfg.max_decisions:])
+
+    # Personal decisions (only in DMs)
+    if not shared_only:
+        personal_path = workspaces / person / "decisions.md"
+        if personal_path.exists():
+            entries = [
+                ln.strip() for ln in personal_path.read_text().splitlines()
+                if ln.strip().startswith("- [")
+            ]
+            lines.extend(f"  {ln}" for ln in entries[-cfg.max_decisions:])
+
+    return lines
 
 
 def estimate_tokens(text: str) -> int:

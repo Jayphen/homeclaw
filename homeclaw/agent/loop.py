@@ -53,6 +53,10 @@ Proactively remember personal details (likes, allergies, birthdays, routines, go
 memory_save. Pick a short topic name and it appends — no need to read first. Do this \
 silently. Use household_share for household-wide info.
 
+When someone settles on a decision — "let's go with", "we decided", "from now on" — log it \
+with decision_log so it sticks. If the context shows a settled decision, respect it and do \
+not re-ask or second-guess it unless the person explicitly wants to revisit.
+
 {context}"""
 
 MAX_TOOL_ROUNDS = 10
@@ -80,6 +84,7 @@ _PERSONAL_WRITE_TOOLS = frozenset({
     "skill_create",
     "skill_remove",
     "skill_migrate",
+    "decision_log",
 })
 
 
