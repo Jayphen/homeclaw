@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.7](https://github.com/Jayphen/homeclaw/compare/v0.3.6...v0.3.7) (2026-03-19)
+
+
+### Features
+
+* add decision logging tool and context injection ([6df69af](https://github.com/Jayphen/homeclaw/commit/6df69af27003bb272f8c086c616cfce1c566555f))
+* add proactive behavior guidance to system prompt ([415415c](https://github.com/Jayphen/homeclaw/commit/415415c6ba728c2473f070b6f351590b035d84fd))
+* consolidate tool selection guidance with examples in system prompt ([da1c72e](https://github.com/Jayphen/homeclaw/commit/da1c72ea132e305fe4c8239acf2382bef0351594))
+* enrich context builder with notes, routines, and memory topics ([2a6c5af](https://github.com/Jayphen/homeclaw/commit/2a6c5afd5ece2a5b14eac1a4c560a1458ebc4b84))
+
+
+### Bug Fixes
+
+* path traversal and CORS security vulnerabilities ([7046bf4](https://github.com/Jayphen/homeclaw/commit/7046bf4d00bf3d5c4fad4adc27cc312688c70abb))
+* sanitize markdown rendering with DOMPurify to prevent XSS ([4cd3e60](https://github.com/Jayphen/homeclaw/commit/4cd3e60ddfdca99a7fe39527064cdd44092453e7))
+
 ## [0.3.6](https://github.com/Jayphen/homeclaw/compare/v0.3.5...v0.3.6) (2026-03-19)
 
 
