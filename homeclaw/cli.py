@@ -102,9 +102,11 @@ class HomeclawApp:
 
         self._scheduler: Scheduler | None = None
 
+        from homeclaw.channel.dispatcher import ChannelDispatcher
         from homeclaw.plugins.registry import PluginRegistry
         from homeclaw.plugins.skills.loader import load_all_skills
 
+        self.dispatcher = ChannelDispatcher(self.workspaces)
         self.registry = ToolRegistry()
         self.plugin_registry = PluginRegistry(tool_registry=self.registry)
 
@@ -118,6 +120,7 @@ class HomeclawApp:
                 on_routines_changed=self._reload_routines,
                 config=self.config,
                 plugin_registry=self.plugin_registry,
+                dispatcher=self.dispatcher,
             )
 
         from homeclaw.memory.semantic import SemanticMemory
@@ -280,6 +283,7 @@ def _run_serve_with_channels(
         workspaces=workspaces,
         on_scheduler_start=hc_app.start_scheduler,
         allowed_user_ids=config.telegram_allowed_user_ids,
+        dispatcher=hc_app.dispatcher,
     )
 
     wa_channel = None
@@ -290,6 +294,7 @@ def _run_serve_with_channels(
                 loop=hc_app.loop,
                 workspaces=workspaces,
                 allowed_phones=config.whatsapp_allowed_phone_numbers,
+                dispatcher=hc_app.dispatcher,
             )
         except ImportError:
             logger.warning(
@@ -352,6 +357,7 @@ def _run_serve_with_deferred_telegram(
                 loop=hc_app.loop,
                 workspaces=workspaces,
                 allowed_phones=config.whatsapp_allowed_phone_numbers,
+                dispatcher=hc_app.dispatcher,
             )
         except ImportError:
             logger.warning(
@@ -381,6 +387,7 @@ def _run_serve_with_deferred_telegram(
                 workspaces=workspaces,
                 on_scheduler_start=hc_app.start_scheduler,
                 allowed_user_ids=config.telegram_allowed_user_ids,
+                dispatcher=hc_app.dispatcher,
             )
             await tg_channel.start()
             hc_app.start_scheduler()
@@ -431,6 +438,7 @@ def _run_telegram() -> None:
         workspaces=app.workspaces,
         on_scheduler_start=app.start_scheduler,
         allowed_user_ids=app.config.telegram_allowed_user_ids,
+        dispatcher=app.dispatcher,
     )
     try:
         channel.run()
@@ -456,6 +464,7 @@ def _run_whatsapp() -> None:
         loop=app.loop,
         workspaces=app.workspaces,
         allowed_phones=app.config.whatsapp_allowed_phone_numbers,
+        dispatcher=app.dispatcher,
     )
 
     async def _run() -> None:

@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from homeclaw.agent.loop import AgentLoop
+from homeclaw.channel.dispatcher import ChannelDispatcher
 from homeclaw.contacts.store import get_contact, save_contact
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,7 @@ class WhatsAppChannel:
         loop: AgentLoop,
         workspaces: Path,
         allowed_phones: set[str] | None = None,
+        dispatcher: ChannelDispatcher | None = None,
     ) -> None:
         # Runtime import — neonize is an optional dependency.
         from neonize.aioze.client import NewAClient  # type: ignore[import-untyped]
@@ -77,6 +79,7 @@ class WhatsAppChannel:
         db_dir.mkdir(parents=True, exist_ok=True)
         self._client: Any = NewAClient(str(db_dir / "whatsapp.db"))
         self._connect_task: asyncio.Task[None] | None = None
+        self._dispatcher = dispatcher
 
         # Store event types so _register_handlers can reference them
         self._ConnectedEv = ConnectedEv
@@ -167,6 +170,9 @@ class WhatsAppChannel:
                 save_contact(self._workspaces, contact)
                 logger.info("Linked contact '%s' to member workspace '%s'", contact.id, name)
 
+        if self._dispatcher:
+            self._dispatcher.set_preference_if_unset(name, "whatsapp")
+
         await self._client.reply_message(
             f"Registered as '{name}'. You can now chat with me!", ev
         )
@@ -196,9 +202,42 @@ class WhatsAppChannel:
             for chunk in _split_message(response):
                 await self._client.reply_message(chunk, ev)
 
+    def _reverse_user_map(self) -> dict[str, str]:
+        """Return person_name → phone mapping."""
+        return {name: phone for phone, name in self._user_map.items()}
+
+    def _has_person(self, person: str) -> bool:
+        return person in self._reverse_user_map()
+
+    async def _send_to_person(self, person: str, text: str) -> dict[str, Any]:
+        """Send a proactive message to a person via WhatsApp."""
+        from neonize.utils.jid import build_jid  # type: ignore[import-untyped]
+
+        reverse = self._reverse_user_map()
+        phone = reverse.get(person)
+        if not phone:
+            return {"status": "error", "detail": f"'{person}' not registered on WhatsApp"}
+        try:
+            jid = build_jid(phone)
+            for chunk in _split_message(text):
+                await self._client.send_message(jid, chunk)
+            return {"status": "sent", "channel": "whatsapp", "person": person}
+        except Exception as exc:
+            logger.exception("Failed to send WhatsApp message to %s", person)
+            return {"status": "error", "detail": str(exc)}
+
+    def _register_with_dispatcher(self) -> None:
+        if self._dispatcher:
+            self._dispatcher.register(
+                "whatsapp",
+                send=self._send_to_person,
+                has_person=self._has_person,
+            )
+
     async def start(self) -> None:
         """Connect to WhatsApp. Non-blocking — QR code shown in logs on first run."""
         self._connect_task = asyncio.create_task(self._run_connect())
+        self._register_with_dispatcher()
         logger.info(
             "WhatsApp channel connecting — scan the QR code in logs if this is a first run"
         )

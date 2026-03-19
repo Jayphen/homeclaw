@@ -63,6 +63,7 @@ def register_builtin_tools(
     on_routines_changed: Callable[[], None] | None = None,
     config: Any = None,
     plugin_registry: Any = None,  # PluginRegistry | None — avoided to prevent circular import
+    dispatcher: Any = None,  # ChannelDispatcher | None — avoided to prevent circular import
 ) -> None:
     """Register all built-in tools with the registry."""
 
@@ -971,17 +972,20 @@ def register_builtin_tools(
         web_search,
     )
 
-    # --- Message tool (stub — channel adapters implement delivery) ---
+    # --- Message tool — delivers via channel dispatcher ---
 
     async def message_send(
         *, person: str, text: str, **_: Any
     ) -> dict[str, Any]:
-        return {"status": "queued", "person": person, "text": text}
+        if dispatcher is None:
+            return {"status": "queued", "person": person, "text": text}
+        return await dispatcher.send(person, text)
 
     registry.register(
         ToolDefinition(
             name="message_send",
-            description="Send a message to a household member via their preferred channel.",
+            description="Send a message to a household member via their preferred channel "
+            "(Telegram, WhatsApp, etc.).",
             parameters={
                 "type": "object",
                 "properties": {
@@ -992,6 +996,71 @@ def register_builtin_tools(
             },
         ),
         message_send,
+    )
+
+    # --- Channel preference tool ---
+
+    async def channel_preference_set(
+        *, person: str, channel: str, **_: Any
+    ) -> dict[str, Any]:
+        if dispatcher is None:
+            return {"status": "error", "detail": "No channel dispatcher available"}
+        available = dispatcher.available_channels()
+        if channel not in available:
+            return {
+                "status": "error",
+                "detail": f"Unknown channel '{channel}'. Available: {available}",
+            }
+        dispatcher.set_preference(person, channel)
+        return {"status": "ok", "person": person, "preferred_channel": channel}
+
+    async def channel_preference_get(
+        *, person: str, **_: Any
+    ) -> dict[str, Any]:
+        if dispatcher is None:
+            return {"status": "error", "detail": "No channel dispatcher available"}
+        pref = dispatcher.get_preference(person)
+        return {
+            "person": person,
+            "preferred_channel": pref,
+            "available_channels": dispatcher.available_channels(),
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="channel_preference_set",
+            description=(
+                "Set a household member's preferred messaging channel "
+                "for scheduled updates."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Member name"},
+                    "channel": {
+                        "type": "string",
+                        "description": "Channel name (e.g. 'telegram', 'whatsapp')",
+                    },
+                },
+                "required": ["person", "channel"],
+            },
+        ),
+        channel_preference_set,
+    )
+
+    registry.register(
+        ToolDefinition(
+            name="channel_preference_get",
+            description="Get a household member's preferred messaging channel.",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Member name"},
+                },
+                "required": ["person"],
+            },
+        ),
+        channel_preference_get,
     )
 
     # --- Routine management tools ---

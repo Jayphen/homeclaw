@@ -13,6 +13,7 @@ from telegram.constants import ChatAction, ChatType
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from homeclaw.agent.loop import AgentLoop
+from homeclaw.channel.dispatcher import ChannelDispatcher
 from homeclaw.contacts.store import get_contact, save_contact
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class TelegramChannel:
         on_tool_call: Any | None = None,
         on_scheduler_start: Callable[[], None] | None = None,
         allowed_user_ids: set[int] | None = None,
+        dispatcher: ChannelDispatcher | None = None,
     ) -> None:
         self._token = token
         self._loop = loop
@@ -55,6 +57,7 @@ class TelegramChannel:
         self._allowed_user_ids = allowed_user_ids
         self._user_map = _load_user_map(workspaces)
         self._user_map_lock = asyncio.Lock()
+        self._dispatcher = dispatcher
 
     def _is_allowed(self, update: Update) -> bool:
         """Check if the Telegram user is in the allowlist (if configured)."""
@@ -118,6 +121,9 @@ class TelegramChannel:
                 contact.member = name
                 save_contact(self._workspaces, contact)
                 logger.info("Linked contact '%s' to member workspace '%s'", contact.id, name)
+
+        if self._dispatcher:
+            self._dispatcher.set_preference_if_unset(name, "telegram")
 
         await update.message.reply_text(f"Registered as '{name}'. You can now chat with me!")
         logger.info(
@@ -265,6 +271,37 @@ class TelegramChannel:
             for chunk in _split_message(response):
                 await _send_markdown(update.message, chunk)
 
+    def _reverse_user_map(self) -> dict[str, str]:
+        """Return person_name → telegram_id mapping."""
+        return {name: tid for tid, name in self._user_map.items()}
+
+    def _has_person(self, person: str) -> bool:
+        return person in self._reverse_user_map()
+
+    async def _send_to_person(self, person: str, text: str) -> dict[str, Any]:
+        """Send a proactive message to a person via Telegram."""
+        reverse = self._reverse_user_map()
+        tid = reverse.get(person)
+        if not tid:
+            return {"status": "error", "detail": f"'{person}' not registered on Telegram"}
+        if not hasattr(self, "_app"):
+            return {"status": "error", "detail": "Telegram bot not running"}
+        try:
+            for chunk in _split_message(text):
+                await _send_markdown(self._app.bot, chunk, chat_id=int(tid))
+            return {"status": "sent", "channel": "telegram", "person": person}
+        except Exception as exc:
+            logger.exception("Failed to send Telegram message to %s", person)
+            return {"status": "error", "detail": str(exc)}
+
+    def _register_with_dispatcher(self) -> None:
+        if self._dispatcher:
+            self._dispatcher.register(
+                "telegram",
+                send=self._send_to_person,
+                has_person=self._has_person,
+            )
+
     async def _post_init(self, _app: Application) -> None:  # type: ignore[type-arg]
         """Called by python-telegram-bot after the event loop is running."""
         if self._on_scheduler_start:
@@ -296,6 +333,7 @@ class TelegramChannel:
         await self._app.initialize()
         await self._app.start()
         await self._app.updater.start_polling()  # type: ignore[union-attr]
+        self._register_with_dispatcher()
         logger.info("Telegram polling started (non-blocking)")
 
     async def stop(self) -> None:
@@ -306,15 +344,27 @@ class TelegramChannel:
             await self._app.shutdown()
 
 
-async def _send_markdown(message: Any, text: str) -> None:
-    """Send a message with Markdown formatting, falling back to plain text."""
+async def _send_markdown(
+    message: Any, text: str, *, chat_id: int | None = None
+) -> None:
+    """Send a message with Markdown formatting, falling back to plain text.
+
+    If *chat_id* is provided, *message* is treated as a Bot and
+    ``send_message`` is used (for proactive outbound messages).
+    Otherwise *message* is a Message object and ``reply_text`` is used.
+    """
     from telegram.constants import ParseMode
 
-    try:
-        await message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
-    except Exception:
-        # Telegram's Markdown parser is strict — fall back to plain text
-        await message.reply_text(text)
+    if chat_id is not None:
+        try:
+            await message.send_message(chat_id, text, parse_mode=ParseMode.MARKDOWN)
+        except Exception:
+            await message.send_message(chat_id, text)
+    else:
+        try:
+            await message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+        except Exception:
+            await message.reply_text(text)
 
 
 def _split_message(text: str, max_len: int = 4096) -> list[str]:
