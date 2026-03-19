@@ -274,6 +274,57 @@ def add_routine(workspaces: Path, title: str, schedule: str, action: str) -> Non
     path.write_text(text, encoding="utf-8")
 
 
+def update_routine(
+    workspaces: Path,
+    name: str,
+    *,
+    schedule: str | None = None,
+    action: str | None = None,
+    title: str | None = None,
+) -> bool:
+    """Update an existing routine's schedule, action, or title by slug name.
+
+    Returns True if found and updated.
+    """
+    if schedule is not None:
+        _parse_schedule(schedule)  # validate before modifying file
+
+    path = _routines_path(workspaces)
+    if not path.exists():
+        return False
+    text = path.read_text(encoding="utf-8")
+    sections = re.split(r"(^## .+)", text, flags=re.MULTILINE)
+    # sections: [preamble, "## heading1", body1, "## heading2", body2, ...]
+    found = False
+    i = 0
+    while i < len(sections):
+        part = sections[i]
+        if part.startswith("## "):
+            heading = part[3:].strip()
+            slug = re.sub(r"[^a-z0-9]+", "_", heading.lower()).strip("_")
+            if slug == name:
+                found = True
+                # Parse existing body to get current values
+                body = sections[i + 1] if i + 1 < len(sections) else ""
+                cur_schedule, cur_actions = _extract_schedule_and_actions(
+                    body.strip().splitlines()
+                )
+                new_title = title or heading
+                new_schedule = schedule or cur_schedule or ""
+                new_action = action or ("; ".join(cur_actions) if cur_actions else "")
+
+                sections[i] = f"## {new_title}"
+                sections[i + 1] = (
+                    f"\n- **Schedule**: {new_schedule}"
+                    f"\n- **Action**: {new_action}\n"
+                )
+                break
+        i += 1
+    if found:
+        path.write_text("".join(sections).rstrip() + "\n", encoding="utf-8")
+    return found
+
+
 def remove_routine(workspaces: Path, name: str) -> bool:
     """Remove a routine by slug name. Returns True if found and removed."""
     path = _routines_path(workspaces)

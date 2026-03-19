@@ -51,6 +51,16 @@ silently. Use household_share for household-wide info.
 
 MAX_TOOL_ROUNDS = 10
 
+# Extra instructions prepended to the user message for scheduled routines so
+# the model actively uses web tools instead of hedging with stale training data.
+_ROUTINE_PREAMBLE = (
+    "You are executing a scheduled routine. For ANY information that requires "
+    "current data (news, weather, headlines, events, prices, scores, etc.) you "
+    "MUST use the web_search and web_read tools — do NOT try to answer from "
+    "memory or training data. Make multiple searches if the routine covers "
+    "several topics. Summarize the real results concisely.\n\n"
+)
+
 # Tools that write to a person's workspace. In DMs, the `person` argument
 # is forced to the authenticated caller so the LLM can't accidentally
 # attribute notes/memory/reminders to someone else.
@@ -135,6 +145,11 @@ class AgentLoop:
         system = SYSTEM_PROMPT.format(context=context)
 
         history = _load_history(self._workspaces, history_key)
+
+        # Prepend routine preamble so the LLM knows to use web tools
+        if call_type == CallType.ROUTINE and isinstance(user_message, str):
+            user_message = _ROUTINE_PREAMBLE + user_message
+
         history.append(Message(role="user", content=user_message))
 
         tools = self._registry.get_definitions()

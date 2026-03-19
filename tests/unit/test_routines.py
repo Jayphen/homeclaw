@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from homeclaw.scheduler.routines import ParsedRoutine, parse_routines_md, _parse_schedule, _parse_time, _ordinal_day_range
+from homeclaw.scheduler.routines import ParsedRoutine, parse_routines_md, _parse_schedule, _parse_time, _ordinal_day_range, update_routine
 
 
 class TestParseTime:
@@ -218,3 +218,55 @@ class TestParseRoutinesMd:
         routines = parse_routines_md(tmp_path)
         assert len(routines) == 1
         assert routines[0].name == "valid_routine"
+
+
+class TestUpdateRoutine:
+    def test_update_action(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        (tmp_path / "household" / "ROUTINES.md").write_text(
+            "# Routines\n\n"
+            "## Morning briefing\n"
+            "- **Schedule**: Every weekday at 7:30am\n"
+            "- **Action**: Send each household member their daily summary\n"
+        )
+        assert update_routine(tmp_path, "morning_briefing", action="Send daily summary with top news headlines and weather")
+        routines = parse_routines_md(tmp_path)
+        assert len(routines) == 1
+        assert "top news headlines" in routines[0].description
+
+    def test_update_schedule(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        (tmp_path / "household" / "ROUTINES.md").write_text(
+            "# Routines\n\n"
+            "## Morning briefing\n"
+            "- **Schedule**: Every weekday at 7:30am\n"
+            "- **Action**: Send daily summary\n"
+        )
+        assert update_routine(tmp_path, "morning_briefing", schedule="Every day at 8:00am")
+        routines = parse_routines_md(tmp_path)
+        assert routines[0].trigger_kwargs == {"hour": 8, "minute": 0}
+
+    def test_update_not_found(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        (tmp_path / "household" / "ROUTINES.md").write_text("# Routines\n")
+        assert not update_routine(tmp_path, "nonexistent", action="something")
+
+    def test_update_preserves_other_routines(self, dev_workspaces: Path):
+        original = parse_routines_md(dev_workspaces)
+        update_routine(dev_workspaces, "morning_briefing", action="Updated action")
+        updated = parse_routines_md(dev_workspaces)
+        assert len(updated) == len(original)
+        # Other routines unchanged
+        by_name = {r.name: r for r in updated}
+        assert "grocery list" in by_name["weekly_grocery_check"].description
+
+    def test_update_invalid_schedule_raises(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        (tmp_path / "household" / "ROUTINES.md").write_text(
+            "# Routines\n\n"
+            "## Test\n"
+            "- **Schedule**: Every day at 8:00am\n"
+            "- **Action**: Do stuff\n"
+        )
+        with pytest.raises(ValueError, match="Cannot parse schedule"):
+            update_routine(tmp_path, "test", schedule="whenever")

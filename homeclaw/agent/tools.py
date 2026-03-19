@@ -911,8 +911,10 @@ def register_builtin_tools(
             name="web_read",
             description=(
                 "Fetch a web page and return its content as clean markdown. "
-                "Use this when someone shares a URL or you need to look up "
-                "information from a specific page."
+                "Use this when someone shares a URL, you need to look up "
+                "information from a specific page, or you want to read an "
+                "article, news story, or any web content. Always prefer this "
+                "over guessing at page contents."
             ),
             parameters={
                 "type": "object",
@@ -954,9 +956,11 @@ def register_builtin_tools(
         ToolDefinition(
             name="web_search",
             description=(
-                "Search the web and return results. Use this when someone asks "
-                "a question that needs current information, wants to research "
-                "something, or needs to find a specific resource online."
+                "Search the web and return results. You MUST use this for any "
+                "question requiring current information — news, weather, events, "
+                "prices, scores, headlines, recent developments. Never guess or "
+                "hedge about current events; search first, then summarize the "
+                "real results."
             ),
             parameters={
                 "type": "object",
@@ -1131,6 +1135,56 @@ def register_builtin_tools(
             },
         ),
         routine_add,
+    )
+
+    async def routine_update(
+        *, name: str,
+        schedule: str | None = None,
+        action: str | None = None,
+        title: str | None = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        from homeclaw.scheduler.routines import update_routine
+        updated = update_routine(workspaces, name, schedule=schedule, action=action, title=title)
+        if not updated:
+            return {"error": f"Routine '{name}' not found"}
+        if on_routines_changed:
+            on_routines_changed()
+        return {"status": "updated", "name": name}
+
+    registry.register(
+        ToolDefinition(
+            name="routine_update",
+            description=(
+                "Update an existing routine's schedule, action, or title. "
+                "Use routine_list first to see available routine names. "
+                "Use this when someone wants to change what a routine does "
+                "(e.g. 'add news to my morning briefing') or when it runs."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The routine slug name (e.g. 'morning_briefing')",
+                    },
+                    "schedule": {
+                        "type": "string",
+                        "description": "New schedule (optional — omit to keep current)",
+                    },
+                    "action": {
+                        "type": "string",
+                        "description": "New action description (optional — omit to keep current)",
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "New title (optional — omit to keep current)",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        routine_update,
     )
 
     async def routine_remove(*, name: str, **_: Any) -> dict[str, Any]:

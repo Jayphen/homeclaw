@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class CallType(Enum):
     CONVERSATION = "conversation"  # user message, needs reasoning
-    ROUTINE = "routine"  # scheduled heartbeat task
+    ROUTINE = "routine"  # scheduled heartbeat task (initial call uses conversation model)
     TOOL_ONLY = "tool_only"  # simple tool call, no reasoning needed
     MEMORY_WRITE = "memory_write"  # saving a fact or note
 
@@ -69,14 +69,20 @@ def classify_tool_round(tool_names: list[str]) -> CallType:
 
 
 def route_model(call_type: CallType, config: RoutingConfig) -> str:
-    """Return the model name to use for a given call type."""
-    if call_type in (CallType.ROUTINE, CallType.TOOL_ONLY, CallType.MEMORY_WRITE):
+    """Return the model name to use for a given call type.
+
+    Routines use the conversation model for the initial call so the LLM is
+    capable enough to decide which tools to invoke (e.g. web_search).  After
+    tool dispatch, classify_tool_round downgrades to the routine model for
+    simple follow-up rounds.
+    """
+    if call_type in (CallType.TOOL_ONLY, CallType.MEMORY_WRITE):
         return config.routine_model
     return config.conversation_model
 
 
 def max_tokens_for(call_type: CallType, config: RoutingConfig) -> int:
     """Return the max output tokens for a given call type."""
-    if call_type == CallType.ROUTINE:
+    if call_type in (CallType.TOOL_ONLY, CallType.MEMORY_WRITE):
         return config.routine_max_output_tokens
     return config.max_output_tokens
