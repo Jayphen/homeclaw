@@ -22,7 +22,13 @@ def _notes_for(workspaces: Path, bookmark: Bookmark) -> str | None:
     path = workspaces / "household" / "bookmarks" / "notes" / f"{bookmark.id}.md"
     if not path.is_file():
         return None
-    return path.read_text()
+    text = path.read_text()
+    # Strip legacy "# Title" header — the UI already shows the bookmark title
+    lines = text.splitlines()
+    if lines and lines[0].startswith("# "):
+        lines = [l for l in lines[1:] if l.strip()]
+        text = "\n".join(lines) + "\n" if lines else ""
+    return text or None
 
 
 @router.get("", dependencies=[AuthDep])

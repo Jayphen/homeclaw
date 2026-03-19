@@ -790,6 +790,8 @@ def register_builtin_tools(
         *, bookmark_id: str, content: str, **_: Any
     ) -> dict[str, Any]:
         """Add a note to a bookmark — stored as markdown for semantic search."""
+        if not content or not content.strip() or content.strip().lower() == "none":
+            return {"error": "content must not be empty"}
         if err := _check_content_length(content):
             return err
         # Verify the bookmark exists
@@ -902,6 +904,68 @@ def register_builtin_tools(
             },
         ),
         bookmark_note_edit,
+    )
+
+    async def bookmark_note_delete(
+        *, bookmark_id: str, note_index: int, **_: Any
+    ) -> dict[str, Any]:
+        """Delete a note from a bookmark by its 1-based index."""
+        notes_dir = workspaces / "household" / "bookmarks" / "notes"
+        safe_id = safe_slug(bookmark_id)
+        path = notes_dir / f"{safe_id}.md"
+        if not path.exists():
+            return {"error": f"No notes found for bookmark '{bookmark_id}'"}
+
+        lines = path.read_text().splitlines()
+        note_indices: list[int] = []
+        for i, line in enumerate(lines):
+            if line.startswith("- ["):
+                note_indices.append(i)
+
+        if not note_indices:
+            return {"error": "No note entries found in file"}
+        if note_index < 1 or note_index > len(note_indices):
+            return {
+                "error": (
+                    f"Invalid note_index {note_index}; "
+                    f"bookmark has {len(note_indices)} note(s)"
+                )
+            }
+
+        line_idx = note_indices[note_index - 1]
+        del lines[line_idx]
+        path.write_text("\n".join(lines) + "\n")
+
+        return {
+            "status": "deleted",
+            "bookmark_id": bookmark_id,
+            "note_index": note_index,
+            "remaining_notes": len(note_indices) - 1,
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="bookmark_note_delete",
+            description=(
+                "Delete a note from a bookmark by its 1-based index. Use this to "
+                "remove incorrect, duplicate, or unwanted notes."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "bookmark_id": {
+                        "type": "string",
+                        "description": "ID of the bookmark whose note to delete",
+                    },
+                    "note_index": {
+                        "type": "integer",
+                        "description": "1-based index of the note to delete (in chronological order)",
+                    },
+                },
+                "required": ["bookmark_id", "note_index"],
+            },
+        ),
+        bookmark_note_delete,
     )
 
     # --- Web tools (via Jina) ---
