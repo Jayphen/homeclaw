@@ -29,7 +29,17 @@ from homeclaw.memory.markdown import memory_read_topic, memory_save_topic, memor
 
 _logger = logging.getLogger(__name__)
 
+# Maximum size for user-supplied content written to disk (100 KB).
+MAX_CONTENT_LENGTH = 100_000
+
 ToolHandler = Callable[..., Coroutine[Any, Any, dict[str, Any]]]
+
+
+def _check_content_length(content: str, field: str = "content") -> dict[str, Any] | None:
+    """Return an error dict if content exceeds MAX_CONTENT_LENGTH, else None."""
+    if len(content) > MAX_CONTENT_LENGTH:
+        return {"error": f"{field} too large ({len(content)} chars, max {MAX_CONTENT_LENGTH})"}
+    return None
 
 
 class ToolRegistry:
@@ -158,6 +168,8 @@ def register_builtin_tools(
         *, contact_id: str, content: str, **_: Any
     ) -> dict[str, Any]:
         """Add a note about a contact — stored as markdown for semantic search."""
+        if err := _check_content_length(content):
+            return err
         contact = get_contact(workspaces, contact_id)
         if contact is None:
             return {"error": f"Contact '{contact_id}' not found"}
@@ -249,6 +261,8 @@ def register_builtin_tools(
     async def memory_save(
         *, person: str, topic: str, content: str, **_: Any
     ) -> dict[str, Any]:
+        if err := _check_content_length(content):
+            return err
         path = memory_save_topic(workspaces, person, topic, content)
         return {"status": "saved", "topic": topic, "path": str(path)}
 
@@ -316,6 +330,8 @@ def register_builtin_tools(
         *, topic: str, content: str, **_: Any
     ) -> dict[str, Any]:
         """Share knowledge with the entire household."""
+        if err := _check_content_length(content):
+            return err
         path = memory_save_topic(workspaces, HOUSEHOLD_WORKSPACE, topic, content)
         return {"status": "shared", "topic": topic, "path": str(path)}
 
@@ -347,6 +363,8 @@ def register_builtin_tools(
     # --- Note tools ---
 
     async def note_save(*, person: str, content: str, **_: Any) -> dict[str, Any]:
+        if err := _check_content_length(content):
+            return err
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         time_str = datetime.now(timezone.utc).strftime("%H:%M")
         notes_dir = workspaces / person / "notes"
@@ -772,6 +790,8 @@ def register_builtin_tools(
         *, bookmark_id: str, content: str, **_: Any
     ) -> dict[str, Any]:
         """Add a note to a bookmark — stored as markdown for semantic search."""
+        if err := _check_content_length(content):
+            return err
         # Verify the bookmark exists
         all_bookmarks = list_bookmarks(workspaces)
         bookmark = next((b for b in all_bookmarks if b.id == bookmark_id), None)
@@ -1657,6 +1677,8 @@ def register_builtin_tools(
     async def decision_log(
         *, person: str, decision: str, scope: str = "household", **_: Any
     ) -> dict[str, Any]:
+        if err := _check_content_length(decision, "decision"):
+            return err
         if scope not in ("household", "personal"):
             return {"error": f"Invalid scope '{scope}' — must be 'household' or 'personal'"}
         path = _decisions_path(scope, person)

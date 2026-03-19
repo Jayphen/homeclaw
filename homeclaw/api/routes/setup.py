@@ -6,11 +6,17 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+import secrets
+
+from fastapi import Depends
+
 from homeclaw.api.deps import (
+    AuthDep,
     clear_setup_token,
     get_config,
     get_on_telegram_configured,
     get_setup_token,
+    require_auth,
     verify_setup_token,
 )
 from homeclaw.api.deps import (
@@ -33,12 +39,26 @@ def _mask(value: str | None) -> str | None:
 
 
 @router.get("/status")
-async def setup_status() -> dict[str, Any]:
+async def setup_status(request: Request) -> dict[str, Any]:
     config = get_config()
+
+    # Before a password is set, allow unauthenticated access so the UI
+    # can render the onboarding screen. After setup, require auth.
+    if config.web_password:
+        await require_auth(request)
+
+    # Unauthenticated callers only get minimal info needed for onboarding.
+    if not config.web_password:
+        return {
+            "has_password": False,
+            "needs_setup_token": get_setup_token() is not None,
+            "provider_configured": config.is_provider_configured,
+        }
+
     return {
         "provider_configured": config.is_provider_configured,
         "provider": config.provider,
-        "has_password": bool(config.web_password),
+        "has_password": True,
         "needs_setup_token": get_setup_token() is not None,
         "model": config.model,
         "anthropic_api_key": _mask(config.anthropic_api_key),
@@ -102,8 +122,10 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
     else:
         # After initial setup, accept Bearer auth OR the password in setup_token.
         auth = request.headers.get("Authorization", "")
-        bearer_ok = auth == f"Bearer {config.web_password}"
-        token_ok = body.setup_token is not None and body.setup_token == config.web_password
+        bearer_ok = secrets.compare_digest(auth, f"Bearer {config.web_password}")
+        token_ok = body.setup_token is not None and secrets.compare_digest(
+            body.setup_token, config.web_password
+        )
         if not bearer_ok and not token_ok:
             raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -153,10 +175,10 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         if on_tg:
             await on_tg(config.telegram_token)
 
-    return await setup_status()
+    return await setup_status(request)
 
 
-@router.get("/whatsapp/qr")
+@router.get("/whatsapp/qr", dependencies=[AuthDep])
 async def whatsapp_qr() -> Response:
     """Serve the WhatsApp QR code as a PNG image for scanning in the browser.
 

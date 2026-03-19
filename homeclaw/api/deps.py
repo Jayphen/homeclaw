@@ -127,7 +127,8 @@ async def require_auth(request: Request) -> None:
     if not config.web_password:
         return
     auth = request.headers.get("Authorization", "")
-    if auth != f"Bearer {config.web_password}":
+    expected = f"Bearer {config.web_password}"
+    if not secrets.compare_digest(auth, expected):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
