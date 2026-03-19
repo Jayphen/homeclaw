@@ -284,6 +284,8 @@ def _run_serve_with_channels(
     from homeclaw.channel.telegram import TelegramChannel
 
     hc_app = HomeclawApp(workspaces=workspaces, config=config)
+    from homeclaw.api.deps import set_plugin_registry
+    set_plugin_registry(hc_app.plugin_registry)
     hc_app.load_scheduler()
 
     tg_channel = TelegramChannel(
@@ -367,6 +369,8 @@ def _run_serve_with_deferred_telegram(
         try:
             from homeclaw.channel.whatsapp import WhatsAppChannel
             hc_app = HomeclawApp(workspaces=workspaces, config=config)
+            from homeclaw.api.deps import set_plugin_registry as _set_pr
+            _set_pr(hc_app.plugin_registry)
             wa_channel = WhatsAppChannel(
                 loop=hc_app.loop,
                 workspaces=workspaces,
@@ -389,6 +393,8 @@ def _run_serve_with_deferred_telegram(
             try:
                 if hc_app is None:
                     hc_app = HomeclawApp(workspaces=workspaces, config=config)
+                    from homeclaw.api.deps import set_plugin_registry
+                    set_plugin_registry(hc_app.plugin_registry)
             except ValueError:
                 logger.warning("Cannot start Telegram bot — LLM provider not configured yet")
                 return

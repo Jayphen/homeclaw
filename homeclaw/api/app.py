@@ -1,6 +1,7 @@
 """FastAPI application — serves REST API and static web UI."""
 
 import os
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -12,18 +13,17 @@ from homeclaw.api.deps import AuthDep as AuthDep  # noqa: F401
 from homeclaw.api.deps import get_config as get_config  # noqa: F401
 from homeclaw.api.deps import set_config as set_config  # noqa: F401
 from homeclaw.api.routes.bookmarks import router as bookmarks_router
-from homeclaw.api.routes.skills import router as skills_router
 from homeclaw.api.routes.calendar import router as calendar_router
 from homeclaw.api.routes.contacts import router as contacts_router
-from homeclaw.api.routes.data import router as data_router
 from homeclaw.api.routes.cost import router as cost_router
 from homeclaw.api.routes.dashboard import router as dashboard_router
+from homeclaw.api.routes.data import router as data_router
 from homeclaw.api.routes.memory import router as memory_router
 from homeclaw.api.routes.notes import router as notes_router
+from homeclaw.api.routes.plugins import router as plugins_router
 from homeclaw.api.routes.settings import router as settings_router
 from homeclaw.api.routes.setup import router as setup_router
-
-from importlib.metadata import version as _pkg_version
+from homeclaw.api.routes.skills import router as skills_router
 
 try:
     _version = _pkg_version("homeclaw")
@@ -32,6 +32,7 @@ except Exception:
 
 app = FastAPI(title="homeclaw", version=_version)
 app.include_router(bookmarks_router)
+app.include_router(plugins_router)
 app.include_router(skills_router)
 app.include_router(calendar_router)
 app.include_router(contacts_router)

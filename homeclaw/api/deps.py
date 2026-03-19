@@ -4,6 +4,7 @@ import logging
 import secrets
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Any
 
 from fastapi import Depends, HTTPException, Request
 
@@ -80,6 +81,18 @@ def get_whatsapp_connected() -> bool:
     if _whatsapp_connected_fn is None:
         return False
     return _whatsapp_connected_fn()
+
+
+_plugin_registry: Any = None  # PluginRegistry — avoided to prevent circular import
+
+
+def set_plugin_registry(registry: Any) -> None:
+    global _plugin_registry
+    _plugin_registry = registry
+
+
+def get_plugin_registry() -> Any:
+    return _plugin_registry
 
 
 _whatsapp_qr_fn: Callable[[], bytes | None] | None = None
