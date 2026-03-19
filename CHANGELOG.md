@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.9](https://github.com/Jayphen/homeclaw/compare/v0.3.8...v0.3.9) (2026-03-19)
+
+
+### Bug Fixes
+
+* default to local embeddings and fix setup/status 401 ([64325a2](https://github.com/Jayphen/homeclaw/commit/64325a273b9ea0b6e26386dda868780bf47ea211))
+
+
+### Documentation
+
+* add Docker deployment guide to README ([b5f3710](https://github.com/Jayphen/homeclaw/commit/b5f3710989192a4cc4ea6c77161a74e52cc37ec8))
+* clarify Docker setup is done via web UI, not env vars ([d72e496](https://github.com/Jayphen/homeclaw/commit/d72e49671a519fa4686d8025c259b8ef7a1f1c2d))
+
 ## [0.3.8](https://github.com/Jayphen/homeclaw/compare/v0.3.7...v0.3.8) (2026-03-19)
 
 
