@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.13](https://github.com/Jayphen/homeclaw/compare/v0.3.12...v0.3.13) (2026-03-19)
+
+
+### Bug Fixes
+
+* use local embeddings when API key is not a real OpenAI key ([b9d207f](https://github.com/Jayphen/homeclaw/commit/b9d207f9b0995d686a6cf2e71cb13db58d98d2ed))
+
 ## [0.3.12](https://github.com/Jayphen/homeclaw/compare/v0.3.11...v0.3.12) (2026-03-19)
 
 
