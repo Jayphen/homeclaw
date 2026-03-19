@@ -9,6 +9,11 @@ from fastapi import APIRouter, HTTPException
 from homeclaw.api.deps import AuthDep, get_config, get_plugin_registry
 from homeclaw.plugins.loader import disable_plugin, enable_plugin
 from homeclaw.plugins.marketplace.index import MarketplaceClient
+from homeclaw.plugins.marketplace.installer import (
+    InstallError,
+    install_plugin,
+    uninstall_plugin,
+)
 from homeclaw.plugins.marketplace.models import MarketplacePluginType
 from homeclaw.plugins.registry import PluginStatus, PluginType
 
@@ -105,6 +110,64 @@ async def browse_marketplace(
         "plugins": [p.model_dump() for p in plugins],
         "configured": True,
     }
+
+
+@router.post("/marketplace/install", dependencies=[AuthDep])
+async def install_marketplace_plugin(
+    name: str,
+    enable: bool = True,
+) -> dict[str, Any]:
+    """Install a plugin from the marketplace by name."""
+    config = get_config()
+    registry = get_plugin_registry()
+    if registry is None:
+        raise HTTPException(status_code=503, detail="Plugin system not ready")
+
+    client = MarketplaceClient(
+        marketplace_url=config.marketplace_url,
+        workspaces=config.workspaces.resolve(),
+    )
+    if not client.is_configured:
+        raise HTTPException(
+            status_code=400, detail="Marketplace URL not configured"
+        )
+
+    plugin = await client.get_plugin(name)
+    if plugin is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Plugin '{name}' not found in marketplace",
+        )
+
+    try:
+        entry = await install_plugin(
+            plugin,
+            config.workspaces.resolve(),
+            registry,
+            enable=enable,
+        )
+    except InstallError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    return {"status": "installed", "plugin": _entry_to_dict(entry)}
+
+
+@router.post("/marketplace/uninstall", dependencies=[AuthDep])
+async def uninstall_marketplace_plugin(name: str) -> dict[str, Any]:
+    """Uninstall a plugin by name."""
+    config = get_config()
+    registry = get_plugin_registry()
+    if registry is None:
+        raise HTTPException(status_code=503, detail="Plugin system not ready")
+
+    removed = uninstall_plugin(name, config.workspaces.resolve(), registry)
+    if not removed:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Plugin '{name}' not found",
+        )
+
+    return {"status": "uninstalled", "name": name}
 
 
 @router.get("/{name}", dependencies=[AuthDep])
