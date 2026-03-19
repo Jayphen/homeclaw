@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.14](https://github.com/Jayphen/homeclaw/compare/v0.3.13...v0.3.14) (2026-03-19)
+
+
+### Features
+
+* add bookmark_note_delete tool and fix note quality ([193cf36](https://github.com/Jayphen/homeclaw/commit/193cf36ed9bff3d3849e81be275d80dd6164c18f))
+* add embedding_provider config field ([1f5c91a](https://github.com/Jayphen/homeclaw/commit/1f5c91aa467d482162416f2ad73110bb613b33ab))
+
+
+### Bug Fixes
+
+* auto-reset Milvus collection on embedding dimension mismatch ([63cea43](https://github.com/Jayphen/homeclaw/commit/63cea43379e90b551efbd4e5545df708484a73a1))
+
 ## [0.3.13](https://github.com/Jayphen/homeclaw/compare/v0.3.12...v0.3.13) (2026-03-19)
 
 
