@@ -71,8 +71,14 @@ async def memory_recall(
     q: str = Query(..., description="Search query"),
     top_k: int = Query(default=5, ge=1, le=20),
 ) -> dict[str, Any]:
-    workspaces = get_config().workspaces.resolve()
-    semantic = SemanticMemory(str(workspaces))
+    config = get_config()
+    workspaces = config.workspaces.resolve()
+    embedding_provider = "openai" if config.openai_api_key else "local"
+    semantic = SemanticMemory(
+        str(workspaces),
+        embedding_provider=embedding_provider,
+        embedding_api_key=config.openai_api_key,
+    )
     await semantic.initialize()
     if not semantic.enabled:
         return {"person": person, "query": q, "results": [], "note": "Semantic memory not enabled"}

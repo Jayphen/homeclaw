@@ -42,24 +42,23 @@ def _mask(value: str | None) -> str | None:
 async def setup_status(request: Request) -> dict[str, Any]:
     config = get_config()
 
-    # Before a password is set, allow unauthenticated access so the UI
-    # can render the onboarding screen. After setup, require auth.
-    if config.web_password:
-        await require_auth(request)
-
-    # Unauthenticated callers only get minimal info needed for onboarding.
-    if not config.web_password:
-        return {
-            "has_password": False,
-            "needs_setup_token": get_setup_token() is not None,
-            "provider_configured": config.is_provider_configured,
-        }
-
-    return {
-        "provider_configured": config.is_provider_configured,
-        "provider": config.provider,
-        "has_password": True,
+    # Minimal info is always available without auth — the UI needs this
+    # to decide whether to show the login screen or onboarding flow.
+    base: dict[str, Any] = {
+        "has_password": bool(config.web_password),
         "needs_setup_token": get_setup_token() is not None,
+        "provider_configured": config.is_provider_configured,
+    }
+
+    # Full config details require auth (when a password is set).
+    if config.web_password:
+        try:
+            await require_auth(request)
+        except HTTPException:
+            return base
+
+    base.update({
+        "provider": config.provider,
         "model": config.model,
         "anthropic_api_key": _mask(config.anthropic_api_key),
         "openai_api_key": _mask(config.openai_api_key),
@@ -74,7 +73,8 @@ async def setup_status(request: Request) -> dict[str, Any]:
         "ha_configured": config.ha_url is not None,
         "conversation_model": config.routing.conversation_model,
         "routine_model": config.routing.routine_model,
-    }
+    })
+    return base
 
 
 class SetupBody(BaseModel):

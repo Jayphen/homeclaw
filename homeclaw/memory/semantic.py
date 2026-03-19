@@ -17,8 +17,15 @@ logger = logging.getLogger(__name__)
 
 
 class SemanticMemory:
-    def __init__(self, workspaces_path: str) -> None:
+    def __init__(
+        self,
+        workspaces_path: str,
+        embedding_provider: str = "local",
+        embedding_api_key: str | None = None,
+    ) -> None:
         self._workspaces_path = workspaces_path
+        self._embedding_provider = embedding_provider
+        self._embedding_api_key = embedding_api_key
         self._mem: Any = None
         self._watcher: Any = None
         self._enabled = False
@@ -48,10 +55,14 @@ class SemanticMemory:
                 logger.warning("No workspace directories found to index")
                 return
 
-            self._mem = MemSearch(
-                paths=paths,
-                milvus_uri=f"{self._workspaces_path}/{SEMANTIC_INDEX_PATH}",
-            )
+            kwargs: dict[str, Any] = {
+                "paths": paths,
+                "milvus_uri": f"{self._workspaces_path}/{SEMANTIC_INDEX_PATH}",
+                "embedding_provider": self._embedding_provider,
+            }
+            if self._embedding_api_key:
+                kwargs["embedding_api_key"] = self._embedding_api_key
+            self._mem = MemSearch(**kwargs)
             await self._mem.index()
             self._watcher = self._mem.watch()
             self._enabled = True

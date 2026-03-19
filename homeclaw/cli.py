@@ -125,7 +125,13 @@ class HomeclawApp:
 
         from homeclaw.memory.semantic import SemanticMemory
 
-        self._semantic_memory = SemanticMemory(str(self.workspaces))
+        # Use OpenAI embeddings if an API key is available, otherwise local ONNX.
+        embedding_provider = "openai" if self.config.openai_api_key else "local"
+        self._semantic_memory = SemanticMemory(
+            str(self.workspaces),
+            embedding_provider=embedding_provider,
+            embedding_api_key=self.config.openai_api_key,
+        )
 
         self.loop = AgentLoop(
             provider=provider,
