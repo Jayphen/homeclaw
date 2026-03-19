@@ -103,43 +103,28 @@ docker run -d \
   --name homeclaw \
   -p 8080:8080 \
   -v ./workspaces:/data/workspaces \
-  -e ANTHROPIC_API_KEY=sk-ant-... \
   ghcr.io/jayphen/homeclaw:latest
 ```
 
-Then open `http://localhost:8080` to complete setup in the web UI.
+Open `http://localhost:8080` — the web UI will walk you through setup (API keys,
+password, Telegram, etc.). A one-time setup token is printed to the container
+logs: `docker logs homeclaw`.
 
 **With docker-compose (recommended):**
-
-Create a `.env` file with your config:
-
-```bash
-ANTHROPIC_API_KEY=sk-ant-...
-# Optional:
-TELEGRAM_TOKEN=123456:ABC-...
-TELEGRAM_ALLOWED_USERS=123456789
-JINA_API_KEY=jina_...
-```
-
-Then use the included `docker-compose.yml`:
 
 ```bash
 docker compose up -d
 ```
 
 This maps port 7399 → 8080 and bind-mounts `./workspaces` for persistent data.
+All configuration happens in the web UI — no `.env` file required.
 
-**Key environment variables:**
+If you prefer env vars over the web UI, you can pass them via `.env` or `-e`
+flags. See the Configuration section above for available options. Additionally:
 
 | Variable | Description |
 |----------|-------------|
-| `ANTHROPIC_API_KEY` | Anthropic API key (or use `OPENAI_API_KEY` + `OPENAI_BASE_URL`) |
-| `TELEGRAM_TOKEN` | Telegram bot token (optional) |
-| `TELEGRAM_ALLOWED_USERS` | Comma-separated Telegram user IDs (optional) |
-| `WHATSAPP_ENABLED` | Set to `true` to enable WhatsApp (optional) |
-| `JINA_API_KEY` | Jina API key for web search (optional) |
-| `WEB_PASSWORD` | Web UI password (or set via first-run setup) |
-| `HOMECLAW_CORS_ORIGINS` | Comma-separated allowed origins, e.g. `https://home.example.com` |
+| `HOMECLAW_CORS_ORIGINS` | Comma-separated allowed origins for production, e.g. `https://home.example.com` |
 
 **Volume:** Mount `/data/workspaces` to persist all household data (contacts,
 notes, memory, bookmarks, config). Back this up regularly.
