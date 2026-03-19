@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.5](https://github.com/Jayphen/homeclaw/compare/v0.3.4...v0.3.5) (2026-03-19)
+
+
+### Features
+
+* add channel dispatcher for outbound message delivery ([e8c37bc](https://github.com/Jayphen/homeclaw/commit/e8c37bcb5d5bd8178bff1b481c6504039538ecf2))
+* add WhatsApp channel adapter via neonize ([54c9c9d](https://github.com/Jayphen/homeclaw/commit/54c9c9dbf705c7366f4313adbb72d3cd08f17612))
+* add WhatsApp photo handling and include neonize in Docker image ([91dd301](https://github.com/Jayphen/homeclaw/commit/91dd301e42f89689d2664178154a649e68898671))
+* add WhatsApp to setup API and web UI ([f5c75e9](https://github.com/Jayphen/homeclaw/commit/f5c75e9aadd15cf89ca36c05ce6b88f8df2e7bfd))
+* improve routine web searches and add routine_update tool ([a93a49a](https://github.com/Jayphen/homeclaw/commit/a93a49a697f1c3a88d5c9f30dc4081e5a87ef273))
+* use telegramify-markdown for proper Telegram formatting ([f03b05e](https://github.com/Jayphen/homeclaw/commit/f03b05e18de5009423d4b35b166dc6abb17b0daf))
+* WhatsApp pairing code auth, QR endpoint, reconnection logging, and tests ([646f2f2](https://github.com/Jayphen/homeclaw/commit/646f2f203324d5435bba3014df1679043d84ea0e))
+
+
+### Documentation
+
+* add WhatsApp channel and dispatcher docs to CLAUDE.md ([1c43c11](https://github.com/Jayphen/homeclaw/commit/1c43c1133e08598c1aa49176b614a16f267faecf))
+
 ## [0.3.4](https://github.com/Jayphen/homeclaw/compare/v0.3.3...v0.3.4) (2026-03-18)
 
 
