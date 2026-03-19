@@ -23,7 +23,14 @@ from homeclaw.api.routes.notes import router as notes_router
 from homeclaw.api.routes.settings import router as settings_router
 from homeclaw.api.routes.setup import router as setup_router
 
-app = FastAPI(title="homeclaw", version="0.1.0")
+from importlib.metadata import version as _pkg_version
+
+try:
+    _version = _pkg_version("homeclaw")
+except Exception:
+    _version = "dev"
+
+app = FastAPI(title="homeclaw", version=_version)
 app.include_router(bookmarks_router)
 app.include_router(skills_router)
 app.include_router(calendar_router)

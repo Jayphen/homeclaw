@@ -2,6 +2,7 @@
   import { api, getToken, setToken } from "$lib/api";
 
   interface SetupStatus {
+    version?: string;
     provider_configured: boolean;
     provider: string | null;
     has_password: boolean;
@@ -464,6 +465,10 @@
       {/if}
     </section>
   {/if}
+
+  {#if setup}
+    <p class="version-info">homeclaw v{setup.version ?? "?"}</p>
+  {/if}
 </div>
 
 <style>
@@ -878,5 +883,12 @@
     color: #d4d4d4;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .version-info {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-muted, #999);
+    margin-top: 0.5rem;
   }
 </style>

@@ -42,9 +42,17 @@ def _mask(value: str | None) -> str | None:
 async def setup_status(request: Request) -> dict[str, Any]:
     config = get_config()
 
+    from importlib.metadata import version as _pkg_version
+
+    try:
+        app_version = _pkg_version("homeclaw")
+    except Exception:
+        app_version = "dev"
+
     # Minimal info is always available without auth — the UI needs this
     # to decide whether to show the login screen or onboarding flow.
     base: dict[str, Any] = {
+        "version": app_version,
         "has_password": bool(config.web_password),
         "needs_setup_token": get_setup_token() is not None,
         "provider_configured": config.is_provider_configured,
