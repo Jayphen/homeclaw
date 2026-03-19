@@ -1,6 +1,24 @@
 <script lang="ts">
   import { api } from "$lib/api";
 
+  interface InstalledPlugin {
+    name: string;
+    type: string;
+    status: string;
+    description: string;
+    tools: string[];
+    routine_count: number;
+    error: string | null;
+  }
+
+  interface MarketplacePlugin {
+    name: string;
+    type: string;
+    version: string;
+    description: string;
+    author: string;
+  }
+
   interface SkillArchive {
     id: string;
     name: string;
@@ -10,10 +28,14 @@
     files: string[];
   }
 
+  let plugins: InstalledPlugin[] = $state([]);
+  let marketplace: MarketplacePlugin[] = $state([]);
+  let marketplaceConfigured: boolean = $state(false);
   let archives: SkillArchive[] = $state([]);
   let loading: boolean = $state(true);
   let error: string | null = $state(null);
 
+  let expandedTools: Set<string> = $state(new Set());
   let expandedFiles: Set<string> = $state(new Set());
   let confirmingDelete: string | null = $state(null);
   let deleting: Set<string> = $state(new Set());
@@ -27,18 +49,45 @@
     });
   }
 
+  function toggleTools(name: string) {
+    const next = new Set(expandedTools);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    expandedTools = next;
+  }
+
   function toggleFiles(id: string) {
     const next = new Set(expandedFiles);
     if (next.has(id)) next.delete(id); else next.add(id);
     expandedFiles = next;
   }
 
-  async function fetchArchives() {
+  function stripNamespace(toolName: string): string {
+    const idx = toolName.indexOf("__");
+    return idx >= 0 ? toolName.slice(idx + 2) : toolName;
+  }
+
+  async function fetchAll() {
     loading = true; error = null;
     try {
-      const r = await api("/api/skills/archives");
-      if (!r.ok) throw new Error(`${r.status}`);
-      archives = (await r.json()).archives;
+      const [pluginsRes, marketplaceRes, archivesRes] = await Promise.all([
+        api("/api/plugins"),
+        api("/api/plugins/marketplace/browse"),
+        api("/api/skills/archives"),
+      ]);
+      if (!pluginsRes.ok) throw new Error(`Plugins: ${pluginsRes.status}`);
+      if (!archivesRes.ok) throw new Error(`Archives: ${archivesRes.status}`);
+
+      const pluginsData = await pluginsRes.json();
+      plugins = pluginsData.plugins;
+
+      if (marketplaceRes.ok) {
+        const mpData = await marketplaceRes.json();
+        marketplace = mpData.plugins;
+        marketplaceConfigured = mpData.configured;
+      }
+
+      const archivesData = await archivesRes.json();
+      archives = archivesData.archives;
     } catch (e: any) { error = e.message; }
     loading = false;
   }
@@ -67,7 +116,7 @@
     const next = new Set(restoring); next.delete(archive.id); restoring = next;
   }
 
-  $effect(() => { fetchArchives(); });
+  $effect(() => { fetchAll(); });
 </script>
 
 {#if loading}
@@ -75,14 +124,111 @@
     <div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div>
   </div>
 {:else if error}
-  <div class="error-card"><p>Couldn't load skills data</p><small>{error}</small></div>
+  <div class="error-card"><p>Couldn't load plugins data</p><small>{error}</small></div>
 {:else}
   <header class="page-header" style="animation-delay: 0ms">
     <h1>Plugins</h1>
-    <p class="subtitle">Manage installed skills and plugins</p>
+    <p class="subtitle">Manage installed plugins, skills, and browse the marketplace</p>
   </header>
 
+  <!-- Installed plugins -->
   <section class="section" style="animation-delay: 60ms">
+    <div class="section-header">
+      <h2>Installed</h2>
+      <p class="section-desc">Active plugins providing tools and routines to the assistant.</p>
+    </div>
+
+    {#if plugins.length === 0}
+      <div class="empty">
+        <p>No plugins installed</p>
+        <small>Plugins added via chat or the marketplace will appear here.</small>
+      </div>
+    {:else}
+      <div class="plugin-list">
+        {#each plugins as plugin, i}
+          <div class="plugin-card" style="animation-delay: {90 + i * 25}ms">
+            <div class="plugin-title-row">
+              <div class="plugin-identity">
+                <span class="plugin-name">{plugin.name}</span>
+                <span class="type-badge" class:python={plugin.type === "python"} class:skill={plugin.type === "skill"} class:mcp={plugin.type === "mcp"}>
+                  {plugin.type}
+                </span>
+                <span class="status-dot" class:active={plugin.status === "active"} class:error={plugin.status === "error"} class:disabled={plugin.status === "disabled"}></span>
+              </div>
+            </div>
+            {#if plugin.description}
+              <p class="plugin-desc">{plugin.description}</p>
+            {/if}
+            <div class="plugin-meta">
+              {#if plugin.tools.length > 0}
+                <button class="meta-toggle" onclick={() => toggleTools(plugin.name)}>
+                  {plugin.tools.length} {plugin.tools.length === 1 ? "tool" : "tools"}
+                  <span class="toggle-arrow" class:open={expandedTools.has(plugin.name)}>▾</span>
+                </button>
+              {:else}
+                <span class="meta-item">No tools</span>
+              {/if}
+              {#if plugin.routine_count > 0}
+                <span class="meta-item">{plugin.routine_count} {plugin.routine_count === 1 ? "routine" : "routines"}</span>
+              {/if}
+              {#if plugin.error}
+                <span class="meta-error">{plugin.error}</span>
+              {/if}
+            </div>
+            {#if expandedTools.has(plugin.name)}
+              <ul class="tool-list">
+                {#each plugin.tools as tool}<li class="tool-item">{stripNamespace(tool)}</li>{/each}
+              </ul>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </section>
+
+  <!-- Marketplace -->
+  {#if marketplaceConfigured}
+    <section class="section" style="animation-delay: 120ms">
+      <div class="section-header">
+        <h2>Marketplace</h2>
+        <p class="section-desc">Browse and install plugins from the community.</p>
+      </div>
+
+      {#if marketplace.length === 0}
+        <div class="empty">
+          <p>No plugins available</p>
+          <small>The marketplace is empty or could not be reached.</small>
+        </div>
+      {:else}
+        <div class="plugin-list">
+          {#each marketplace as mp, i}
+            <div class="plugin-card" style="animation-delay: {150 + i * 25}ms">
+              <div class="plugin-title-row">
+                <div class="plugin-identity">
+                  <span class="plugin-name">{mp.name}</span>
+                  <span class="type-badge" class:python={mp.type === "python"} class:skill={mp.type === "skill"} class:mcp={mp.type === "mcp"}>
+                    {mp.type}
+                  </span>
+                  <span class="version-badge">v{mp.version}</span>
+                </div>
+              </div>
+              {#if mp.description}
+                <p class="plugin-desc">{mp.description}</p>
+              {/if}
+              {#if mp.author}
+                <div class="plugin-meta">
+                  <span class="meta-item">by {mp.author}</span>
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </section>
+  {/if}
+
+  <!-- Skill archives -->
+  <section class="section" style="animation-delay: 180ms">
     <div class="section-header">
       <h2>Skill archives</h2>
       <p class="section-desc">Skills removed via chat are archived here. Restore them to bring them back, or delete permanently to free up space.</p>
@@ -100,7 +246,7 @@
     {:else}
       <div class="archive-list">
         {#each archives as archive, i}
-          <div class="archive-card" style="animation-delay: {90 + i * 25}ms">
+          <div class="archive-card" style="animation-delay: {210 + i * 25}ms">
             <div class="archive-title-row">
               <div class="archive-identity">
                 <span class="archive-name">{archive.name}</span>
@@ -170,6 +316,43 @@
   .section-header h2 { font-family: var(--font-serif); font-weight: 600; font-size: 1.2rem; margin: 0 0 0.3rem; color: var(--text); letter-spacing: -0.01em; }
   .section-desc { font-size: 0.82rem; color: var(--text-muted); margin: 0; line-height: 1.5; }
 
+  /* Installed plugins */
+  .plugin-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .plugin-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1.1rem; transition: border-color 0.15s; opacity: 0; animation: fadeUp 0.4s ease-out forwards; }
+  .plugin-card:hover { border-color: #d0c8be; }
+
+  .plugin-title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+  .plugin-identity { display: flex; align-items: center; gap: 0.5rem; }
+  .plugin-name { font-weight: 600; font-size: 0.92rem; color: var(--text); }
+
+  .type-badge { font-size: 0.65rem; font-weight: 600; padding: 0.1rem 0.4rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.04em; background: #f0ebe5; color: var(--text-muted); }
+  .type-badge.python { background: #e8eef4; color: #4a7fb5; }
+  .type-badge.skill { background: #eef4ef; color: var(--sage); }
+  .type-badge.mcp { background: #f3eef6; color: #8b6aae; }
+
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.active { background: var(--sage); }
+  .status-dot.error { background: var(--terracotta); }
+  .status-dot.disabled { background: var(--text-muted); }
+
+  .version-badge { font-size: 0.68rem; color: var(--text-muted); font-family: monospace; }
+
+  .plugin-desc { font-size: 0.82rem; color: var(--text-muted); margin: 0.3rem 0 0; line-height: 1.45; }
+
+  .plugin-meta { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.4rem; flex-wrap: wrap; }
+  .meta-item { font-size: 0.75rem; color: var(--text-muted); }
+  .meta-error { font-size: 0.75rem; color: var(--terracotta); }
+
+  .meta-toggle { background: none; border: none; padding: 0; font-family: var(--font-sans); font-size: 0.75rem; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 0.2rem; transition: color 0.15s; }
+  .meta-toggle:hover { color: var(--text); }
+
+  .toggle-arrow { display: inline-block; transition: transform 0.2s ease; font-size: 0.7rem; }
+  .toggle-arrow.open { transform: rotate(180deg); }
+
+  .tool-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: #fdfcfa; border-left: 3px solid var(--border); border-radius: 4px; display: flex; flex-direction: column; gap: 0.15rem; }
+  .tool-item { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }
+
+  /* Skill archives */
   .archive-list { display: flex; flex-direction: column; gap: 0.5rem; }
   .archive-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1.1rem; transition: border-color 0.15s; opacity: 0; animation: fadeUp 0.4s ease-out forwards; }
   .archive-card:hover { border-color: #d0c8be; }
@@ -185,12 +368,9 @@
   .confirm-text { font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
 
   .archive-meta { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.4rem; flex-wrap: wrap; }
-  .meta-item { font-size: 0.75rem; color: var(--text-muted); }
 
   .files-toggle { background: none; border: none; padding: 0; font-family: var(--font-sans); font-size: 0.75rem; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 0.2rem; transition: color 0.15s; }
   .files-toggle:hover { color: var(--text); }
-  .toggle-arrow { display: inline-block; transition: transform 0.2s ease; font-size: 0.7rem; }
-  .toggle-arrow.open { transform: rotate(180deg); }
 
   .file-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: #fdfcfa; border-left: 3px solid var(--border); border-radius: 4px; display: flex; flex-direction: column; gap: 0.15rem; }
   .file-item { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }
