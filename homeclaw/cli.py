@@ -129,10 +129,13 @@ class HomeclawApp:
 
         from homeclaw.memory.semantic import SemanticMemory
 
-        # Use OpenAI embeddings only with a real OpenAI key (sk-..., not sk-or-v1).
-        _key = self.config.openai_api_key or ""
-        _is_openai_key = _key.startswith("sk-") and not _key.startswith("sk-or-")
-        embedding_provider = "openai" if _is_openai_key else "local"
+        # Explicit config wins; otherwise use OpenAI only with a real OpenAI key.
+        if self.config.embedding_provider:
+            embedding_provider = self.config.embedding_provider
+        else:
+            _key = self.config.openai_api_key or ""
+            _is_openai_key = _key.startswith("sk-") and not _key.startswith("sk-or-")
+            embedding_provider = "openai" if _is_openai_key else "local"
         self._semantic_memory = SemanticMemory(
             str(self.workspaces),
             embedding_provider=embedding_provider,

@@ -115,6 +115,9 @@ class HomeclawConfig(BaseSettings):
     web_port: int = 8080
     web_password: str = ""
 
+    # Embedding provider for semantic memory ("local" or "openai")
+    embedding_provider: str | None = None
+
     # Marketplace
     marketplace_url: str | None = None
 
