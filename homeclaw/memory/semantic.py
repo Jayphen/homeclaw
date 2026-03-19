@@ -55,6 +55,14 @@ class SemanticMemory:
                 logger.warning("No workspace directories found to index")
                 return
 
+            provider = self._embedding_provider
+            if provider == "local":
+                logger.info(
+                    "Loading local embedding model (first run downloads ~80 MB)…"
+                )
+            else:
+                logger.info("Initializing %s embedding provider…", provider)
+
             kwargs: dict[str, Any] = {
                 "paths": paths,
                 "milvus_uri": f"{self._workspaces_path}/{SEMANTIC_INDEX_PATH}",
@@ -63,12 +71,22 @@ class SemanticMemory:
             if self._embedding_api_key:
                 kwargs["embedding_api_key"] = self._embedding_api_key
             self._mem = MemSearch(**kwargs)
-            await self._mem.index()
+
+            logger.info("Indexing %d workspace paths…", len(paths))
+            n = await self._mem.index()
             self._watcher = self._mem.watch()
             self._enabled = True
-            logger.info("Semantic memory indexed and watching %d workspace paths", len(paths))
-        except ImportError:
-            logger.debug("memsearch not installed — semantic memory disabled")
+            logger.info(
+                "Semantic memory ready — %d chunks indexed, watching %d paths",
+                n, len(paths),
+            )
+        except ImportError as exc:
+            if "memsearch" in str(exc):
+                logger.debug("memsearch not installed — semantic memory disabled")
+            else:
+                logger.warning(
+                    "Semantic memory disabled — missing dependency: %s", exc,
+                )
             self._enabled = False
         except Exception:
             logger.exception("Failed to initialize semantic memory")
