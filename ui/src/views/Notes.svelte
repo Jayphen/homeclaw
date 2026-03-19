@@ -1,5 +1,6 @@
 <script lang="ts">
   import { marked } from "marked";
+  import DOMPurify from "dompurify";
   import { format, parseISO } from "date-fns";
   import { api } from "$lib/api";
   import MarkdownEditor from "$lib/MarkdownEditor.svelte";
@@ -7,7 +8,7 @@
   marked.setOptions({ breaks: true, gfm: true });
 
   function renderMarkdown(src: string): string {
-    return marked.parse(src) as string;
+    return DOMPurify.sanitize(marked.parse(src) as string);
   }
 
   // Route params from svelte-spa-router

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { marked } from "marked";
+  import DOMPurify from "dompurify";
 
   marked.setOptions({ breaks: true, gfm: true });
 
@@ -15,7 +16,7 @@
   let textarea: HTMLTextAreaElement | undefined = $state();
 
   function rendered(): string {
-    return marked.parse(value) as string;
+    return DOMPurify.sanitize(marked.parse(value) as string);
   }
 
   type WrapAction = { prefix: string; suffix: string };

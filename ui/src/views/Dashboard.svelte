@@ -1,11 +1,12 @@
 <script lang="ts">
   import { marked } from "marked";
+  import DOMPurify from "dompurify";
   import { api } from "$lib/api";
 
   marked.setOptions({ breaks: true, gfm: true });
 
   function renderMarkdown(src: string): string {
-    return marked.parse(src) as string;
+    return DOMPurify.sanitize(marked.parse(src) as string);
   }
 
   interface TodayNote {
