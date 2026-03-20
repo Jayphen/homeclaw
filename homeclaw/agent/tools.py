@@ -72,7 +72,7 @@ def register_builtin_tools(
     registry: ToolRegistry,
     workspaces: Path,
     on_routines_changed: Callable[[], None] | None = None,
-    on_routine_run: Callable[[str], Coroutine[Any, Any, bool]] | None = None,
+    on_routine_run: Callable[[str], Coroutine[Any, Any, str | None]] | None = None,
     config: Any = None,
     plugin_registry: Any = None,  # PluginRegistry | None — avoided to prevent circular import
     dispatcher: Any = None,  # ChannelDispatcher | None — avoided to prevent circular import
@@ -1314,10 +1314,12 @@ def register_builtin_tools(
     async def routine_run(*, name: str, **_: Any) -> dict[str, Any]:
         if on_routine_run is None:
             return {"error": "Scheduler not available"}
-        found = await on_routine_run(name)
-        if not found:
+        result = await on_routine_run(name)
+        if result is None:
             return {"error": f"Routine '{name}' not found — use routine_list to see available names"}
-        return {"status": "triggered", "name": name}
+        if not result:
+            return {"status": "error", "name": name, "detail": "Routine ran but produced no output — check logs for errors"}
+        return {"status": "completed", "name": name, "result": result}
 
     registry.register(
         ToolDefinition(
@@ -1325,7 +1327,8 @@ def register_builtin_tools(
             description=(
                 "Manually trigger a scheduled routine to run right now. "
                 "Use this when a routine was missed or a user asks to run one immediately. "
-                "The routine executes in the background as if it fired on schedule."
+                "The routine runs synchronously and returns its full output so you can "
+                "confirm it completed successfully."
             ),
             parameters={
                 "type": "object",

@@ -70,17 +70,20 @@ class Scheduler:
         loop = self._loop
         scheduler = self
 
-        async def _run_routine() -> None:
+        async def _run_routine() -> str:
             logger.info("Routine fired: %s", description)
             try:
-                await loop.run(
+                result = await loop.run(
                     f"[Scheduled routine] {description}",
                     HOUSEHOLD_WORKSPACE,
                     call_type=CallType.ROUTINE,
                 )
                 scheduler._save_last_run(job_id)
+                logger.info("Routine completed: %s (response length: %d)", description, len(result))
+                return result
             except Exception:
                 logger.exception("Routine failed: %s", description)
+                return ""
 
         return _run_routine
 
@@ -217,16 +220,16 @@ class Scheduler:
             logger.info("Scheduler started after reload with %d routines", count)
         return count
 
-    async def run_now(self, name: str) -> bool:
-        """Trigger a routine by slug name immediately. Returns True if found."""
+    async def run_now(self, name: str) -> str | None:
+        """Trigger a routine by slug name immediately. Returns result text or None if not found."""
         job_id = f"routine:{name}"
         job = self._scheduler.get_job(job_id)
         if job is None:
-            return False
+            return None
         logger.info("Manual trigger: %s", job.name)
         # Run the routine function directly (same as scheduled execution)
-        await job.func()
-        return True
+        result = await job.func()
+        return result
 
     @property
     def job_count(self) -> int:

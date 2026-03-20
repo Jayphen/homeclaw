@@ -161,11 +161,11 @@ class HomeclawApp:
         if self._scheduler:
             self._scheduler.reload_routines()
 
-    async def _run_routine(self, name: str) -> bool:
-        """Manually trigger a routine by slug name."""
+    async def _run_routine(self, name: str) -> str | None:
+        """Manually trigger a routine by slug name. Returns result text or None."""
         if self._scheduler:
             return await self._scheduler.run_now(name)
-        return False
+        return None
 
     def load_scheduler(self) -> None:
         """Parse ROUTINES.md and register routines (does not start the event loop)."""
