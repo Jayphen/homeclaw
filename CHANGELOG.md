@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.3](https://github.com/Jayphen/homeclaw/compare/v0.4.2...v0.4.3) (2026-03-20)
+
+
+### Features
+
+* add member account management UI and sign-out button ([34c0bf9](https://github.com/Jayphen/homeclaw/commit/34c0bf9ca9bb80892d51480844c6cd899a388bde))
+
+
+### Bug Fixes
+
+* install libmagic in Docker, show WhatsApp QR in settings UI ([0c21ddb](https://github.com/Jayphen/homeclaw/commit/0c21ddb9553d7664ad9cf526e483ee717f977206))
+
 ## [0.4.2](https://github.com/Jayphen/homeclaw/compare/v0.4.1...v0.4.2) (2026-03-20)
 
 
