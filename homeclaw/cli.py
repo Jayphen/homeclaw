@@ -171,7 +171,11 @@ class HomeclawApp:
         """Parse ROUTINES.md and register routines (does not start the event loop)."""
         from homeclaw.scheduler.scheduler import Scheduler
 
-        self._scheduler = Scheduler(loop=self.loop, workspaces=self.workspaces)
+        self._scheduler = Scheduler(
+            loop=self.loop,
+            workspaces=self.workspaces,
+            timezone=self.config.timezone,
+        )
         self._scheduler.load_routines_md()
 
     def start_scheduler(self) -> None:
@@ -281,7 +285,7 @@ def _run_serve(workspaces: Path, port: int) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
     from homeclaw.api.logbuffer import install_log_buffer
-    install_log_buffer()
+    install_log_buffer(timezone=config.timezone)
 
     if not config.web_password:
         generate_setup_token()

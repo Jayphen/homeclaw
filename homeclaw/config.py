@@ -35,6 +35,7 @@ _SAVEABLE_FIELDS = {
     "web_password",
     "member_passwords",
     "jwt_secret",
+    "timezone",
 }
 
 # Routing model fields are saved/loaded via the nested RoutingConfig object.
@@ -124,6 +125,9 @@ class HomeclawConfig(BaseSettings):
 
     # Marketplace
     marketplace_url: str | None = None
+
+    # Timezone for schedules and log display (IANA, e.g. "America/New_York")
+    timezone: str | None = None
 
     # Paths
     workspaces_path: str = "./workspaces"

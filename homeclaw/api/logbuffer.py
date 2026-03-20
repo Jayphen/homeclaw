@@ -6,20 +6,22 @@ recent activity without reading files or stdout.
 
 import logging
 from collections import deque
-from datetime import UTC, datetime
+from datetime import UTC, datetime, tzinfo
 from typing import Any
+from zoneinfo import ZoneInfo
 
 
 class LogBuffer(logging.Handler):
     """A logging handler that keeps the last *maxlen* formatted records."""
 
-    def __init__(self, maxlen: int = 500) -> None:
+    def __init__(self, maxlen: int = 500, tz: tzinfo | None = None) -> None:
         super().__init__()
         self._records: deque[dict[str, Any]] = deque(maxlen=maxlen)
+        self._tz: tzinfo = tz or UTC
 
     def emit(self, record: logging.LogRecord) -> None:
         self._records.append({
-            "ts": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
+            "ts": datetime.fromtimestamp(record.created, tz=self._tz).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -36,12 +38,15 @@ class LogBuffer(logging.Handler):
 _buffer: LogBuffer | None = None
 
 
-def install_log_buffer(maxlen: int = 500) -> LogBuffer:
+def install_log_buffer(
+    maxlen: int = 500, timezone: str | None = None
+) -> LogBuffer:
     """Install the log buffer on the root logger. Idempotent."""
     global _buffer
     if _buffer is not None:
         return _buffer
-    _buffer = LogBuffer(maxlen=maxlen)
+    tz = ZoneInfo(timezone) if timezone else None
+    _buffer = LogBuffer(maxlen=maxlen, tz=tz)
     _buffer.setLevel(logging.DEBUG)
     logging.getLogger().addHandler(_buffer)
     return _buffer

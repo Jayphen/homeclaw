@@ -8,6 +8,7 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -27,10 +28,16 @@ _LAST_RUN_FILE = "household/.routine_last_run.json"
 class Scheduler:
     """Manages scheduled routines backed by APScheduler."""
 
-    def __init__(self, loop: AgentLoop, workspaces: Path) -> None:
+    def __init__(
+        self, loop: AgentLoop, workspaces: Path, timezone: str | None = None
+    ) -> None:
         self._loop = loop
         self._workspaces = workspaces
-        self._scheduler = AsyncIOScheduler()
+        self._tz = ZoneInfo(timezone) if timezone else None
+        scheduler_kwargs: dict[str, Any] = {}
+        if self._tz is not None:
+            scheduler_kwargs["timezone"] = self._tz
+        self._scheduler = AsyncIOScheduler(**scheduler_kwargs)
         self._job_count = 0
 
     def _make_trigger(
@@ -170,10 +177,13 @@ class Scheduler:
             # Ask the trigger: when would you have fired after last_run?
             next_fire = job.trigger.get_next_fire_time(None, last_dt)
             if next_fire is not None and next_fire < now:
+                display_time = (
+                    next_fire.astimezone(self._tz) if self._tz else next_fire
+                )
                 logger.info(
                     "Missed routine detected: %s (should have fired %s)",
                     job.name,
-                    next_fire,
+                    display_time,
                 )
                 # Fire in background so we don't block startup
                 asyncio.ensure_future(job.func())
