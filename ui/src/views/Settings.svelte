@@ -198,18 +198,32 @@
   }
 
   async function toggleAdmin(member: string) {
-    const isAdmin = setup?.admin_members?.includes(member) ?? false;
+    if (!setup) return;
+    const isAdmin = setup.admin_members?.includes(member) ?? false;
+    const newAdmins = isAdmin
+      ? (setup.admin_members ?? []).filter((m) => m !== member)
+      : [...(setup.admin_members ?? []), member];
+
+    // Optimistic update — avoids full re-render and scroll jump
+    setup = { ...setup, admin_members: newAdmins };
+
     try {
       const r = await api("/api/setup/members/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ member, is_admin: !isAdmin }),
       });
-      if (!r.ok) throw new Error(`${r.status}`);
-      await fetchAll();
+      if (!r.ok) {
+        // Revert on failure
+        setup = { ...setup, admin_members: isAdmin
+          ? [...newAdmins, member]
+          : newAdmins.filter((m) => m !== member) };
+      }
     } catch {
-      // Refresh to revert the checkbox
-      await fetchAll();
+      // Revert on error
+      setup = { ...setup, admin_members: isAdmin
+        ? [...(setup.admin_members ?? []), member]
+        : (setup.admin_members ?? []).filter((m) => m !== member) };
     }
   }
 
