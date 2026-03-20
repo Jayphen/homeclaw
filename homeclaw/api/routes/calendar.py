@@ -7,6 +7,7 @@ from fastapi import APIRouter, Query
 
 from homeclaw.api.deps import MemberDep, get_config, list_member_workspaces, visible_members
 from homeclaw.contacts.store import list_contacts
+from homeclaw.reminders.store import load_reminders
 
 router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
@@ -38,11 +39,13 @@ def _collect_notes(
         for person in members:
             path = ws / person / "notes" / f"{date_str}.md"
             if path.exists():
+                with open(path) as f:
+                    summary = f.read(200).strip()
                 events.append({
                     "date": date_str,
                     "type": "note",
                     "person": person,
-                    "summary": path.read_text().strip()[:200],
+                    "summary": summary,
                 })
         current += timedelta(days=1)
     return events
@@ -57,30 +60,20 @@ def _collect_reminders(
     events: list[dict[str, Any]] = []
     ws = Path(workspaces_path)
     for person in members:
-        path = ws / person / "notes" / "reminders.md"
-        if not path.exists():
-            continue
-        for line in path.read_text().splitlines():
-            line = line.strip()
-            if not line.startswith("- ["):
+        for r in load_reminders(ws, person):
+            nd = r.next_due
+            if nd is None:
                 continue
-            # Parse "- [ ] YYYY-MM-DD: text" or "- [x] YYYY-MM-DD: text"
-            done = line.startswith("- [x]")
-            rest = line[6:].strip()  # after "- [ ] " or "- [x] "
-            if ":" not in rest:
-                continue
-            date_part, note = rest.split(":", 1)
-            try:
-                reminder_date = date.fromisoformat(date_part.strip())
-            except ValueError:
-                continue
-            if start <= reminder_date <= end:
+            if start <= nd <= end:
+                summary = r.note
+                if r.interval_days:
+                    summary += f" (every {r.interval_days}d)"
                 events.append({
-                    "date": reminder_date.isoformat(),
+                    "date": nd.isoformat(),
                     "type": "reminder",
                     "person": person,
-                    "summary": note.strip(),
-                    "done": done,
+                    "summary": summary,
+                    "done": r.done,
                 })
     return events
 
