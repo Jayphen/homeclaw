@@ -12,16 +12,23 @@ from homeclaw.agent.tools import ToolRegistry
 from homeclaw.plugins.interface import Plugin
 from homeclaw.plugins.registry import PluginEntry, PluginRegistry, PluginType
 from homeclaw.plugins.skills.loader import (
+    SkillCatalogEntry,
     SkillLocation,
     SkillPlugin,
+    build_skill_catalog,
     discover_skills,
     load_all_skills,
     load_skill,
+    migrate_legacy_skill,
+    parse_skill_file,
     parse_skill_markdown,
+    parse_skill_md,
+    render_skill_md,
+    skill_md_to_definition,
 )
 
 # ---------------------------------------------------------------------------
-# Sample markdown
+# Sample markdown — legacy format
 # ---------------------------------------------------------------------------
 
 WEATHER_SKILL_MD = """\
@@ -63,22 +70,119 @@ Description: A minimal skill
 ## Instructions
 """
 
+# ---------------------------------------------------------------------------
+# Sample SKILL.md — new YAML frontmatter format
+# ---------------------------------------------------------------------------
+
+WEATHER_SKILL_NEW = """\
+---
+name: weather
+description: Get current weather and forecasts
+allowed-domains:
+  - api.openweathermap.org
+metadata:
+  api_key_env: OPENWEATHER_API_KEY
+---
+When the user asks about weather, use the get_weather tool.
+For forecasts, use get_forecast.
+"""
+
+MINIMAL_SKILL_NEW = """\
+---
+name: minimal
+description: A minimal skill
+---
+"""
+
+BUDGET_SKILL_NEW = """\
+---
+name: budget-tracker
+description: Track household spending and budgets
+license: MIT
+metadata:
+  currency: AUD
+allowed-tools: data_read data_write
+---
+## Usage
+When the user mentions spending, bills, or budget:
+1. Load the current month's data file
+2. Append the new entry
+3. Show a running total
+"""
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def make_skill_dir(parent: Path, name: str, content: str) -> Path:
-    """Create a skill directory with a skill.md file."""
+def make_skill_dir(parent: Path, name: str, content: str, filename: str = "skill.md") -> Path:
+    """Create a skill directory with a skill definition file."""
     skill_dir = parent / name
     skill_dir.mkdir(parents=True, exist_ok=True)
-    (skill_dir / "skill.md").write_text(content)
+    (skill_dir / filename).write_text(content)
     return skill_dir
 
 
 # ---------------------------------------------------------------------------
-# parse_skill_markdown — valid input
+# parse_skill_md — new YAML frontmatter format
+# ---------------------------------------------------------------------------
+
+
+def test_parse_skill_md_basic() -> None:
+    fm, body = parse_skill_md(WEATHER_SKILL_NEW)
+    assert fm.name == "weather"
+    assert fm.description == "Get current weather and forecasts"
+    assert fm.allowed_domains == ["api.openweathermap.org"]
+    assert fm.metadata == {"api_key_env": "OPENWEATHER_API_KEY"}
+    assert "get_weather" in body
+
+
+def test_parse_skill_md_minimal() -> None:
+    fm, body = parse_skill_md(MINIMAL_SKILL_NEW)
+    assert fm.name == "minimal"
+    assert fm.description == "A minimal skill"
+    assert fm.allowed_domains == []
+    assert body == ""
+
+
+def test_parse_skill_md_all_fields() -> None:
+    fm, body = parse_skill_md(BUDGET_SKILL_NEW)
+    assert fm.name == "budget-tracker"
+    assert fm.license == "MIT"
+    assert fm.metadata == {"currency": "AUD"}
+    assert fm.allowed_tools == ["data_read", "data_write"]
+    assert "## Usage" in body
+
+
+def test_parse_skill_md_missing_frontmatter() -> None:
+    with pytest.raises(ValueError, match="missing YAML frontmatter"):
+        parse_skill_md("# Just a markdown file\nNo frontmatter here.")
+
+
+def test_parse_skill_md_missing_name() -> None:
+    content = "---\ndescription: no name\n---\nBody here.\n"
+    with pytest.raises(ValueError, match="missing required 'name'"):
+        parse_skill_md(content)
+
+
+def test_parse_skill_md_invalid_yaml() -> None:
+    content = "---\n: invalid yaml [[\n---\nBody.\n"
+    with pytest.raises(ValueError, match="Invalid YAML"):
+        parse_skill_md(content)
+
+
+def test_skill_md_to_definition() -> None:
+    defn = skill_md_to_definition(BUDGET_SKILL_NEW)
+    assert defn.name == "budget-tracker"
+    assert defn.description == "Track household spending and budgets"
+    assert defn.license == "MIT"
+    assert defn.allowed_tools == ["data_read", "data_write"]
+    assert "## Usage" in defn.instructions
+
+
+# ---------------------------------------------------------------------------
+# parse_skill_markdown — legacy format
 # ---------------------------------------------------------------------------
 
 
@@ -115,11 +219,6 @@ def test_parse_minimal_skill() -> None:
     assert defn.allowed_domains == ["example.com"]
     assert defn.tools == []
     assert defn.instructions == ""
-
-
-# ---------------------------------------------------------------------------
-# parse_skill_markdown — missing / malformed sections
-# ---------------------------------------------------------------------------
 
 
 def test_parse_missing_name_raises() -> None:
@@ -164,6 +263,59 @@ Description: just a name
     assert defn.allowed_domains == []
     assert defn.tools == []
     assert defn.instructions == ""
+
+
+# ---------------------------------------------------------------------------
+# parse_skill_file — auto-detect format
+# ---------------------------------------------------------------------------
+
+
+def test_parse_skill_file_detects_new_format() -> None:
+    defn = parse_skill_file(WEATHER_SKILL_NEW)
+    assert defn.name == "weather"
+    assert defn.description == "Get current weather and forecasts"
+
+
+def test_parse_skill_file_detects_legacy_format() -> None:
+    defn = parse_skill_file(WEATHER_SKILL_MD)
+    assert defn.name == "weather"
+    assert len(defn.tools) == 2
+
+
+# ---------------------------------------------------------------------------
+# render_skill_md
+# ---------------------------------------------------------------------------
+
+
+def test_render_skill_md_roundtrip() -> None:
+    rendered = render_skill_md(
+        name="test-skill",
+        description="A test skill",
+        allowed_domains=["api.example.com"],
+        instructions="Do the thing.",
+    )
+    defn = skill_md_to_definition(rendered)
+    assert defn.name == "test-skill"
+    assert defn.description == "A test skill"
+    assert defn.allowed_domains == ["api.example.com"]
+    assert defn.instructions == "Do the thing."
+
+
+def test_render_skill_md_no_domains() -> None:
+    rendered = render_skill_md(name="simple", description="Simple skill")
+    defn = skill_md_to_definition(rendered)
+    assert defn.name == "simple"
+    assert defn.allowed_domains == []
+
+
+def test_render_skill_md_with_metadata() -> None:
+    rendered = render_skill_md(
+        name="meta",
+        description="With metadata",
+        metadata={"key": "value"},
+    )
+    defn = skill_md_to_definition(rendered)
+    assert defn.metadata == {"key": "value"}
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +388,14 @@ async def test_skill_plugin_handle_tool_unknown(tmp_path: Path) -> None:
     assert "error" in result
 
 
+def test_skill_plugin_from_new_format(tmp_path: Path) -> None:
+    defn = skill_md_to_definition(WEATHER_SKILL_NEW)
+    plugin = SkillPlugin(defn, tmp_path, "household")
+    assert plugin.name == "weather"
+    tools = plugin.tools()
+    assert any(t.name == "http_call" for t in tools)
+
+
 # ---------------------------------------------------------------------------
 # discover_skills
 # ---------------------------------------------------------------------------
@@ -245,7 +405,7 @@ def test_discover_skills_finds_household_and_private(tmp_path: Path) -> None:
     make_skill_dir(tmp_path / "household" / "skills", "weather", WEATHER_SKILL_MD)
     make_skill_dir(tmp_path / "alice" / "skills", "notes", MINIMAL_SKILL_MD.replace("minimal", "notes"))
 
-    locations = discover_skills(tmp_path, "alice")
+    locations = discover_skills(tmp_path, "alice", include_builtin=False)
 
     assert len(locations) == 2
     by_name = {loc.name: loc for loc in locations}
@@ -257,10 +417,41 @@ def test_discover_skills_finds_household_and_private(tmp_path: Path) -> None:
     assert by_name["notes"].skill_dir == tmp_path / "alice" / "skills" / "notes"
 
 
+def test_discover_skills_finds_new_format(tmp_path: Path) -> None:
+    make_skill_dir(
+        tmp_path / "household" / "skills", "weather",
+        WEATHER_SKILL_NEW, filename="SKILL.md",
+    )
+    locations = discover_skills(tmp_path, "alice", include_builtin=False)
+    assert len(locations) == 1
+    assert locations[0].skill_file == "SKILL.md"
+
+
+def test_discover_skills_prefers_skill_md_over_legacy(tmp_path: Path) -> None:
+    """If both SKILL.md and skill.md exist, SKILL.md wins.
+
+    On case-insensitive filesystems (macOS, Windows), both files can't
+    coexist, so this test only runs on case-sensitive FS.
+    """
+    skill_dir = tmp_path / "household" / "skills" / "weather"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "skill.md").write_text(WEATHER_SKILL_MD)
+    (skill_dir / "SKILL.md").write_text(WEATHER_SKILL_NEW)
+
+    # Check if FS is case-sensitive
+    actual_files = {f.name for f in skill_dir.iterdir()}
+    if "SKILL.md" not in actual_files or "skill.md" not in actual_files:
+        pytest.skip("Case-insensitive filesystem — can't have both files")
+
+    locations = discover_skills(tmp_path, "alice", include_builtin=False)
+    assert len(locations) == 1
+    assert locations[0].skill_file == "SKILL.md"
+
+
 def test_discover_skills_household_only(tmp_path: Path) -> None:
     make_skill_dir(tmp_path / "household" / "skills", "weather", WEATHER_SKILL_MD)
 
-    locations = discover_skills(tmp_path, "bob")
+    locations = discover_skills(tmp_path, "bob", include_builtin=False)
 
     assert len(locations) == 1
     assert locations[0].name == "weather"
@@ -270,7 +461,7 @@ def test_discover_skills_household_only(tmp_path: Path) -> None:
 def test_discover_skills_private_only(tmp_path: Path) -> None:
     make_skill_dir(tmp_path / "alice" / "skills", "myskill", MINIMAL_SKILL_MD.replace("minimal", "myskill"))
 
-    locations = discover_skills(tmp_path, "alice")
+    locations = discover_skills(tmp_path, "alice", include_builtin=False)
 
     assert len(locations) == 1
     assert locations[0].scope == "alice"
@@ -283,7 +474,7 @@ def test_discover_skills_skips_archive_dir(tmp_path: Path) -> None:
     archived.mkdir(parents=True)
     (archived / "skill.md").write_text(MINIMAL_SKILL_MD)
 
-    locations = discover_skills(tmp_path, "alice")
+    locations = discover_skills(tmp_path, "alice", include_builtin=False)
 
     assert len(locations) == 1
     assert locations[0].name == "weather"
@@ -297,25 +488,25 @@ def test_discover_skills_skips_dirs_without_skill_md(tmp_path: Path) -> None:
     (skills_dir / "notaskill" / "README.md").write_text("not a skill")
     make_skill_dir(skills_dir, "weather", WEATHER_SKILL_MD)
 
-    locations = discover_skills(tmp_path, "alice")
+    locations = discover_skills(tmp_path, "alice", include_builtin=False)
 
     assert len(locations) == 1
     assert locations[0].name == "weather"
 
 
 def test_discover_skills_empty(tmp_path: Path) -> None:
-    assert discover_skills(tmp_path, "alice") == []
+    assert discover_skills(tmp_path, "alice", include_builtin=False) == []
 
 
 def test_discover_skills_missing_dirs(tmp_path: Path) -> None:
-    assert discover_skills(tmp_path / "nonexistent", "alice") == []
+    assert discover_skills(tmp_path / "nonexistent", "alice", include_builtin=False) == []
 
 
 def test_discover_skills_household_before_personal(tmp_path: Path) -> None:
     make_skill_dir(tmp_path / "alice" / "skills", "aaa", MINIMAL_SKILL_MD.replace("minimal", "aaa"))
     make_skill_dir(tmp_path / "household" / "skills", "zzz", MINIMAL_SKILL_MD.replace("minimal", "zzz"))
 
-    locations = discover_skills(tmp_path, "alice")
+    locations = discover_skills(tmp_path, "alice", include_builtin=False)
 
     # Household comes first regardless of name sort
     assert locations[0].scope == "household"
@@ -327,13 +518,30 @@ def test_discover_skills_household_before_personal(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_load_skill_reads_skill_md(tmp_path: Path) -> None:
+def test_load_skill_reads_legacy_skill_md(tmp_path: Path) -> None:
     skill_dir = make_skill_dir(tmp_path, "weather", WEATHER_SKILL_MD)
     plugin = load_skill(skill_dir, "household")
 
     assert plugin.name == "weather"
     assert plugin.scope == "household"
     assert plugin.data_dir == skill_dir / "data"
+
+
+def test_load_skill_reads_new_skill_md(tmp_path: Path) -> None:
+    skill_dir = make_skill_dir(tmp_path, "weather", WEATHER_SKILL_NEW, filename="SKILL.md")
+    plugin = load_skill(skill_dir, "household")
+
+    assert plugin.name == "weather"
+    assert plugin.scope == "household"
+
+
+def test_load_skill_auto_migrates_legacy(tmp_path: Path) -> None:
+    """Loading a legacy skill.md creates SKILL.md alongside it."""
+    skill_dir = make_skill_dir(tmp_path, "weather", WEATHER_SKILL_MD)
+    load_skill(skill_dir, "household")
+
+    assert (skill_dir / "SKILL.md").is_file()
+    assert (skill_dir / "skill.md").is_file()  # kept as backup
 
 
 def test_load_skill_migrates_legacy_data_files(tmp_path: Path) -> None:
@@ -372,6 +580,36 @@ def test_load_skill_no_migration_when_data_dir_exists(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# migrate_legacy_skill
+# ---------------------------------------------------------------------------
+
+
+def test_migrate_legacy_skill_creates_skill_md(tmp_path: Path) -> None:
+    skill_dir = make_skill_dir(tmp_path, "weather", WEATHER_SKILL_MD)
+    assert migrate_legacy_skill(skill_dir) is True
+    assert (skill_dir / "SKILL.md").is_file()
+
+    # Verify the new file parses correctly
+    defn = skill_md_to_definition((skill_dir / "SKILL.md").read_text())
+    assert defn.name == "weather"
+    assert defn.description == "Get current weather and forecasts"
+
+
+def test_migrate_legacy_skill_skips_if_already_new_format(tmp_path: Path) -> None:
+    """If the skill already has SKILL.md (new format), migration is skipped."""
+    skill_dir = tmp_path / "weather"
+    skill_dir.mkdir()
+    (skill_dir / "SKILL.md").write_text(WEATHER_SKILL_NEW)
+    assert migrate_legacy_skill(skill_dir) is False
+
+
+def test_migrate_legacy_skill_skips_if_no_legacy(tmp_path: Path) -> None:
+    skill_dir = tmp_path / "weather"
+    skill_dir.mkdir()
+    assert migrate_legacy_skill(skill_dir) is False
+
+
+# ---------------------------------------------------------------------------
 # load_all_skills
 # ---------------------------------------------------------------------------
 
@@ -382,12 +620,13 @@ def test_load_all_skills_registers_with_registry(tmp_path: Path) -> None:
     tool_reg = ToolRegistry()
     plugin_reg = PluginRegistry(tool_registry=tool_reg)
 
-    entries = load_all_skills(tmp_path, "alice", plugin_reg)
+    entries = load_all_skills(tmp_path, "alice", plugin_reg, include_builtin=False)
 
     assert len(entries) == 1
     assert entries[0].name == "weather"
     assert entries[0].plugin_type == PluginType.SKILL
-    assert tool_reg.has_tool("weather.http_call")
+    # PluginRegistry namespaces tools as name__tool_name
+    assert tool_reg.has_tool("weather__http_call")
 
 
 def test_load_all_skills_loads_household_and_private(tmp_path: Path) -> None:
@@ -397,7 +636,7 @@ def test_load_all_skills_loads_household_and_private(tmp_path: Path) -> None:
     tool_reg = ToolRegistry()
     plugin_reg = PluginRegistry(tool_registry=tool_reg)
 
-    entries = load_all_skills(tmp_path, "alice", plugin_reg)
+    entries = load_all_skills(tmp_path, "alice", plugin_reg, include_builtin=False)
 
     assert len(entries) == 2
     names = {e.name for e in entries}
@@ -411,7 +650,7 @@ def test_load_all_skills_other_person_cannot_see_private(tmp_path: Path) -> None
     tool_reg = ToolRegistry()
     plugin_reg = PluginRegistry(tool_registry=tool_reg)
 
-    entries = load_all_skills(tmp_path, "bob", plugin_reg)
+    entries = load_all_skills(tmp_path, "bob", plugin_reg, include_builtin=False)
 
     assert len(entries) == 0
 
@@ -425,7 +664,64 @@ def test_load_all_skills_skips_bad_files(tmp_path: Path) -> None:
     tool_reg = ToolRegistry()
     plugin_reg = PluginRegistry(tool_registry=tool_reg)
 
-    entries = load_all_skills(tmp_path, "alice", plugin_reg)
+    entries = load_all_skills(tmp_path, "alice", plugin_reg, include_builtin=False)
 
     assert len(entries) == 1
     assert entries[0].name == "weather"
+
+
+def test_load_all_skills_with_new_format(tmp_path: Path) -> None:
+    make_skill_dir(
+        tmp_path / "household" / "skills", "weather",
+        WEATHER_SKILL_NEW, filename="SKILL.md",
+    )
+
+    tool_reg = ToolRegistry()
+    plugin_reg = PluginRegistry(tool_registry=tool_reg)
+
+    entries = load_all_skills(tmp_path, "alice", plugin_reg, include_builtin=False)
+
+    assert len(entries) == 1
+    assert entries[0].name == "weather"
+    assert tool_reg.has_tool("weather__http_call")
+
+
+# ---------------------------------------------------------------------------
+# build_skill_catalog
+# ---------------------------------------------------------------------------
+
+
+def test_build_skill_catalog_basic(tmp_path: Path) -> None:
+    make_skill_dir(
+        tmp_path / "household" / "skills", "weather",
+        WEATHER_SKILL_NEW, filename="SKILL.md",
+    )
+    # Add scripts/ dir
+    (tmp_path / "household" / "skills" / "weather" / "scripts").mkdir()
+
+    catalog = build_skill_catalog(tmp_path, "alice", include_builtin=False)
+    assert len(catalog) == 1
+    assert catalog[0].name == "weather"
+    assert catalog[0].scope == "household"
+    assert catalog[0].has_scripts is True
+
+
+def test_build_skill_catalog_empty(tmp_path: Path) -> None:
+    assert build_skill_catalog(tmp_path, "alice", include_builtin=False) == []
+
+
+def test_build_skill_catalog_mixed_formats(tmp_path: Path) -> None:
+    make_skill_dir(
+        tmp_path / "household" / "skills", "weather",
+        WEATHER_SKILL_NEW, filename="SKILL.md",
+    )
+    make_skill_dir(
+        tmp_path / "alice" / "skills", "budget",
+        MINIMAL_SKILL_MD.replace("minimal", "budget"),
+    )
+
+    catalog = build_skill_catalog(tmp_path, "alice", include_builtin=False)
+    assert len(catalog) == 2
+    names = {c.name for c in catalog}
+    assert "weather" in names
+    assert "budget" in names

@@ -431,7 +431,7 @@ wheels = [
 
 [[package]]
 name = "homeclaw"
-version = "0.3.14"
+version = "0.5.11"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -446,6 +446,7 @@ dependencies = [
     { name = "pyjwt" },
     { name = "python-multipart" },
     { name = "python-telegram-bot" },
+    { name = "pyyaml" },
     { name = "telegramify-markdown" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -488,6 +489,7 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "python-multipart", specifier = ">=0.0.22" },
     { name = "python-telegram-bot", specifier = ">=21.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "qrcode", extras = ["pil"], marker = "extra == 'whatsapp'", specifier = ">=7.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8" },
     { name = "telegramify-markdown", specifier = ">=1.1.1" },

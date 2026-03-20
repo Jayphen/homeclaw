@@ -1361,19 +1361,23 @@ def register_builtin_tools(
     # --- Skill tools ---
 
     async def skill_list(*, person: str, **_: Any) -> dict[str, Any]:
-        from homeclaw.plugins.skills.loader import discover_skills, parse_skill_markdown
+        from homeclaw.plugins.skills.loader import _find_skill_file, discover_skills, parse_skill_file
 
         locations = discover_skills(workspaces, person)
         skills = []
         for loc in locations:
             try:
-                defn = parse_skill_markdown((loc.skill_dir / "skill.md").read_text())
+                skill_file = _find_skill_file(loc.skill_dir)
+                if not skill_file:
+                    continue
+                defn = parse_skill_file((loc.skill_dir / skill_file).read_text())
                 skills.append({
                     "name": loc.name,
                     "scope": loc.scope,
                     "description": defn.description,
                     "tool_count": len(defn.tools),
                     "allowed_domains": defn.allowed_domains,
+                    "format": "SKILL.md" if skill_file == "SKILL.md" else "legacy",
                 })
             except Exception:
                 skills.append({"name": loc.name, "scope": loc.scope, "error": "failed to parse"})
@@ -1413,7 +1417,7 @@ def register_builtin_tools(
     ) -> dict[str, Any]:
         from homeclaw.plugins.skills.loader import (
             load_skill,
-            render_skill_markdown,
+            render_skill_md,
             slugify_skill_name,
         )
         from homeclaw.plugins.registry import PluginType
@@ -1435,15 +1439,14 @@ def register_builtin_tools(
         data_dir = skill_dir / "data"
         data_dir.mkdir(exist_ok=True)
 
-        # Write skill.md (definition — lives in skill root, not data/)
-        skill_md = render_skill_markdown(
+        # Write SKILL.md (new YAML frontmatter format)
+        skill_md = render_skill_md(
             name=slug,
             description=description,
-            allowed_domains=allowed_domains or [],
+            allowed_domains=allowed_domains or None,
             instructions=instructions,
-            tools=tools or [],
         )
-        (skill_dir / "skill.md").write_text(skill_md)
+        (skill_dir / "SKILL.md").write_text(skill_md)
 
         seeded: list[str] = []
 
@@ -1701,44 +1704,32 @@ def register_builtin_tools(
     ) -> dict[str, Any]:
         from homeclaw.plugins.registry import PluginType
         from homeclaw.plugins.skills.loader import (
+            _find_skill_file,
             load_skill,
-            parse_skill_markdown,
-            render_skill_markdown,
+            parse_skill_file,
+            render_skill_md,
         )
 
         skill_dir = workspaces / safe_slug(owner) / "skills" / safe_slug(name)
-        skill_md_path = skill_dir / "skill.md"
-        if not skill_md_path.exists():
+        skill_file = _find_skill_file(skill_dir)
+        if not skill_file:
             return {"error": f"Skill '{name}' not found under '{owner}'"}
 
-        defn = parse_skill_markdown(skill_md_path.read_text())
+        skill_md_path = skill_dir / skill_file
+        defn = parse_skill_file(skill_md_path.read_text())
 
         new_desc = description if description is not None else defn.description
         new_instr = instructions if instructions is not None else defn.instructions
 
-        updated_md = render_skill_markdown(
+        # Always write back as SKILL.md (new format)
+        updated_md = render_skill_md(
             name=defn.name,
             description=new_desc,
-            allowed_domains=defn.allowed_domains,
+            allowed_domains=defn.allowed_domains if defn.allowed_domains else None,
             instructions=new_instr,
-            tools=[
-                {
-                    "name": t.name,
-                    "description": t.description,
-                    "params": [
-                        {
-                            "name": p.name,
-                            "type": p.type,
-                            "required": p.required,
-                            "description": p.description,
-                        }
-                        for p in t.parameters
-                    ],
-                }
-                for t in defn.tools
-            ],
         )
-        skill_md_path.write_text(updated_md)
+        new_path = skill_dir / "SKILL.md"
+        new_path.write_text(updated_md)
 
         # Re-register so the plugin picks up the new instructions
         loaded = False
@@ -1904,6 +1895,158 @@ def register_builtin_tools(
             },
         ),
         skill_migrate,
+    )
+
+    # Track activated skills per session to avoid re-injecting
+    _activated_skills: set[str] = set()
+
+    async def read_skill(
+        *,
+        person: str,
+        name: str,
+        **_: Any,
+    ) -> dict[str, Any]:
+        from homeclaw.plugins.skills.loader import (
+            _find_skill_file,
+            discover_skills,
+            parse_skill_file,
+        )
+
+        locations = discover_skills(workspaces, person)
+        loc = next((sk for sk in locations if sk.name == name), None)
+        if loc is None:
+            return {"error": f"Skill '{name}' not found"}
+
+        skill_file = _find_skill_file(loc.skill_dir)
+        if not skill_file:
+            return {"error": f"No SKILL.md or skill.md in '{name}'"}
+
+        content = (loc.skill_dir / skill_file).read_text()
+        defn = parse_skill_file(content)
+
+        # List available resource directories
+        resources: dict[str, list[str]] = {}
+        for subdir in ("scripts", "references", "assets", "data"):
+            dir_path = loc.skill_dir / subdir
+            if dir_path.is_dir():
+                files = sorted(f.name for f in dir_path.iterdir() if f.is_file())
+                if files:
+                    resources[subdir] = files
+
+        _activated_skills.add(name)
+
+        return {
+            "name": defn.name,
+            "description": defn.description,
+            "instructions": defn.instructions,
+            "skill_dir": str(loc.skill_dir),
+            "scope": loc.scope,
+            "resources": resources,
+            "already_loaded": name in _activated_skills,
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="read_skill",
+            description=(
+                "Load a skill's full instructions and see its available resources. "
+                "Call this before using a skill's tools (data_read, data_write, "
+                "http_call, run_skill_script). The skill catalog in your context "
+                "lists available skills."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member name"},
+                    "name": {
+                        "type": "string",
+                        "description": "Skill name (as shown in the skill catalog)",
+                    },
+                },
+                "required": ["person", "name"],
+            },
+        ),
+        read_skill,
+    )
+
+    async def run_skill_script(
+        *,
+        person: str,
+        name: str,
+        script: str,
+        args: list[str] | None = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        import asyncio
+
+        from homeclaw.plugins.skills.loader import discover_skills
+
+        locations = discover_skills(workspaces, person)
+        loc = next((sk for sk in locations if sk.name == name), None)
+        if loc is None:
+            return {"error": f"Skill '{name}' not found"}
+
+        scripts_dir = loc.skill_dir / "scripts"
+        if not scripts_dir.is_dir():
+            return {"error": f"Skill '{name}' has no scripts/ directory"}
+
+        # Resolve and validate path (prevent traversal)
+        script_path = (scripts_dir / script).resolve()
+        if not script_path.is_relative_to(scripts_dir.resolve()):
+            return {"error": f"Invalid script path: {script}"}
+        if not script_path.is_file():
+            return {"error": f"Script not found: {script}"}
+
+        cmd = [str(script_path)] + (args or [])
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(loc.skill_dir),
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+            return {
+                "exit_code": proc.returncode,
+                "stdout": stdout.decode(errors="replace")[:50_000],
+                "stderr": stderr.decode(errors="replace")[:10_000],
+            }
+        except TimeoutError:
+            proc.kill()  # type: ignore[union-attr]
+            return {"error": "Script timed out after 30 seconds"}
+        except Exception as exc:
+            return {"error": f"Failed to run script: {exc}"}
+
+    registry.register(
+        ToolDefinition(
+            name="run_skill_script",
+            description=(
+                "Run a script bundled with a skill. Scripts live in the skill's "
+                "scripts/ directory and are listed when you read_skill. Only "
+                "pre-installed scripts can be run — no arbitrary shell commands."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member name"},
+                    "name": {
+                        "type": "string",
+                        "description": "Skill name",
+                    },
+                    "script": {
+                        "type": "string",
+                        "description": "Script filename (relative to scripts/)",
+                    },
+                    "args": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Arguments to pass to the script",
+                    },
+                },
+                "required": ["person", "name", "script"],
+            },
+        ),
+        run_skill_script,
     )
 
     # --- Decision tools ---

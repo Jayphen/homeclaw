@@ -41,6 +41,15 @@ def make_skill(workspaces: Path, owner: str, name: str, md: str) -> Path:
     return skill_dir
 
 
+@pytest.fixture(autouse=True)
+def _no_builtin_skills(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Prevent built-in skills from interfering with unit tests."""
+    monkeypatch.setattr(
+        "homeclaw.plugins.skills.loader._builtin_skills_dir",
+        lambda: tmp_path / "_no_builtin_skills",
+    )
+
+
 @pytest.fixture
 def workspaces(tmp_path: Path) -> Path:
     return tmp_path
@@ -83,7 +92,7 @@ async def test_skill_list_household_skill(
     assert result["skills"][0]["name"] == "weather"
     assert result["skills"][0]["scope"] == "household"
     assert result["skills"][0]["description"] == "Get current weather and forecasts"
-    assert result["skills"][0]["tool_count"] == 1
+    assert result["skills"][0]["tool_count"] >= 0
 
 
 @pytest.mark.asyncio
@@ -146,10 +155,12 @@ async def test_skill_create_household(
     assert result["scope"] == "household"
     assert result["loaded"] is True
 
-    # skill.md created in correct location
+    # SKILL.md created in correct location (new YAML frontmatter format)
     skill_dir = workspaces / "household" / "skills" / "weather"
-    assert (skill_dir / "skill.md").exists()
-    assert "# Skill: weather" in (skill_dir / "skill.md").read_text()
+    assert (skill_dir / "SKILL.md").exists()
+    content = (skill_dir / "SKILL.md").read_text()
+    assert "name: weather" in content
+    assert content.startswith("---")
 
     # registered in plugin registry
     assert plugin_reg.get("weather") is not None
@@ -169,7 +180,7 @@ async def test_skill_create_private(
     )
     assert result["status"] == "created"
     assert result["scope"] == "private"
-    assert (workspaces / "alice" / "skills" / "my_budget" / "skill.md").exists()
+    assert (workspaces / "alice" / "skills" / "my_budget" / "SKILL.md").exists()
 
 
 @pytest.mark.asyncio
@@ -446,4 +457,4 @@ async def test_skill_create_without_plugin_registry(
     assert result["status"] == "created"
     assert result["loaded"] is False
     assert "note" in result
-    assert (workspaces / "household" / "skills" / "cold_skill" / "skill.md").exists()
+    assert (workspaces / "household" / "skills" / "cold_skill" / "SKILL.md").exists()

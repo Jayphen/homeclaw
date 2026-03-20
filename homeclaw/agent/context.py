@@ -145,13 +145,18 @@ async def build_context(
             parts.append("Your memory topics:")
             parts.extend(person_topics)
 
-    # --- Priority 2d: scheduled routines ---
+    # --- Priority 2d: skill catalog ---
+    skill_catalog = _build_skill_catalog(workspaces, person)
+    if skill_catalog:
+        parts.extend(skill_catalog)
+
+    # --- Priority 2e: scheduled routines ---
     routines = _build_routines_summary(workspaces)
     if routines:
         parts.append("Household routines:")
         parts.extend(routines)
 
-    # --- Priority 2e: recent decisions ---
+    # --- Priority 2f: recent decisions ---
     decisions = _build_decisions_summary(workspaces, person, cfg, shared_only)
     if decisions:
         parts.append("Settled decisions (do not re-litigate):")
@@ -230,6 +235,35 @@ def _build_person_memory_summary(workspaces: Path, person: str) -> list[str]:
     if not topics:
         return []
     return [f"  - {topic}" for topic in topics]
+
+
+def _build_skill_catalog(workspaces: Path, person: str) -> list[str]:
+    """Build a catalog of available skills for system prompt injection.
+
+    Returns a compact list of skill name + description so the LLM knows
+    which skills exist and can call ``read_skill`` to load them on demand.
+    """
+    from homeclaw.plugins.skills.loader import build_skill_catalog
+
+    catalog = build_skill_catalog(workspaces, person)
+    if not catalog:
+        return []
+
+    lines: list[str] = [
+        "Available skills (call read_skill to load instructions before using):",
+    ]
+    for entry in catalog:
+        scope_tag = f" [{entry.scope}]" if entry.scope != "household" else ""
+        extras: list[str] = []
+        if entry.has_scripts:
+            extras.append("scripts")
+        if entry.has_references:
+            extras.append("references")
+        if entry.has_data:
+            extras.append("data")
+        extra_str = f" ({', '.join(extras)})" if extras else ""
+        lines.append(f"  - {entry.name}: {entry.description}{scope_tag}{extra_str}")
+    return lines
 
 
 def _build_routines_summary(workspaces: Path) -> list[str]:
