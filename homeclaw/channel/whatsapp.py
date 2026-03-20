@@ -257,8 +257,8 @@ class WhatsAppChannel:
         person = self._resolve_person(phone)
         if person is None:
             await self._client.reply_message(
-                "I don't know who you are yet. Ask an admin to register "
-                "you with: /register_member <name> <phone>",
+                f"I don't know who you are yet. Ask an admin to register "
+                f"you with: /register_member <yourname> {phone}",
                 ev,
             )
             return
