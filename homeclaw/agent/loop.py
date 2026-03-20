@@ -266,13 +266,10 @@ class AgentLoop:
 
         _save_history(self._workspaces, history_key, history)
 
-        # Append group chat exchanges to a markdown log so memsearch
-        # can index them — this lets members reference group conversations
-        # from their private DMs via semantic recall.
-        if channel and channel.startswith("group-") and response and response.content:
-            _append_chat_log(
-                self._workspaces, channel, text_for_context, response.content,
-            )
+        # Log group chat messages so memsearch can index them — lets
+        # members reference group conversations from private DMs.
+        if channel and channel.startswith("group-"):
+            _append_chat_log(self._workspaces, channel, text_for_context)
 
         return response.content if response else ""
 
@@ -320,17 +317,22 @@ def _append_chat_log(
     workspaces: Path,
     channel: str,
     user_text: str,
-    assistant_text: str,
 ) -> None:
-    """Append a group chat exchange to a markdown log for memsearch indexing."""
+    """Append a group chat message to a daily log for memsearch indexing.
+
+    Only logs user messages (not homeclaw's responses) to keep the log
+    concise.  Rotated daily so individual files stay small.
+    """
     from datetime import datetime, timezone
 
     channel_dir = workspaces / "household" / "channels" / channel
     channel_dir.mkdir(parents=True, exist_ok=True)
-    log_path = channel_dir / "chat.md"
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
-    entry = f"- [{timestamp}] {user_text}\n- [{timestamp}] homeclaw: {assistant_text}\n"
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    log_path = channel_dir / f"{today}.md"
+
+    timestamp = datetime.now(timezone.utc).strftime("%H:%M")
+    entry = f"- [{timestamp}] {user_text}\n"
 
     with open(log_path, "a") as f:
         f.write(entry)
