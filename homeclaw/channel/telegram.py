@@ -2,7 +2,6 @@
 
 import asyncio
 import base64
-import json
 import logging
 from collections.abc import Callable
 from pathlib import Path
@@ -14,26 +13,16 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from homeclaw.agent.loop import AgentLoop
 from homeclaw.channel.dispatcher import ChannelDispatcher
-from homeclaw.contacts.store import get_contact, save_contact
+from homeclaw.channel.registration import (
+    load_user_map,
+    register_member,
+    register_self,
+)
 
 logger = logging.getLogger(__name__)
 
 # Maps Telegram user IDs to household member names.
-# Stored in workspaces/household/telegram_users.json as {"<telegram_id>": "member_name"}.
-_USER_MAP_FILE = "household/telegram_users.json"
-
-
-def _load_user_map(workspaces: Path) -> dict[str, str]:
-    path = workspaces / _USER_MAP_FILE
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text())  # type: ignore[no-any-return]
-
-
-def _save_user_map(workspaces: Path, user_map: dict[str, str]) -> None:
-    path = workspaces / _USER_MAP_FILE
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(user_map, indent=2) + "\n")
+_USER_MAP_FILE = "telegram_users.json"
 
 
 class TelegramChannel:
@@ -55,7 +44,7 @@ class TelegramChannel:
         self._on_tool_call = on_tool_call
         self._on_scheduler_start = on_scheduler_start
         self._allowed_user_ids = allowed_user_ids
-        self._user_map = _load_user_map(workspaces)
+        self._user_map = load_user_map(workspaces, _USER_MAP_FILE)
         self._user_map_lock = asyncio.Lock()
         self._dispatcher = dispatcher
 
@@ -103,33 +92,54 @@ class TelegramChannel:
             await update.message.reply_text("Usage: /register <name>")
             return
 
-        name = parts[1].strip().lower()
         tid = str(update.effective_user.id)
-
-        async with self._user_map_lock:
-            self._user_map[tid] = name
-            _save_user_map(self._workspaces, self._user_map)
-
-            # Ensure the member workspace directory exists before the lock
-            # releases, so message handlers won't write to a missing dir.
-            member_dir = self._workspaces / name
-            member_dir.mkdir(parents=True, exist_ok=True)
-
-            # Auto-link to existing contact record if one matches
-            contact = get_contact(self._workspaces, name)
-            if contact and contact.member != name:
-                contact.member = name
-                save_contact(self._workspaces, contact)
-                logger.info("Linked contact '%s' to member workspace '%s'", contact.id, name)
-
-        if self._dispatcher:
-            self._dispatcher.set_preference_if_unset(name, "telegram")
-
-        await update.message.reply_text(f"Registered as '{name}'. You can now chat with me!")
-        logger.info(
-            "Registered Telegram user %s (id=%s) as '%s'",
-            update.effective_user.username, tid, name,
+        msg = await register_self(
+            identifier=tid,
+            name=parts[1],
+            workspaces=self._workspaces,
+            map_file=_USER_MAP_FILE,
+            user_map=self._user_map,
+            lock=self._user_map_lock,
+            channel_name="telegram",
+            dispatcher=self._dispatcher,
         )
+        await update.message.reply_text(msg)
+
+    async def _handle_register_member(
+        self, update: Update, _context: Any,
+    ) -> None:
+        """Handle /register_member <name> <telegram_id> — admin-only."""
+        if update.message is None:
+            return
+
+        text = (update.message.text or "").strip()
+        parts = text.split()
+        if len(parts) < 3:
+            await update.message.reply_text(
+                "Usage: /register_member <name> <telegram_user_id>\n"
+                "Example: /register_member alice 123456789"
+            )
+            return
+
+        tid = str(update.effective_user.id) if update.effective_user else ""
+        ok, msg = await register_member(
+            admin_identifier=tid,
+            target_identifier=parts[2].strip(),
+            name=parts[1],
+            workspaces=self._workspaces,
+            map_file=_USER_MAP_FILE,
+            user_map=self._user_map,
+            lock=self._user_map_lock,
+            channel_name="telegram",
+            dispatcher=self._dispatcher,
+            allowed_set=(
+                {str(x) for x in self._allowed_user_ids}
+                if self._allowed_user_ids is not None else None
+            ),
+        )
+        if ok and self._allowed_user_ids is not None:
+            self._allowed_user_ids.add(int(parts[2].strip()))
+        await update.message.reply_text(msg)
 
     def _is_group_chat(self, update: Update) -> bool:
         """Return True if the message is from a group or supergroup."""
@@ -317,6 +327,7 @@ class TelegramChannel:
         )
         app.add_handler(CommandHandler("start", self._handle_start))
         app.add_handler(CommandHandler("register", self._handle_register))
+        app.add_handler(CommandHandler("register_member", self._handle_register_member))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
         app.add_handler(MessageHandler(filters.PHOTO, self._handle_photo))
         return app

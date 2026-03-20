@@ -8,33 +8,22 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
-import json
 import logging
 from pathlib import Path
 from typing import Any
 
 from homeclaw.agent.loop import AgentLoop
 from homeclaw.channel.dispatcher import ChannelDispatcher
-from homeclaw.contacts.store import get_contact, save_contact
+from homeclaw.channel.registration import (
+    load_user_map,
+    register_member,
+    register_self,
+)
 
 logger = logging.getLogger(__name__)
 
 # Maps phone numbers to household member names.
-# Stored as {"<phone>": "member_name"} in workspaces/household/whatsapp_users.json.
-_USER_MAP_FILE = "household/whatsapp_users.json"
-
-
-def _load_user_map(workspaces: Path) -> dict[str, str]:
-    path = workspaces / _USER_MAP_FILE
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text())  # type: ignore[no-any-return]
-
-
-def _save_user_map(workspaces: Path, user_map: dict[str, str]) -> None:
-    path = workspaces / _USER_MAP_FILE
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(user_map, indent=2) + "\n")
+_USER_MAP_FILE = "whatsapp_users.json"
 
 
 def _extract_text(ev: Any) -> str | None:
@@ -84,7 +73,7 @@ class WhatsAppChannel:
         self._loop = loop
         self._workspaces = workspaces
         self._allowed_phones = allowed_phones
-        self._user_map = _load_user_map(workspaces)
+        self._user_map = load_user_map(workspaces, _USER_MAP_FILE)
         self._user_map_lock = asyncio.Lock()
 
         db_dir = workspaces / "household"
@@ -209,37 +198,25 @@ class WhatsAppChannel:
             return
         text = text.strip()
 
+        if text.startswith("/register_member "):
+            await self._handle_register_member(phone, text, ev)
+            return
+
         if text.startswith("/register "):
             await self._handle_register(phone, text, ev)
             return
 
-        is_group: bool = ev.Info.MessageSource.IsGroup
-        chat: Any = ev.Info.MessageSource.Chat
-
         person = self._resolve_person(phone)
-
-        # In groups, auto-register unknown senders using their WhatsApp
-        # display name so they don't have to /register in a DM first.
-        if person is None and is_group:
-            push_name: str = getattr(ev.Info, "Pushname", "") or ""
-            if push_name.strip():
-                name = push_name.strip().split()[0].lower()
-                async with self._user_map_lock:
-                    self._user_map[phone] = name
-                    _save_user_map(self._workspaces, self._user_map)
-                    (self._workspaces / name).mkdir(parents=True, exist_ok=True)
-                person = name
-                logger.info(
-                    "Auto-registered group member +%s as '%s' from push name",
-                    phone, name,
-                )
-
         if person is None:
             await self._client.reply_message(
-                "I don't know who you are. Send /register <name> first.", ev
+                "I don't know who you are yet. Ask an admin to register "
+                "you with: /register_member <name> <phone>",
+                ev,
             )
             return
 
+        is_group: bool = ev.Info.MessageSource.IsGroup
+        chat: Any = ev.Info.MessageSource.Chat
         if is_group:
             user_text = f"[{person}] {text}"
             channel: str | None = f"group-{chat.User}"
@@ -311,28 +288,47 @@ class WhatsAppChannel:
             await self._client.reply_message("Usage: /register <name>", ev)
             return
 
-        name = parts[1].strip().lower()
-
-        async with self._user_map_lock:
-            self._user_map[phone] = name
-            _save_user_map(self._workspaces, self._user_map)
-
-            member_dir = self._workspaces / name
-            member_dir.mkdir(parents=True, exist_ok=True)
-
-            contact = get_contact(self._workspaces, name)
-            if contact and contact.member != name:
-                contact.member = name
-                save_contact(self._workspaces, contact)
-                logger.info("Linked contact '%s' to member workspace '%s'", contact.id, name)
-
-        if self._dispatcher:
-            self._dispatcher.set_preference_if_unset(name, "whatsapp")
-
-        await self._client.reply_message(
-            f"Registered as '{name}'. You can now chat with me!", ev
+        msg = await register_self(
+            identifier=phone,
+            name=parts[1],
+            workspaces=self._workspaces,
+            map_file=_USER_MAP_FILE,
+            user_map=self._user_map,
+            lock=self._user_map_lock,
+            channel_name="whatsapp",
+            dispatcher=self._dispatcher,
         )
-        logger.info("Registered WhatsApp user +%s as '%s'", phone, name)
+        await self._client.reply_message(msg, ev)
+
+    async def _handle_register_member(
+        self, phone: str, text: str, ev: Any,
+    ) -> None:
+        """Handle /register_member <name> <phone> — admin-only."""
+        parts = text.split()
+        if len(parts) < 3:
+            await self._client.reply_message(
+                "Usage: /register_member <name> <phone>\n"
+                "Example: /register_member alice 61412345678",
+                ev,
+            )
+            return
+
+        target_phone = parts[2].strip().translate(
+            str.maketrans("", "", "+- ()")
+        )
+        ok, msg = await register_member(
+            admin_identifier=phone,
+            target_identifier=target_phone,
+            name=parts[1],
+            workspaces=self._workspaces,
+            map_file=_USER_MAP_FILE,
+            user_map=self._user_map,
+            lock=self._user_map_lock,
+            channel_name="whatsapp",
+            dispatcher=self._dispatcher,
+            allowed_set=self._allowed_phones,
+        )
+        await self._client.reply_message(msg, ev)
 
     async def _run_and_reply(
         self,
