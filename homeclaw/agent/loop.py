@@ -265,6 +265,15 @@ class AgentLoop:
             )
 
         _save_history(self._workspaces, history_key, history)
+
+        # Append group chat exchanges to a markdown log so memsearch
+        # can index them — this lets members reference group conversations
+        # from their private DMs via semantic recall.
+        if channel and channel.startswith("group-") and response and response.content:
+            _append_chat_log(
+                self._workspaces, channel, text_for_context, response.content,
+            )
+
         return response.content if response else ""
 
     async def _dispatch_tools(
@@ -305,6 +314,26 @@ class AgentLoop:
                 logger.exception("Tool %s failed", tc.name)
                 results.append({"error": f"Tool {tc.name} failed: {e}"})
         return results
+
+
+def _append_chat_log(
+    workspaces: Path,
+    channel: str,
+    user_text: str,
+    assistant_text: str,
+) -> None:
+    """Append a group chat exchange to a markdown log for memsearch indexing."""
+    from datetime import datetime, timezone
+
+    channel_dir = workspaces / "household" / "channels" / channel
+    channel_dir.mkdir(parents=True, exist_ok=True)
+    log_path = channel_dir / "chat.md"
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+    entry = f"- [{timestamp}] {user_text}\n- [{timestamp}] homeclaw: {assistant_text}\n"
+
+    with open(log_path, "a") as f:
+        f.write(entry)
 
 
 def _history_path(workspaces: Path, key: str) -> Path:
