@@ -253,6 +253,7 @@ def _parse_auth(request: Request) -> tuple[str | None, bool]:
     # Member auth: "member:password"
     if ":" in token:
         member, password = token.split(":", 1)
+        member = member.lower()
         expected = config.member_passwords.get(member)
         if expected is not None and verify_password(password, expected):
             return member, member in config.admin_members

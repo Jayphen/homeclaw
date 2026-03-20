@@ -215,6 +215,7 @@ async def set_member_password(
     to admin.
     """
     config = get_config()
+    body.member = body.member.lower()
     bootstrapping = not config.admin_members
 
     if not bootstrapping:
@@ -269,6 +270,7 @@ async def set_member_admin(
 ) -> dict[str, Any]:
     """Grant or revoke admin privileges for a member. Admin only."""
     config = get_config()
+    body.member = body.member.lower()
     workspaces = config.workspaces.resolve()
     members = list_member_workspaces(workspaces)
 
