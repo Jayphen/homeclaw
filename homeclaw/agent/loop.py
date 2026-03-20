@@ -292,10 +292,15 @@ class AgentLoop:
         return results
 
 
-def _history_path(workspaces: Path, person: str) -> Path:
-    person_dir = workspaces / person
-    person_dir.mkdir(parents=True, exist_ok=True)
-    return person_dir / "history.jsonl"
+def _history_path(workspaces: Path, key: str) -> Path:
+    # Channel/group histories go under household/channels/ to avoid
+    # creating top-level directories that look like member workspaces.
+    if key.startswith("group-"):
+        hist_dir = workspaces / "household" / "channels" / key
+    else:
+        hist_dir = workspaces / key
+    hist_dir.mkdir(parents=True, exist_ok=True)
+    return hist_dir / "history.jsonl"
 
 
 def _load_history(workspaces: Path, person: str, max_messages: int = 50) -> list[Message]:

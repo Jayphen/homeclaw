@@ -215,7 +215,10 @@ def list_member_workspaces(workspaces: Path) -> list[str]:
     return sorted(
         d.name
         for d in ws.iterdir()
-        if d.is_dir() and d.name not in skip and not d.name.startswith(".")
+        if d.is_dir()
+        and d.name not in skip
+        and not d.name.startswith(".")
+        and not d.name.startswith("group-")
     )
 
 
