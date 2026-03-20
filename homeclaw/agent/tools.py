@@ -175,7 +175,7 @@ def register_builtin_tools(
         if contact is None:
             return {"error": f"Contact '{contact_id}' not found"}
 
-        notes_dir = workspaces / "household" / "contacts" / "notes"
+        notes_dir = workspaces / HOUSEHOLD_WORKSPACE / "contacts" / "notes"
         notes_dir.mkdir(parents=True, exist_ok=True)
         safe_id = safe_slug(contact.id)
         path = notes_dir / f"{safe_id}.md"
@@ -801,7 +801,7 @@ def register_builtin_tools(
         if bookmark is None:
             return {"error": f"Bookmark '{bookmark_id}' not found"}
 
-        notes_dir = workspaces / "household" / "bookmarks" / "notes"
+        notes_dir = workspaces / HOUSEHOLD_WORKSPACE / "bookmarks" / "notes"
         notes_dir.mkdir(parents=True, exist_ok=True)
         safe_id = safe_slug(bookmark_id)
         path = notes_dir / f"{safe_id}.md"
@@ -845,7 +845,7 @@ def register_builtin_tools(
         *, bookmark_id: str, note_index: int, content: str, **_: Any
     ) -> dict[str, Any]:
         """Edit an existing note on a bookmark by its 1-based index."""
-        notes_dir = workspaces / "household" / "bookmarks" / "notes"
+        notes_dir = workspaces / HOUSEHOLD_WORKSPACE / "bookmarks" / "notes"
         safe_id = safe_slug(bookmark_id)
         path = notes_dir / f"{safe_id}.md"
         if not path.exists():
@@ -911,7 +911,7 @@ def register_builtin_tools(
         *, bookmark_id: str, note_index: int, **_: Any
     ) -> dict[str, Any]:
         """Delete a note from a bookmark by its 1-based index."""
-        notes_dir = workspaces / "household" / "bookmarks" / "notes"
+        notes_dir = workspaces / HOUSEHOLD_WORKSPACE / "bookmarks" / "notes"
         safe_id = safe_slug(bookmark_id)
         path = notes_dir / f"{safe_id}.md"
         if not path.exists():
@@ -1445,7 +1445,7 @@ def register_builtin_tools(
 
             content = memory_read_topic(workspaces, person, topic)
             if content is None:
-                content = memory_read_topic(workspaces, "household", topic)
+                content = memory_read_topic(workspaces, HOUSEHOLD_WORKSPACE, topic)
             if content is not None:
                 dest = data_dir / f"{topic}.md"
                 dest.write_text(content)

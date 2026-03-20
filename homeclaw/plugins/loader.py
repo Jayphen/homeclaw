@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from homeclaw.plugins.interface import Plugin as PluginProtocol
-from homeclaw.plugins.registry import PluginEntry, PluginRegistry, PluginType
+from homeclaw.plugins.registry import PluginEntry, PluginRegistry, PluginStatus, PluginType
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +145,7 @@ def load_all_plugins(
         except Exception:
             logger.exception("Skipping plugin '%s' — failed to register", name)
 
-    active = sum(1 for e in entries if e.status.value == "active")
+    active = sum(1 for e in entries if e.status == PluginStatus.ACTIVE)
     logger.info(
         "Plugin loading complete: %d discovered, %d active, %d disabled",
         len(entries), active, len(entries) - active,

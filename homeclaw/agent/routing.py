@@ -48,9 +48,11 @@ class RoutingConfig(BaseSettings):
 # Tools that require reasoning to synthesize results — keep Sonnet.
 _REASONING_TOOLS = frozenset({"web_read", "web_search"})
 
-# Tools that write to memory/household state — Haiku is fine for follow-up.
-_MEMORY_WRITE_TOOLS = frozenset({
-    "memory_update", "household_share", "note_save",
+# Tools that do simple writes — Haiku is fine for the follow-up summary.
+_SIMPLE_WRITE_TOOLS = frozenset({
+    "memory_save", "memory_read", "household_share", "note_save",
+    "reminder_add", "reminder_complete", "reminder_delete",
+    "bookmark_save", "decision_log", "interaction_log",
 })
 
 
@@ -63,7 +65,7 @@ def classify_tool_round(tool_names: list[str]) -> CallType:
     names = set(tool_names)
     if names & _REASONING_TOOLS:
         return CallType.CONVERSATION
-    if names and names <= _MEMORY_WRITE_TOOLS:
+    if names and names <= _SIMPLE_WRITE_TOOLS:
         return CallType.MEMORY_WRITE
     return CallType.TOOL_ONLY
 

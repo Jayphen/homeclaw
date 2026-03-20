@@ -1,29 +1,6 @@
 <script lang="ts">
   import { api, getToken, setToken } from "$lib/api";
-
-  interface SetupStatus {
-    version?: string;
-    provider_configured: boolean;
-    provider: string | null;
-    has_password: boolean;
-    model: string;
-    anthropic_api_key: string | null;
-    openai_api_key: string | null;
-    openai_base_url: string | null;
-    telegram_configured: boolean;
-    telegram_allowed_users: string | null;
-    whatsapp_configured: boolean;
-    whatsapp_connected: boolean;
-    whatsapp_phone_number: string | null;
-    whatsapp_allowed_users: string | null;
-    jina_api_key: string | null;
-    ha_configured: boolean;
-    conversation_model: string;
-    routine_model: string;
-    members?: string[];
-    members_with_passwords?: string[];
-    admin_members?: string[];
-  }
+  import type { SetupStatus } from "$lib/types";
 
   let setup: SetupStatus | null = $state(null);
   let pageState: "loading" | "ready" | "error" = $state("loading");

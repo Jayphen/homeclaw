@@ -1,18 +1,6 @@
 <script lang="ts">
-  interface SetupStatus {
-    provider_configured: boolean;
-    has_password: boolean;
-    needs_setup_token: boolean;
-    model: string;
-    anthropic_api_key: string | null;
-    openai_api_key: string | null;
-    openai_base_url: string | null;
-    telegram_configured: boolean;
-    telegram_allowed_users: string | null;
-    ha_configured: boolean;
-  }
-
   import { setToken } from "$lib/api";
+  import type { SetupStatus } from "$lib/types";
 
   let { oncomplete }: { oncomplete: () => void } = $props();
 
