@@ -442,10 +442,11 @@ class WhatsAppChannel:
 
     async def _send_to_group(self, group_id: str, text: str) -> dict[str, Any]:
         """Send a message to a WhatsApp group chat."""
-        from neonize.utils.jid import JID  # type: ignore[import-untyped]
+        from neonize.utils.jid import build_jid  # type: ignore[import-untyped]
 
         try:
-            gid = JID(User=group_id, Server="g.us")
+            # build_jid with a @g.us suffix creates a proper group JID
+            gid = build_jid(group_id, server="g.us")
             formatted = _md_to_whatsapp(text)
             for chunk in _split_message(formatted):
                 await self._client.send_message(gid, chunk)
