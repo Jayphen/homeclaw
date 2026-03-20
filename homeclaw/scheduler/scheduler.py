@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +20,8 @@ from homeclaw.plugins.interface import RoutineDefinition
 from homeclaw.scheduler.routines import parse_routines_md
 
 logger = logging.getLogger(__name__)
+
+_LAST_RUN_FILE = "household/.routine_last_run.json"
 
 
 class Scheduler:
@@ -35,9 +40,28 @@ class Scheduler:
             return CronTrigger(**trigger_kwargs)
         return IntervalTrigger(**trigger_kwargs)
 
-    def _make_routine_func(self, description: str) -> Any:
+    def _load_last_runs(self) -> dict[str, str]:
+        """Load last-run timestamps from disk."""
+        path = self._workspaces / _LAST_RUN_FILE
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return {}
+
+    def _save_last_run(self, job_id: str) -> None:
+        """Record that a routine just ran."""
+        path = self._workspaces / _LAST_RUN_FILE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data = self._load_last_runs()
+        data[job_id] = datetime.now(UTC).isoformat()
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    def _make_routine_func(self, job_id: str, description: str) -> Any:
         """Create the async callable for a routine job."""
         loop = self._loop
+        scheduler = self
 
         async def _run_routine() -> None:
             logger.info("Routine fired: %s", description)
@@ -47,6 +71,7 @@ class Scheduler:
                     HOUSEHOLD_WORKSPACE,
                     call_type=CallType.ROUTINE,
                 )
+                scheduler._save_last_run(job_id)
             except Exception:
                 logger.exception("Routine failed: %s", description)
 
@@ -62,7 +87,7 @@ class Scheduler:
         trigger = self._make_trigger(trigger_type, trigger_kwargs)
 
         self._scheduler.add_job(
-            self._make_routine_func(description),
+            self._make_routine_func(job_id, description),
             trigger=trigger,
             id=job_id,
             name=description,
@@ -117,6 +142,45 @@ class Scheduler:
             return
         self._scheduler.start()
         logger.info("Scheduler started with %d routines", self._job_count)
+
+    async def fire_missed(self) -> int:
+        """Check for routines that should have run while the server was down.
+
+        Compares each routine's trigger against its last recorded run time.
+        If the trigger would have fired between last_run and now, queues the
+        routine to run immediately.  Returns count of missed routines fired.
+        """
+        last_runs = self._load_last_runs()
+        if not last_runs:
+            # First run ever — nothing to compare against, record current time
+            # for all jobs so the *next* restart can detect misses.
+            for job in self._scheduler.get_jobs():
+                self._save_last_run(job.id)
+            return 0
+
+        now = datetime.now(UTC)
+        fired = 0
+        for job in self._scheduler.get_jobs():
+            last_iso = last_runs.get(job.id)
+            if not last_iso:
+                # New routine added while server was up — no missed run
+                self._save_last_run(job.id)
+                continue
+            last_dt = datetime.fromisoformat(last_iso)
+            # Ask the trigger: when would you have fired after last_run?
+            next_fire = job.trigger.get_next_fire_time(None, last_dt)
+            if next_fire is not None and next_fire < now:
+                logger.info(
+                    "Missed routine detected: %s (should have fired %s)",
+                    job.name,
+                    next_fire,
+                )
+                # Fire in background so we don't block startup
+                asyncio.ensure_future(job.func())
+                fired += 1
+        if fired:
+            logger.info("Fired %d missed routine(s) on startup", fired)
+        return fired
 
     def shutdown(self) -> None:
         """Shutdown the scheduler gracefully."""

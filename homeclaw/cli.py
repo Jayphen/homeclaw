@@ -178,6 +178,7 @@ class HomeclawApp:
         """Start the scheduler. Must be called inside a running event loop."""
         if self._scheduler:
             self._scheduler.start()
+            asyncio.ensure_future(self._scheduler.fire_missed())
 
     def shutdown(self) -> None:
         """Shut down background services."""
