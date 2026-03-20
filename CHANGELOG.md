@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.0](https://github.com/Jayphen/homeclaw/compare/v0.4.5...v0.5.0) (2026-03-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* replace separate admin with member-level admin role
+
+### Features
+
+* replace separate admin with member-level admin role ([d188036](https://github.com/Jayphen/homeclaw/commit/d188036d78450a05b1ecd90d5d6325e57553e96c))
+
+
+### Bug Fixes
+
+* properly render block-level markdown in previews ([b73656e](https://github.com/Jayphen/homeclaw/commit/b73656e3497b3ec1a20b1567004e71741bb5b771))
+* setup POST auth now accepts JWT tokens (admin required) ([da8885e](https://github.com/Jayphen/homeclaw/commit/da8885e5a87ed6760e221a339f2330eafcdd20d9))
+* use full markdown rendering for note previews ([feba6b7](https://github.com/Jayphen/homeclaw/commit/feba6b77c7a6e931ce61ccc7755166228e2a7715))
+
 ## [0.4.5](https://github.com/Jayphen/homeclaw/compare/v0.4.4...v0.4.5) (2026-03-20)
 
 
