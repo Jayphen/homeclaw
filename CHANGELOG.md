@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.11](https://github.com/Jayphen/homeclaw/compare/v0.5.10...v0.5.11) (2026-03-20)
+
+
+### Bug Fixes
+
+* use build_jid for WhatsApp group JID construction ([ea89dfb](https://github.com/Jayphen/homeclaw/commit/ea89dfb293b1289fdfd21cb04e7cbb8189ac0ac6))
+
 ## [0.5.10](https://github.com/Jayphen/homeclaw/compare/v0.5.9...v0.5.10) (2026-03-20)
 
 
