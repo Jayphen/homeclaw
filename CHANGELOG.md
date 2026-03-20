@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.5](https://github.com/Jayphen/homeclaw/compare/v0.5.4...v0.5.5) (2026-03-20)
+
+
+### Features
+
+* convert markdown to WhatsApp formatting in outbound messages ([07ec239](https://github.com/Jayphen/homeclaw/commit/07ec2393a7b2c8cc2db6dfca7010dd257bdf4490))
+
+
+### Bug Fixes
+
+* address P1/P2 findings from state drift audit ([c00bc40](https://github.com/Jayphen/homeclaw/commit/c00bc40975a34740e2e70a2905d07ee802636643))
+* lowercase member names at all API entry points ([081ea9c](https://github.com/Jayphen/homeclaw/commit/081ea9c4a4255a603a538686c9c2f738cf775f6f))
+* show actual WhatsApp sender ID in registration prompt ([9feb5b5](https://github.com/Jayphen/homeclaw/commit/9feb5b5be40601a1c2d3286b9210d7b4187a886a))
+* support WhatsApp LIDs in allowed users and registration ([bfd92b8](https://github.com/Jayphen/homeclaw/commit/bfd92b8a96c440574cbb204e0fa4dc1d7e2082da))
+* use 24-hour time everywhere in the web UI ([e5fcff3](https://github.com/Jayphen/homeclaw/commit/e5fcff30e0c75ffe461c8ae442b8b14462a108b3))
+
 ## [0.5.4](https://github.com/Jayphen/homeclaw/compare/v0.5.3...v0.5.4) (2026-03-20)
 
 
