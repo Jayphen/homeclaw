@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.8](https://github.com/Jayphen/homeclaw/compare/v0.5.7...v0.5.8) (2026-03-20)
+
+
+### Features
+
+* log group chat exchanges as markdown for semantic recall ([f91b060](https://github.com/Jayphen/homeclaw/commit/f91b060b046bf4bca8bc01b3215929960e13b0a8))
+
+
+### Bug Fixes
+
+* include homeclaw responses in group chat log for full recall ([438b51f](https://github.com/Jayphen/homeclaw/commit/438b51f84bc8af017baa6ac046a538427c476ac3))
+* slim down group chat log — user messages only, daily rotation ([d59a34a](https://github.com/Jayphen/homeclaw/commit/d59a34aba17c17002ffa707c35b5334d7e216e97))
+
 ## [0.5.7](https://github.com/Jayphen/homeclaw/compare/v0.5.6...v0.5.7) (2026-03-20)
 
 
