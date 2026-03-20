@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.4](https://github.com/Jayphen/homeclaw/compare/v0.5.3...v0.5.4) (2026-03-20)
+
+
+### Features
+
+* add /register_member admin command, extract shared registration ([915a4ff](https://github.com/Jayphen/homeclaw/commit/915a4ffec3b096316d721bb765b1e44012ef826b))
+* auto-register unknown group members from WhatsApp display name ([53f206e](https://github.com/Jayphen/homeclaw/commit/53f206e818172399ece4c392f611e11cba6b1da9))
+
+
+### Bug Fixes
+
+* store group chat history under household/channels/ ([6bb8370](https://github.com/Jayphen/homeclaw/commit/6bb83705eccd1c85141ccd8708017206be013e49))
+
 ## [0.5.3](https://github.com/Jayphen/homeclaw/compare/v0.5.2...v0.5.3) (2026-03-20)
 
 
