@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/Jayphen/homeclaw/compare/v0.5.2...v0.5.3) (2026-03-20)
+
+
+### Bug Fixes
+
+* handle missing url attribute on WhatsApp image message stubs ([5731a52](https://github.com/Jayphen/homeclaw/commit/5731a526c040b295bc9310785a7da28261e62db4))
+
 ## [0.5.2](https://github.com/Jayphen/homeclaw/compare/v0.5.1...v0.5.2) (2026-03-20)
 
 
