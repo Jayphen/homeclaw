@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.1](https://github.com/Jayphen/homeclaw/compare/v0.5.0...v0.5.1) (2026-03-20)
+
+
+### Bug Fixes
+
+* admin toggle uses optimistic update to prevent scroll jump ([21956d5](https://github.com/Jayphen/homeclaw/commit/21956d5e4eef7cb817f16f77ef09c0f843ccd63f))
+* bootstrap admin — first member account auto-promotes to admin ([9e8c53d](https://github.com/Jayphen/homeclaw/commit/9e8c53dba1344dc7980520dababe5b424b3e1b57))
+* normalize WhatsApp phone numbers for flexible matching ([259c97b](https://github.com/Jayphen/homeclaw/commit/259c97be72275b09470af513da8361f388d6b263))
+
 ## [0.5.0](https://github.com/Jayphen/homeclaw/compare/v0.4.5...v0.5.0) (2026-03-20)
 
 
