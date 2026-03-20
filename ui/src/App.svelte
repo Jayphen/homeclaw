@@ -9,7 +9,7 @@
   import Plugins from "./views/Plugins.svelte";
   import Settings from "./views/Settings.svelte";
   import Setup from "./views/Setup.svelte";
-  import { api, getToken, setToken } from "$lib/api";
+  import { api, getToken, setToken, clearToken } from "$lib/api";
 
   const routes = {
     "/": Dashboard,
