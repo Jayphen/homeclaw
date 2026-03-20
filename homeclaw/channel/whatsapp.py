@@ -132,6 +132,7 @@ class WhatsAppChannel:
 
         self._connected = False
         self._last_qr: bytes | None = None  # Raw QR data for web UI
+        self._known_groups: set[str] = set()  # Group JID Users seen
 
         # Store event types so _register_handlers can reference them
         self._ConnectedEv = ConnectedEv
@@ -266,6 +267,7 @@ class WhatsAppChannel:
         is_group: bool = ev.Info.MessageSource.IsGroup
         chat: Any = ev.Info.MessageSource.Chat
         if is_group:
+            self._known_groups.add(chat.User)
             user_text = f"[{person}] {text}"
             channel: str | None = f"group-{chat.User}"
         else:
@@ -428,12 +430,31 @@ class WhatsAppChannel:
             logger.exception("Failed to send WhatsApp message to %s", person)
             return {"status": "error", "detail": str(exc)}
 
+    async def _send_to_group(self, group_id: str, text: str) -> dict[str, Any]:
+        """Send a message to a WhatsApp group chat."""
+        from neonize.utils.jid import JID  # type: ignore[import-untyped]
+
+        try:
+            gid = JID(User=group_id, Server="g.us")
+            formatted = _md_to_whatsapp(text)
+            for chunk in _split_message(formatted):
+                await self._client.send_message(gid, chunk)
+            return {"status": "sent", "channel": "whatsapp", "group": group_id}
+        except Exception as exc:
+            logger.exception("Failed to send WhatsApp group message to %s", group_id)
+            return {"status": "error", "detail": str(exc)}
+
+    def _list_groups(self) -> list[str]:
+        return list(self._known_groups)
+
     def _register_with_dispatcher(self) -> None:
         if self._dispatcher:
             self._dispatcher.register(
                 "whatsapp",
                 send=self._send_to_person,
                 has_person=self._has_person,
+                send_group=self._send_to_group,
+                group_ids=self._list_groups,
             )
 
     async def start(self) -> None:

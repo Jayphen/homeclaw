@@ -61,6 +61,9 @@ def _make_channel(
     channel._ConnectedEv = object
     channel._MessageEv = object
     channel._PairStatusEv = object
+    channel._connected = False
+    channel._last_qr = None
+    channel._known_groups = set()
     return channel
 
 

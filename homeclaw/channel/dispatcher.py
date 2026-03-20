@@ -20,18 +20,24 @@ _PREFS_FILE = "household/channel_preferences.json"
 
 # Signature: (person_name, text) → delivery result dict
 SendFn = Callable[[str, str], Awaitable[dict[str, Any]]]
+# Signature: (group_id, text) → delivery result dict
+GroupSendFn = Callable[[str, str], Awaitable[dict[str, Any]]]
 
 
 class _ChannelEntry:
-    __slots__ = ("send", "has_person")
+    __slots__ = ("send", "has_person", "send_group", "group_ids")
 
     def __init__(
         self,
         send: SendFn,
         has_person: Callable[[str], bool],
+        send_group: GroupSendFn | None = None,
+        group_ids: Callable[[], list[str]] | None = None,
     ) -> None:
         self.send = send
         self.has_person = has_person
+        self.send_group = send_group
+        self.group_ids = group_ids
 
 
 class ChannelDispatcher:
@@ -48,9 +54,14 @@ class ChannelDispatcher:
         name: str,
         send: SendFn,
         has_person: Callable[[str], bool],
+        send_group: GroupSendFn | None = None,
+        group_ids: Callable[[], list[str]] | None = None,
     ) -> None:
         """Register a channel adapter for outbound delivery."""
-        self._channels[name] = _ChannelEntry(send=send, has_person=has_person)
+        self._channels[name] = _ChannelEntry(
+            send=send, has_person=has_person,
+            send_group=send_group, group_ids=group_ids,
+        )
         logger.info("Channel dispatcher: registered '%s'", name)
 
     def unregister(self, name: str) -> None:
@@ -116,3 +127,32 @@ class ChannelDispatcher:
             "detail": f"No channel has '{person}' registered. "
             "They need to /register on Telegram or WhatsApp first.",
         }
+
+    async def send_group(self, group_id: str, text: str) -> dict[str, Any]:
+        """Send a message to a group chat."""
+        for name, entry in self._channels.items():
+            if entry.send_group and entry.group_ids:
+                if group_id in entry.group_ids():
+                    return await entry.send_group(group_id, text)
+
+        # No specific group found — try sending to the first channel
+        # that supports groups at all (household group).
+        for name, entry in self._channels.items():
+            if entry.send_group and entry.group_ids:
+                ids = entry.group_ids()
+                if ids:
+                    return await entry.send_group(ids[0], text)
+
+        return {
+            "status": "error",
+            "detail": "No channel has a group chat registered.",
+        }
+
+    def list_groups(self) -> list[dict[str, str]]:
+        """Return known group IDs across all channels."""
+        groups: list[dict[str, str]] = []
+        for name, entry in self._channels.items():
+            if entry.group_ids:
+                for gid in entry.group_ids():
+                    groups.append({"channel": name, "group_id": gid})
+        return groups

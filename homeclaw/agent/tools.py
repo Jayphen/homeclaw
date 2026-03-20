@@ -1074,24 +1074,38 @@ def register_builtin_tools(
     # --- Message tool — delivers via channel dispatcher ---
 
     async def message_send(
-        *, person: str, text: str, **_: Any
+        *, text: str, person: str | None = None, group: bool = False, **_: Any,
     ) -> dict[str, Any]:
         if dispatcher is None:
             return {"status": "queued", "person": person, "text": text}
+        if group:
+            return await dispatcher.send_group("", text)
+        if not person:
+            return {"error": "Either 'person' or 'group: true' is required."}
         return await dispatcher.send(person, text)
 
     registry.register(
         ToolDefinition(
             name="message_send",
-            description="Send a message to a household member via their preferred channel "
-            "(Telegram, WhatsApp, etc.).",
+            description=(
+                "Send a message to a household member or the household group chat. "
+                "Set 'person' to message an individual, or 'group' to true to "
+                "send to the household group chat."
+            ),
             parameters={
                 "type": "object",
                 "properties": {
-                    "person": {"type": "string", "description": "Recipient name"},
+                    "person": {
+                        "type": "string",
+                        "description": "Recipient name (for individual messages)",
+                    },
                     "text": {"type": "string", "description": "Message text"},
+                    "group": {
+                        "type": "boolean",
+                        "description": "Send to the household group chat instead",
+                    },
                 },
-                "required": ["person", "text"],
+                "required": ["text"],
             },
         ),
         message_send,
