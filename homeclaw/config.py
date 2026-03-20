@@ -34,6 +34,7 @@ _SAVEABLE_FIELDS = {
     "ha_token",
     "web_password",
     "member_passwords",
+    "admin_members",
     "jwt_secret",
     "timezone",
 }
@@ -116,8 +117,9 @@ class HomeclawConfig(BaseSettings):
 
     # Web UI
     web_port: int = 8080
-    web_password: str = ""
-    member_passwords: dict[str, str] = {}  # {member_name: password}
+    web_password: str = ""  # Deprecated — kept for migration only
+    member_passwords: dict[str, str] = {}  # {member_name: hashed_password}
+    admin_members: list[str] = []  # Members with admin privileges
     jwt_secret: str = ""  # Auto-generated on first login; signs session tokens
 
     # Embedding provider for semantic memory ("local" or "openai")

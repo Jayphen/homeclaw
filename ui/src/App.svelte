@@ -70,12 +70,13 @@
 
   async function handleLogin() {
     loginError = null;
+    if (!loginMember.trim()) {
+      loginError = "Please enter your name.";
+      return;
+    }
     loggingIn = true;
     try {
-      const body: Record<string, string> = { password: loginPassword };
-      if (loginMember.trim()) {
-        body.member = loginMember.trim();
-      }
+      const body = { member: loginMember.trim(), password: loginPassword };
       const r = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -132,12 +133,10 @@
         <div class="login-error">{loginError}</div>
       {/if}
       <form onsubmit={(e) => { e.preventDefault(); handleLogin(); }}>
-        {#if hasMemberAccounts}
-          <label for="login-member">Name</label>
-          <input id="login-member" type="text" bind:value={loginMember} placeholder="Your name (or leave blank for admin)" autofocus />
-        {/if}
+        <label for="login-member">Name</label>
+        <input id="login-member" type="text" bind:value={loginMember} placeholder="Your name" autofocus />
         <label for="login-pw">Password</label>
-        <input id="login-pw" type="password" bind:value={loginPassword} placeholder="Enter password" autofocus={!hasMemberAccounts} />
+        <input id="login-pw" type="password" bind:value={loginPassword} placeholder="Enter password" />
         <button type="submit" disabled={loggingIn}>
           {loggingIn ? "Signing in..." : "Sign in"}
         </button>

@@ -67,8 +67,8 @@ async def setup_status(request: Request) -> dict[str, Any]:
         "has_member_accounts": bool(config.member_passwords),
     }
 
-    # Full config details require auth (when a password is set).
-    if config.web_password:
+    # Full config details require auth (when any password is set).
+    if config.web_password or config.member_passwords:
         try:
             await require_auth(request)
         except HTTPException:
@@ -77,6 +77,7 @@ async def setup_status(request: Request) -> dict[str, Any]:
     base.update({
         "members": members,
         "members_with_passwords": members_with_passwords,
+        "admin_members": config.admin_members,
         "provider": config.provider,
         "model": config.model,
         "anthropic_api_key": _mask(config.anthropic_api_key),
@@ -229,6 +230,40 @@ async def set_member_password(
         "status": "updated",
         "member": body.member,
         "has_password": body.member in config.member_passwords,
+    }
+
+
+class MemberAdminBody(BaseModel):
+    member: str
+    is_admin: bool
+
+
+@router.post("/members/admin", dependencies=[AdminDep])
+async def set_member_admin(
+    request: Request, body: MemberAdminBody,
+) -> dict[str, Any]:
+    """Grant or revoke admin privileges for a member. Admin only."""
+    config = get_config()
+    workspaces = config.workspaces.resolve()
+    members = list_member_workspaces(workspaces)
+
+    if body.member not in members:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown member '{body.member}'. "
+            f"Available: {', '.join(members)}",
+        )
+
+    if body.is_admin and body.member not in config.admin_members:
+        config.admin_members.append(body.member)
+    elif not body.is_admin and body.member in config.admin_members:
+        config.admin_members.remove(body.member)
+
+    await config.save_async()
+    return {
+        "status": "updated",
+        "member": body.member,
+        "is_admin": body.member in config.admin_members,
     }
 
 

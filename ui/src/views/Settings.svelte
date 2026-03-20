@@ -22,6 +22,7 @@
     routine_model: string;
     members?: string[];
     members_with_passwords?: string[];
+    admin_members?: string[];
   }
 
   let setup: SetupStatus | null = $state(null);
@@ -116,8 +117,6 @@
   let whatsappPhoneNumber: string = $state("");
   let whatsappAllowedUsers: string = $state("");
   let timezoneValue: string = $state("");
-  let newPassword: string = $state("");
-  let newPasswordConfirm: string = $state("");
 
   // Member account management
   let memberPasswords: Record<string, string> = $state({});
@@ -198,6 +197,22 @@
     }
   }
 
+  async function toggleAdmin(member: string) {
+    const isAdmin = setup?.admin_members?.includes(member) ?? false;
+    try {
+      const r = await api("/api/setup/members/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ member, is_admin: !isAdmin }),
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+      await fetchAll();
+    } catch {
+      // Refresh to revert the checkbox
+      await fetchAll();
+    }
+  }
+
   async function saveMemberPassword(member: string) {
     const pw = memberPasswords[member] ?? "";
     memberSaveStatus = { ...memberSaveStatus, [member]: "saving" };
@@ -242,11 +257,6 @@
     error = null;
     if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
 
-    if (newPassword && newPassword !== newPasswordConfirm) {
-      error = "Passwords don't match.";
-      return;
-    }
-
     saveState = "saving";
     const body: Record<string, string | boolean | null> = {};
 
@@ -269,7 +279,6 @@
       body.whatsapp_allowed_users = whatsappAllowedUsers || null;
     }
     if (timezoneValue !== (setup?.timezone || "")) body.timezone = timezoneValue || null;
-    if (newPassword) body.web_password = newPassword;
 
     if (Object.keys(body).length === 0) {
       saveState = "idle";
@@ -303,12 +312,6 @@
       openaiKey = "";
       jinaKey = "";
       telegramToken = "";
-
-      if (newPassword) {
-        setToken(newPassword);
-        newPassword = "";
-        newPasswordConfirm = "";
-      }
 
       saveState = "success";
       saveTimeout = setTimeout(() => { saveState = "idle"; saveTimeout = null; }, 3000);
@@ -481,23 +484,11 @@
       </div>
     </section>
 
-    <section class="card">
-      <h2>Change admin password</h2>
-      <div class="field">
-        <label for="new-pw">New password</label>
-        <input id="new-pw" type="password" bind:value={newPassword} placeholder="Leave blank to keep current" />
-      </div>
-      <div class="field">
-        <label for="new-pw-confirm">Confirm new password</label>
-        <input id="new-pw-confirm" type="password" bind:value={newPasswordConfirm} placeholder="Confirm" />
-      </div>
-    </section>
-
     {#if setup.members && setup.members.length > 0}
       <section class="card">
         <h2>Member accounts</h2>
         <small class="field-hint" style="margin-bottom: 0.75rem; display: block;">
-          Set passwords to allow members to log in with their own account. Members only see their own data.
+          Set passwords to allow members to log in. Admin members can access settings.
         </small>
         {#each setup.members as member}
           <div class="member-row">
@@ -506,29 +497,41 @@
               {#if setup.members_with_passwords?.includes(member)}
                 <span class="member-badge">has login</span>
               {/if}
+              {#if setup.admin_members?.includes(member)}
+                <span class="member-badge admin-badge">admin</span>
+              {/if}
             </span>
-            <div class="member-pw-row">
-              <input
-                type="password"
-                bind:value={memberPasswords[member]}
-                placeholder={setup.members_with_passwords?.includes(member) ? "New password (or blank to remove)" : "Set password"}
-              />
-              <button
-                class="btn secondary"
-                onclick={() => saveMemberPassword(member)}
-                disabled={memberSaveStatus[member] === "saving"}
-              >
-                {#if memberSaveStatus[member] === "saving"}
-                  Saving...
-                {:else if memberSaveStatus[member] === "saved"}
-                  Saved
-                {:else}
-                  Set
-                {/if}
-              </button>
+            <div class="member-controls">
+              <label class="admin-toggle">
+                <input
+                  type="checkbox"
+                  checked={setup.admin_members?.includes(member) ?? false}
+                  onchange={() => toggleAdmin(member)}
+                /> Admin
+              </label>
+              <div class="member-pw-row">
+                <input
+                  type="password"
+                  bind:value={memberPasswords[member]}
+                  placeholder={setup.members_with_passwords?.includes(member) ? "New password (or blank to remove)" : "Set password"}
+                />
+                <button
+                  class="btn secondary"
+                  onclick={() => saveMemberPassword(member)}
+                  disabled={memberSaveStatus[member] === "saving"}
+                >
+                  {#if memberSaveStatus[member] === "saving"}
+                    Saving...
+                  {:else if memberSaveStatus[member] === "saved"}
+                    Saved
+                  {:else}
+                    Set
+                  {/if}
+                </button>
+              </div>
             </div>
             {#if memberSaveStatus[member] === "error"}
-              <small class="field-hint" style="color: var(--terracotta);">Failed to update password.</small>
+              <small class="field-hint" style="color: var(--terracotta);">Failed to update.</small>
             {/if}
           </div>
         {/each}
@@ -862,6 +865,30 @@
     background: rgba(106, 153, 78, 0.1);
     padding: 0.1rem 0.4rem;
     border-radius: 4px;
+  }
+
+  .admin-badge {
+    color: var(--terracotta);
+    background: rgba(180, 100, 60, 0.1);
+  }
+
+  .member-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .admin-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .admin-toggle input {
+    cursor: pointer;
   }
 
   .member-pw-row {

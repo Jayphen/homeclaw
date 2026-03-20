@@ -55,7 +55,7 @@ def _ensure_jwt_secret(config: HomeclawConfig) -> str:
 
 
 def create_session_token(
-    member: str | None, *, is_admin: bool,
+    member: str, *, is_admin: bool,
 ) -> dict[str, Any]:
     """Create a signed JWT session token.
 
@@ -66,7 +66,7 @@ def create_session_token(
     now = datetime.now(UTC)
     exp = now + _SESSION_TOKEN_TTL
     payload = {
-        "sub": member or "__admin__",
+        "sub": member,
         "adm": is_admin,
         "iat": now,
         "exp": exp,
@@ -90,9 +90,12 @@ def _parse_jwt(token: str) -> tuple[str | None, bool] | None:
     except jwt.InvalidTokenError:
         return None
     sub = payload.get("sub")
-    is_admin = bool(payload.get("adm", False))
-    member = None if sub == "__admin__" else sub
-    return member, is_admin
+    if not sub or sub == "__admin__":
+        # Legacy admin-only token — treat as admin if no member specified.
+        # New tokens always have a real member name.
+        return None, True
+    is_admin = sub in config.admin_members
+    return sub, is_admin
 
 _config: HomeclawConfig | None = None
 _setup_token: str | None = None
@@ -221,7 +224,7 @@ def _parse_auth(request: Request) -> tuple[str | None, bool]:
 
     Token formats (tried in order):
     - ``Bearer <jwt>``              → decoded from signed session token
-    - ``Bearer <web_password>``     → admin (legacy / CLI)
+    - ``Bearer <web_password>``     → legacy admin (migration compat)
     - ``Bearer <member>:<password>``→ specific member (legacy / CLI)
 
     Returns (None, False) if auth is invalid.
@@ -239,44 +242,44 @@ def _parse_auth(request: Request) -> tuple[str | None, bool]:
         if result is not None:
             return result
 
-    # Admin auth: matches web_password (hashed or legacy plaintext)
+    # Legacy admin auth: matches web_password — return first admin member
     if config.web_password and verify_password(token, config.web_password):
-        return None, True
+        first_admin = config.admin_members[0] if config.admin_members else None
+        return first_admin, True
 
     # Member auth: "member:password"
     if ":" in token:
         member, password = token.split(":", 1)
         expected = config.member_passwords.get(member)
         if expected is not None and verify_password(password, expected):
-            return member, False
+            return member, member in config.admin_members
 
     return None, False
 
 
 async def require_auth(request: Request) -> None:
     config = get_config()
-    # No password and no member passwords → open access
+    # No passwords configured → open access
     if not config.web_password and not config.member_passwords:
         return
-    member, is_admin = _parse_auth(request)
-    if not is_admin and member is None:
+    member, _is_admin = _parse_auth(request)
+    if member is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 async def get_current_member(request: Request) -> str | None:
-    """Return the authenticated member name, or None for admin/open access.
+    """Return the authenticated member name, or None for open access.
 
-    Admin users get None — callers should treat this as "all members visible".
+    All authenticated users (including admins) get their member name.
+    Admin privileges only grant access to settings, not other members' data.
     Raises 401 if passwords are configured but auth is invalid.
     """
     config = get_config()
     if not config.web_password and not config.member_passwords:
         return None
-    member, is_admin = _parse_auth(request)
-    if not is_admin and member is None:
+    member, _is_admin = _parse_auth(request)
+    if member is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    if is_admin:
-        return None  # Admin sees everything
     return member
 
 

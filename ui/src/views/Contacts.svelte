@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from "$lib/api";
+  import { renderMarkdown } from "$lib/markdown";
 
   interface ContactSummary {
     id: string;
@@ -205,7 +206,7 @@
           {#if selected.notes_md}
             <section class="card">
               <h3>Notes</h3>
-              <pre class="contact-notes">{selected.notes_md}</pre>
+              <div class="contact-notes">{@html renderMarkdown(selected.notes_md)}</div>
             </section>
           {/if}
 
@@ -686,9 +687,11 @@
     line-height: 1.5;
     color: var(--text);
     margin: 0;
-    white-space: pre-wrap;
-    word-wrap: break-word;
   }
+
+  .contact-notes :global(p) { margin: 0 0 0.4rem; }
+  .contact-notes :global(p:last-child) { margin-bottom: 0; }
+  .contact-notes :global(ul), .contact-notes :global(ol) { margin: 0.2rem 0; padding-left: 1.2rem; }
 
   /* ---- Empty state ---- */
   .empty {

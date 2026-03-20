@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from "$lib/api";
+  import { renderMarkdown } from "$lib/markdown";
 
   interface Bookmark {
     id: string;
@@ -150,7 +151,7 @@
             </div>
 
             {#if bm.notes_md}
-              <pre class="bm-notes">{bm.notes_md}</pre>
+              <div class="bm-notes">{@html renderMarkdown(bm.notes_md)}</div>
             {/if}
 
             <div class="bm-meta">
@@ -362,9 +363,11 @@
     background: #fdfcfa;
     border-left: 3px solid var(--sage);
     border-radius: 4px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
   }
+
+  .bm-notes :global(p) { margin: 0 0 0.3rem; }
+  .bm-notes :global(p:last-child) { margin-bottom: 0; }
+  .bm-notes :global(ul), .bm-notes :global(ol) { margin: 0.2rem 0; padding-left: 1.2rem; }
 
   .bm-meta {
     display: flex;
