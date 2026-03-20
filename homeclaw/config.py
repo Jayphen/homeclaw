@@ -104,11 +104,11 @@ class HomeclawConfig(BaseSettings):
 
     @property
     def whatsapp_allowed_phone_numbers(self) -> set[str] | None:
-        """Parse allowed phone numbers, or None if unrestricted.
+        """Parse allowed WhatsApp IDs (phone numbers or LIDs).
 
-        Normalizes numbers by stripping ``+``, spaces, dashes, and
-        parentheses so users can enter numbers in any common format
-        (e.g. ``+61 412 345 678``, ``0412345678``, ``61412345678``).
+        Accepts both traditional phone numbers and WhatsApp Linked
+        Identity (LID) numbers.  Normalizes by stripping ``+``, spaces,
+        dashes, and parentheses.
         """
         if not self.whatsapp_allowed_users:
             return None

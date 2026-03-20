@@ -266,9 +266,9 @@
           <label for="wa-phone">Your phone number</label>
           <input id="wa-phone" type="text" bind:value={whatsappPhoneNumber} placeholder="14155551234" />
           <p class="hint">For pair-code auth (no camera needed). Leave blank to use QR code.</p>
-          <label for="wa-users">Allowed phone numbers</label>
-          <input id="wa-users" type="text" bind:value={whatsappAllowedUsers} placeholder="14155551234, 447911123456" />
-          <p class="hint">Comma-separated, no + prefix. Leave blank for unrestricted.</p>
+          <label for="wa-users">Allowed WhatsApp IDs</label>
+          <input id="wa-users" type="text" bind:value={whatsappAllowedUsers} placeholder="61412345678, 262899863912491" />
+          <p class="hint">Comma-separated phone numbers or WhatsApp LIDs. Check logs for exact IDs. Leave blank for unrestricted.</p>
         {/if}
 
         <p class="hint skip-hint">No messaging channels? Just click Next.</p>

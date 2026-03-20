@@ -481,9 +481,9 @@
           </small>
         </div>
         <div class="field">
-          <label for="wa-users">Allowed phone numbers</label>
-          <input id="wa-users" type="text" bind:value={whatsappAllowedUsers} placeholder="14155551234, 447911123456" />
-          <small class="field-hint">Comma-separated, no + prefix. Leave blank for unrestricted.</small>
+          <label for="wa-users">Allowed WhatsApp IDs</label>
+          <input id="wa-users" type="text" bind:value={whatsappAllowedUsers} placeholder="61412345678, 262899863912491" />
+          <small class="field-hint">Comma-separated phone numbers or WhatsApp LIDs. Check logs for the exact ID. Leave blank for unrestricted.</small>
         </div>
       {/if}
     </section>
