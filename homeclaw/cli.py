@@ -122,6 +122,7 @@ class HomeclawApp:
                 self.registry,
                 self.workspaces,
                 on_routines_changed=self._reload_routines,
+                on_routine_run=self._run_routine,
                 config=self.config,
                 plugin_registry=self.plugin_registry,
                 dispatcher=self.dispatcher,
@@ -160,17 +161,28 @@ class HomeclawApp:
         if self._scheduler:
             self._scheduler.reload_routines()
 
+    async def _run_routine(self, name: str) -> bool:
+        """Manually trigger a routine by slug name."""
+        if self._scheduler:
+            return await self._scheduler.run_now(name)
+        return False
+
     def load_scheduler(self) -> None:
         """Parse ROUTINES.md and register routines (does not start the event loop)."""
         from homeclaw.scheduler.scheduler import Scheduler
 
-        self._scheduler = Scheduler(loop=self.loop, workspaces=self.workspaces)
+        self._scheduler = Scheduler(
+            loop=self.loop,
+            workspaces=self.workspaces,
+            timezone=self.config.timezone,
+        )
         self._scheduler.load_routines_md()
 
     def start_scheduler(self) -> None:
         """Start the scheduler. Must be called inside a running event loop."""
         if self._scheduler:
             self._scheduler.start()
+            asyncio.ensure_future(self._scheduler.fire_missed())
 
     def shutdown(self) -> None:
         """Shut down background services."""
@@ -273,7 +285,7 @@ def _run_serve(workspaces: Path, port: int) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
     from homeclaw.api.logbuffer import install_log_buffer
-    install_log_buffer()
+    install_log_buffer(timezone=config.timezone)
 
     if not config.web_password:
         generate_setup_token()

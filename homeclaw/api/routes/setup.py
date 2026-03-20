@@ -91,6 +91,7 @@ async def setup_status(request: Request) -> dict[str, Any]:
         "ha_configured": config.ha_url is not None,
         "conversation_model": config.routing.conversation_model,
         "routine_model": config.routing.routine_model,
+        "timezone": config.timezone,
     })
     return base
 
@@ -124,6 +125,9 @@ class SetupBody(BaseModel):
     # Routing
     conversation_model: str | None = None
     routine_model: str | None = None
+
+    # Timezone
+    timezone: str | None = None
 
     # Auth
     web_password: str | None = None
@@ -180,6 +184,8 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         config.routing.conversation_model = body.conversation_model
     if body.routine_model is not None:
         config.routing.routine_model = body.routine_model
+    if body.timezone is not None:
+        config.timezone = body.timezone or None
     if body.web_password is not None:
         config.web_password = hash_password(body.web_password) if body.web_password else ""
 
