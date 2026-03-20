@@ -1,15 +1,8 @@
 <script lang="ts">
-  import { marked } from "marked";
-  import DOMPurify from "dompurify";
   import { format, parseISO } from "date-fns";
   import { api } from "$lib/api";
+  import { renderMarkdown, renderInlineMarkdown } from "$lib/markdown";
   import MarkdownEditor from "$lib/MarkdownEditor.svelte";
-
-  marked.setOptions({ breaks: true, gfm: true });
-
-  function renderMarkdown(src: string): string {
-    return DOMPurify.sanitize(marked.parse(src) as string);
-  }
 
   // Route params from svelte-spa-router
   let { params = {} }: { params?: { person?: string; date?: string } } = $props();
@@ -231,7 +224,7 @@
               <span class="note-card-date">{formatDateShort(note.date)}</span>
               <span class="note-card-updated">{formatTime(note.updated_at)}</span>
             </div>
-            <p class="note-card-preview">{note.preview}</p>
+            <p class="note-card-preview">{@html renderInlineMarkdown(note.preview)}</p>
           </a>
         {/each}
       </div>
@@ -262,7 +255,7 @@
                   <span class="note-card-date">{formatDateShort(note.date)}</span>
                   <span class="note-card-updated">{formatTime(note.updated_at)}</span>
                 </div>
-                <p class="note-card-preview">{note.preview}</p>
+                <p class="note-card-preview">{@html renderInlineMarkdown(note.preview)}</p>
               </a>
             {/each}
             {#if notes.length > 5}

@@ -17,6 +17,7 @@
   } from "date-fns";
   import { querystring } from "svelte-spa-router";
   import { api } from "$lib/api";
+  import { renderInlineMarkdown } from "$lib/markdown";
 
   type ViewMode = "month" | "schedule";
 
@@ -316,7 +317,7 @@
                     <a class="ev-link" href="#/notes/{ev.person}/{ev.date}">View note</a>
                   {/if}
                 </div>
-                <p class="ev-summary">{ev.summary}</p>
+                <p class="ev-summary">{@html renderInlineMarkdown(ev.summary)}</p>
               </div>
             </li>
           {/each}
@@ -355,7 +356,7 @@
                         <a class="ev-link" href="#/notes/{ev.person}/{ev.date}">View note</a>
                       {/if}
                     </div>
-                    <p class="ev-summary">{ev.summary}</p>
+                    <p class="ev-summary">{@html renderInlineMarkdown(ev.summary)}</p>
                   </div>
                 </div>
               {/each}
