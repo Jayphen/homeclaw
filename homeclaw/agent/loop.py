@@ -266,10 +266,12 @@ class AgentLoop:
 
         _save_history(self._workspaces, history_key, history)
 
-        # Log group chat messages so memsearch can index them — lets
+        # Log group chat exchanges so memsearch can index them — lets
         # members reference group conversations from private DMs.
-        if channel and channel.startswith("group-"):
-            _append_chat_log(self._workspaces, channel, text_for_context)
+        if channel and channel.startswith("group-") and response and response.content:
+            _append_chat_log(
+                self._workspaces, channel, text_for_context, response.content,
+            )
 
         return response.content if response else ""
 
@@ -317,11 +319,13 @@ def _append_chat_log(
     workspaces: Path,
     channel: str,
     user_text: str,
+    assistant_text: str,
 ) -> None:
-    """Append a group chat message to a daily log for memsearch indexing.
+    """Append a group chat exchange to a daily log for memsearch indexing.
 
-    Only logs user messages (not homeclaw's responses) to keep the log
-    concise.  Rotated daily so individual files stay small.
+    Logs both user messages and homeclaw responses so members can
+    reference anything from the group conversation in their DMs.
+    Rotated daily so individual files stay small.
     """
     from datetime import datetime, timezone
 
@@ -332,7 +336,7 @@ def _append_chat_log(
     log_path = channel_dir / f"{today}.md"
 
     timestamp = datetime.now(timezone.utc).strftime("%H:%M")
-    entry = f"- [{timestamp}] {user_text}\n"
+    entry = f"- [{timestamp}] {user_text}\n- [{timestamp}] homeclaw: {assistant_text}\n"
 
     with open(log_path, "a") as f:
         f.write(entry)
