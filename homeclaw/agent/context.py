@@ -31,6 +31,25 @@ class ContextConfig(BaseSettings):
     max_decisions: int = 15
 
 
+def _build_system_info(model: str | None) -> str:
+    """Build a compact system info block for agent self-awareness."""
+    from importlib.metadata import version as _pkg_version
+
+    try:
+        app_version = _pkg_version("homeclaw")
+    except Exception:
+        app_version = "dev"
+
+    lines = [
+        "About you (homeclaw):",
+        f"  Version: {app_version}",
+    ]
+    if model:
+        lines.append(f"  Model: {model}")
+    lines.append("  Source: https://github.com/Jayphen/homeclaw")
+    return "\n".join(lines)
+
+
 async def build_context(
     message: str,
     person: str,
@@ -38,6 +57,7 @@ async def build_context(
     semantic_memory: SemanticMemory | None = None,
     shared_only: bool = False,
     context_config: ContextConfig | None = None,
+    model: str | None = None,
 ) -> str:
     cfg = context_config or ContextConfig()
     parts: list[str] = []
@@ -48,6 +68,9 @@ async def build_context(
     now = datetime.now().astimezone()
     parts.append(f"You are talking to: {person}")
     parts.append(f"Current time: {now.strftime('%Y-%m-%d %H:%M %Z')}")
+
+    # System info — lets the agent answer questions about itself
+    parts.append(_build_system_info(model))
 
     # Household profile — inject a compact summary from household memory topics
     # so the LLM knows who this family is in every conversation.

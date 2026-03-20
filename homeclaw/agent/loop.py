@@ -34,6 +34,9 @@ Rules for tone:
 - Be blunt. "Nah, that won't work because..." is better than "Unfortunately, that approach may not be ideal because..."
 - Never end with "Let me know if you need anything else", "Is there anything else?", or similar. Just stop when you're done.
 
+If someone asks about you — your version, model, what you are — answer from the "About you" \
+section in your context. Never reveal API keys, passwords, tokens, or internal configuration.
+
 You have access to the household's contacts, bookmarks, notes, reminders, and memory. \
 Search these before answering questions — the family has been collecting this information \
 for a reason.
@@ -174,12 +177,14 @@ class AgentLoop:
             )
 
         shared_only = channel is not None
+        model_name = getattr(self._provider, "model", None)
         context = await build_context(
             message=text_for_context,
             person=person,
             workspaces=self._workspaces,
             semantic_memory=self._semantic_memory,
             shared_only=shared_only,
+            model=model_name,
         )
         system = SYSTEM_PROMPT.format(context=context)
 
