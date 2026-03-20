@@ -48,13 +48,30 @@
   let logSearch: string = $state("");
   let logPollTimer: ReturnType<typeof setInterval> | null = $state(null);
 
+  let hiddenLoggers: Set<string> = $state(new Set());
+
+  let loggerCounts = $derived(() => {
+    const counts = new Map<string, number>();
+    for (const e of logEntries) {
+      counts.set(e.logger, (counts.get(e.logger) ?? 0) + 1);
+    }
+    return counts;
+  });
+
+  function toggleLogger(name: string) {
+    const next = new Set(hiddenLoggers);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    hiddenLoggers = next;
+  }
+
   let filteredLogEntries = $derived(
-    logSearch
-      ? logEntries.filter(e =>
-          e.message.toLowerCase().includes(logSearch.toLowerCase()) ||
-          e.logger.toLowerCase().includes(logSearch.toLowerCase())
-        )
-      : logEntries
+    logEntries.filter(e => {
+      if (hiddenLoggers.has(e.logger)) return false;
+      if (!logSearch) return true;
+      const q = logSearch.toLowerCase();
+      return e.message.toLowerCase().includes(q) || e.logger.toLowerCase().includes(q);
+    })
   );
 
   async function fetchLogs() {
@@ -462,6 +479,20 @@
             {logLoading ? "Loading..." : "Refresh"}
           </button>
         </div>
+        {#if loggerCounts().size > 0}
+          <div class="log-loggers">
+            {#each [...loggerCounts().entries()].sort((a, b) => b[1] - a[1]) as [name, count]}
+              <button
+                class="logger-pill"
+                class:hidden-logger={hiddenLoggers.has(name)}
+                onclick={() => toggleLogger(name)}
+                title={hiddenLoggers.has(name) ? `Show ${name}` : `Hide ${name}`}
+              >
+                {name} <span class="logger-count">{count}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
         <div class="log-viewer">
           {#if filteredLogEntries.length === 0}
             <p class="log-empty">{logEntries.length === 0 ? "No log entries." : "No matching entries."}</p>
@@ -842,9 +873,47 @@
     color: var(--text);
   }
 
+  .log-loggers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .logger-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fdfcfa;
+    font-size: 0.7rem;
+    font-family: "SF Mono", "Fira Code", monospace;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .logger-pill:hover {
+    border-color: var(--text-muted);
+  }
+
+  .logger-pill.hidden-logger {
+    opacity: 0.4;
+    text-decoration: line-through;
+    background: transparent;
+  }
+
+  .logger-count {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
   .log-viewer {
     max-height: 400px;
-    overflow-y: auto;
+    overflow: auto;
     background: #1e1e1e;
     border-radius: 8px;
     padding: 0.75rem;
@@ -895,8 +964,6 @@
 
   .log-msg {
     color: #d4d4d4;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .version-info {
