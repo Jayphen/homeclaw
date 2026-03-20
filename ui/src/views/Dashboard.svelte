@@ -72,17 +72,7 @@
     return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   }
 
-  function formatTime(iso: string): string {
-    const d = new Date(iso);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return "just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  }
+  import { formatRelativeTime as formatTime } from "$lib/time";
 
   function daysUntil(iso: string): string {
     const d = new Date(iso + "T12:00:00");

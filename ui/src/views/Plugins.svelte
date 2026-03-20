@@ -43,12 +43,7 @@
   let toggling: Set<string> = $state(new Set());
   let actionError: string | null = $state(null);
 
-  function formatDate(iso: string): string {
-    return new Date(iso).toLocaleString("en-US", {
-      month: "short", day: "numeric", year: "numeric",
-      hour: "2-digit", minute: "2-digit",
-    });
-  }
+  import { formatDateTime as formatDate } from "$lib/time";
 
   function toggleTools(name: string) {
     const next = new Set(expandedTools);
