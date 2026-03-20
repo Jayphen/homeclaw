@@ -44,6 +44,54 @@ def _has_image(ev: Any) -> bool:
         return False
 
 
+def _md_to_whatsapp(text: str) -> str:
+    """Convert markdown formatting to WhatsApp-compatible formatting.
+
+    WhatsApp uses: *bold*, _italic_, ~strikethrough~, ```code```.
+    Markdown uses: **bold**, *italic*, ~~strike~~, ```code```.
+    """
+    import re
+
+    lines = text.split("\n")
+    result: list[str] = []
+
+    in_code_block = False
+    for line in lines:
+        # Pass through code blocks unchanged
+        if line.strip().startswith("```"):
+            in_code_block = not in_code_block
+            result.append(line)
+            continue
+        if in_code_block:
+            result.append(line)
+            continue
+
+        # Headings → bold
+        line = re.sub(r"^#{1,6}\s+(.+)$", r"*\1*", line)
+
+        # Unordered list markers → bullet
+        line = re.sub(r"^(\s*)[-*+]\s+", r"\1• ", line)
+
+        # Links: [text](url) → text (url)
+        line = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 (\2)", line)
+
+        # Bold: **text** or __text__ → *text*
+        line = re.sub(r"\*\*(.+?)\*\*", r"*\1*", line)
+        line = re.sub(r"__(.+?)__", r"*\1*", line)
+
+        # Italic: remaining single *text* → _text_
+        # Only match *text* that isn't already WhatsApp bold from above.
+        # We skip this since WhatsApp _italic_ conflicts with markdown's
+        # _italic_ — they're the same, so no conversion needed.
+
+        # Strikethrough: ~~text~~ → ~text~
+        line = re.sub(r"~~(.+?)~~", r"~\1~", line)
+
+        result.append(line)
+
+    return "\n".join(result)
+
+
 class WhatsAppChannel:
     """Bridges WhatsApp <-> AgentLoop via neonize (whatsmeow Python bindings).
 
@@ -351,7 +399,8 @@ class WhatsAppChannel:
             return
 
         if response:
-            for chunk in _split_message(response):
+            formatted = _md_to_whatsapp(response)
+            for chunk in _split_message(formatted):
                 await self._client.reply_message(chunk, ev)
 
     def _reverse_user_map(self) -> dict[str, str]:
@@ -371,7 +420,8 @@ class WhatsAppChannel:
             return {"status": "error", "detail": f"'{person}' not registered on WhatsApp"}
         try:
             jid = build_jid(phone)
-            for chunk in _split_message(text):
+            formatted = _md_to_whatsapp(text)
+            for chunk in _split_message(formatted):
                 await self._client.send_message(jid, chunk)
             return {"status": "sent", "channel": "whatsapp", "person": person}
         except Exception as exc:
