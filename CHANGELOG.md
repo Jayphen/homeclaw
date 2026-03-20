@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.10](https://github.com/Jayphen/homeclaw/compare/v0.5.9...v0.5.10) (2026-03-20)
+
+
+### Bug Fixes
+
+* discover group IDs from channel history dirs instead of separate file ([5c75631](https://github.com/Jayphen/homeclaw/commit/5c75631285fcc375a3068ba16ffd1fa7a42595a8))
+* persist known WhatsApp group IDs across restarts ([bee4e1a](https://github.com/Jayphen/homeclaw/commit/bee4e1aace31378ec583955318ad783029736432))
+
 ## [0.5.9](https://github.com/Jayphen/homeclaw/compare/v0.5.8...v0.5.9) (2026-03-20)
 
 
