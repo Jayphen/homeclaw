@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.2](https://github.com/Jayphen/homeclaw/compare/v0.4.1...v0.4.2) (2026-03-20)
+
+
+### Features
+
+* add logger filter pills and horizontal scroll to log viewer ([349d135](https://github.com/Jayphen/homeclaw/commit/349d135c5f217010ea084c8e9c70ff22f0561ba4))
+* return routine results to calling agent, disable ARM CI build ([d74a574](https://github.com/Jayphen/homeclaw/commit/d74a5746017f0e3baadf910f3d82dcd05142e458))
+
 ## [0.4.1](https://github.com/Jayphen/homeclaw/compare/v0.4.0...v0.4.1) (2026-03-20)
 
 
