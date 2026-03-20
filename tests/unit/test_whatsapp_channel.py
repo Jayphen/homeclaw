@@ -64,6 +64,7 @@ def _make_channel(
     channel._connected = False
     channel._last_qr = None
     channel._known_groups = set()
+    channel._lid_users = set()
     return channel
 
 

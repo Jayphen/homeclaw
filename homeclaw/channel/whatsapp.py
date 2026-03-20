@@ -143,6 +143,9 @@ class WhatsAppChannel:
         self._connected = False
         self._last_qr: bytes | None = None  # Raw QR data for web UI
         self._known_groups: set[str] = _load_known_groups(workspaces)
+        # Track which user IDs are LIDs (server="lid") vs phone numbers
+        # (server="s.whatsapp.net") so outbound messages use the right JID.
+        self._lid_users: set[str] = set()
 
         # Store event types so _register_handlers can reference them
         self._ConnectedEv = ConnectedEv
@@ -237,7 +240,10 @@ class WhatsAppChannel:
         if ev.Info.MessageSource.IsFromMe:
             return
 
-        phone: str = ev.Info.MessageSource.Sender.User
+        sender = ev.Info.MessageSource.Sender
+        phone: str = sender.User
+        if getattr(sender, "Server", "") == "lid":
+            self._lid_users.add(phone)
 
         if not self._is_allowed(phone):
             logger.warning(
@@ -431,7 +437,8 @@ class WhatsAppChannel:
         if not phone:
             return {"status": "error", "detail": f"'{person}' not registered on WhatsApp"}
         try:
-            jid = build_jid(phone)
+            server = "lid" if phone in self._lid_users else "s.whatsapp.net"
+            jid = build_jid(phone, server=server)
             formatted = _md_to_whatsapp(text)
             for chunk in _split_message(formatted):
                 await self._client.send_message(jid, chunk)
