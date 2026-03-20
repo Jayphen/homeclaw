@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.1](https://github.com/Jayphen/homeclaw/compare/v0.4.0...v0.4.1) (2026-03-20)
+
+
+### Features
+
+* add timezone config for scheduler and log timestamps ([c990c52](https://github.com/Jayphen/homeclaw/commit/c990c528f45e9d2d585eeac59b610d8d849c68b7))
+* add timezone setting to web UI ([1d659fb](https://github.com/Jayphen/homeclaw/commit/1d659fb800fca744c458b0a6121308e80a8c0db4))
+
+
+### Bug Fixes
+
+* add misfire_grace_time and routine_run tool to fix silent schedule skips ([716f8d2](https://github.com/Jayphen/homeclaw/commit/716f8d29a2d5e39464d174d15ad65c6926f91093))
+* add misfire_grace_time and routine_run tool to fix silent schedule skips ([4a83762](https://github.com/Jayphen/homeclaw/commit/4a8376267ddd4229e8cb64b50d89afefe7c777e7))
+* detect and fire missed routines after server restart ([cbd9cfb](https://github.com/Jayphen/homeclaw/commit/cbd9cfb3e0fffcdd40f1be9643a8f025da055bbb))
+
 ## [0.4.0](https://github.com/Jayphen/homeclaw/compare/v0.3.14...v0.4.0) (2026-03-19)
 
 
