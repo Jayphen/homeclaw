@@ -48,8 +48,11 @@ def _extract_text(ev: Any) -> str | None:
 
 def _has_image(ev: Any) -> bool:
     """Return True if the message contains an image."""
-    img = ev.Message.imageMessage
-    return bool(img and img.url)
+    try:
+        img = ev.Message.imageMessage
+        return bool(img and img.url)
+    except AttributeError:
+        return False
 
 
 class WhatsAppChannel:
