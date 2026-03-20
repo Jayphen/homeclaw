@@ -10,6 +10,7 @@ from homeclaw.api.deps import (
     AdminDep,
     AuthDep,
     clear_setup_token,
+    create_session_token,
     get_config,
     get_on_telegram_configured,
     get_setup_token,
@@ -139,8 +140,8 @@ class SetupBody(BaseModel):
 async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
     config = get_config()
 
-    # If no password is set, require the setup token (first-run onboarding).
-    if not config.web_password:
+    # First-run onboarding: no passwords set yet — require setup token.
+    if not config.web_password and not config.member_passwords:
         if not body.setup_token or not verify_setup_token(body.setup_token):
             raise HTTPException(status_code=403, detail="Invalid setup token")
     else:
@@ -203,12 +204,22 @@ class MemberPasswordBody(BaseModel):
     password: str
 
 
-@router.post("/members/password", dependencies=[AdminDep])
+@router.post("/members/password")
 async def set_member_password(
     request: Request, body: MemberPasswordBody,
 ) -> dict[str, Any]:
-    """Set or update a member's web UI password. Admin only."""
+    """Set or update a member's web UI password.
+
+    Admin-only, EXCEPT when no admin members exist yet (bootstrap).
+    In that case, the first member to get a password is auto-promoted
+    to admin.
+    """
     config = get_config()
+    bootstrapping = not config.admin_members
+
+    if not bootstrapping:
+        await require_admin(request)
+
     workspaces = config.workspaces.resolve()
     members = list_member_workspaces(workspaces)
 
@@ -225,12 +236,26 @@ async def set_member_password(
     else:
         config.member_passwords[body.member] = hash_password(body.password)
 
+    # Auto-promote first member to admin if none exist
+    if bootstrapping and body.password.strip():
+        config.admin_members.append(body.member)
+
     await config.save_async()
-    return {
+
+    is_admin = body.member in config.admin_members
+    result: dict[str, Any] = {
         "status": "updated",
         "member": body.member,
         "has_password": body.member in config.member_passwords,
+        "is_admin": is_admin,
     }
+
+    # Return a session token during bootstrap so the user is logged in
+    if bootstrapping and body.password.strip():
+        token_data = create_session_token(body.member, is_admin=True)
+        result["token"] = token_data["token"]
+
+    return result
 
 
 class MemberAdminBody(BaseModel):

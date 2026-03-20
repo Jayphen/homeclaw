@@ -45,8 +45,9 @@
   let whatsappEnabled: boolean = $state(false);
   let whatsappPhoneNumber: string = $state("");
   let whatsappAllowedUsers: string = $state("");
-  let webPassword: string = $state("");
-  let webPasswordConfirm: string = $state("");
+  let memberName: string = $state("");
+  let memberPassword: string = $state("");
+  let memberPasswordConfirm: string = $state("");
 
   async function fetchStatus() {
     const r = await fetch("/api/setup/status");
@@ -73,11 +74,15 @@
     }
 
     if (step === 3) {
-      if (!webPassword.trim()) {
+      if (!memberName.trim()) {
+        error = "Enter your name.";
+        return;
+      }
+      if (!memberPassword.trim()) {
         error = "Set a password to secure the web UI.";
         return;
       }
-      if (webPassword !== webPasswordConfirm) {
+      if (memberPassword !== memberPasswordConfirm) {
         error = "Passwords don't match.";
         return;
       }
@@ -94,7 +99,6 @@
           model,
           conversation_model: model,
           routine_model: defaults.routineModel,
-          web_password: webPassword,
         };
         if (provider === "anthropic") {
           body.anthropic_api_key = anthropicKey;
@@ -121,6 +125,7 @@
           }
         }
 
+        // Step 1: Save provider config
         const r = await fetch("/api/setup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -132,7 +137,26 @@
           saving = false;
           return;
         }
-        setToken(webPassword);
+
+        // Step 2: Create member account (auto-promotes to admin)
+        const memberR = await fetch("/api/setup/members/password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            member: memberName.trim().toLowerCase(),
+            password: memberPassword,
+          }),
+        });
+        if (!memberR.ok) {
+          const data = await memberR.json().catch(() => null);
+          error = data?.detail || `Error ${memberR.status}`;
+          saving = false;
+          return;
+        }
+        const memberData = await memberR.json();
+        if (memberData.token) {
+          setToken(memberData.token);
+        }
         oncomplete();
       } catch (e: any) {
         error = e.message;
@@ -252,12 +276,14 @@
 
     {:else if step === 3}
       <div class="field-group">
-        <h2>Set a password</h2>
-        <p class="hint">This protects the web UI and API. You'll need it to log in.</p>
+        <h2>Create your account</h2>
+        <p class="hint">This is your household member account. As the first member, you'll be the admin.</p>
+        <label for="member-name">Your name</label>
+        <input id="member-name" type="text" bind:value={memberName} placeholder="e.g. Alice" />
         <label for="password">Password</label>
-        <input id="password" type="password" bind:value={webPassword} placeholder="Choose a password" />
+        <input id="password" type="password" bind:value={memberPassword} placeholder="Choose a password" />
         <label for="password-confirm">Confirm password</label>
-        <input id="password-confirm" type="password" bind:value={webPasswordConfirm} placeholder="Confirm password" />
+        <input id="password-confirm" type="password" bind:value={memberPasswordConfirm} placeholder="Confirm password" />
       </div>
     {/if}
 
