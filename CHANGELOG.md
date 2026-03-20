@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.4](https://github.com/Jayphen/homeclaw/compare/v0.4.3...v0.4.4) (2026-03-20)
+
+
+### Features
+
+* improve skill data management and fix agent history leaking ([f195ab1](https://github.com/Jayphen/homeclaw/commit/f195ab15b50fa4e6c13355f7ea3a5681e4847014))
+
 ## [0.4.3](https://github.com/Jayphen/homeclaw/compare/v0.4.2...v0.4.3) (2026-03-20)
 
 
