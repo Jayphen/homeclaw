@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.7](https://github.com/Jayphen/homeclaw/compare/v0.5.6...v0.5.7) (2026-03-20)
+
+
+### Features
+
+* let homeclaw answer questions about itself ([a20b164](https://github.com/Jayphen/homeclaw/commit/a20b164d2a4bf91ff0d5b114eeb5198da3c05153))
+
+
+### Bug Fixes
+
+* stop asking if user needs anything else ([79bc326](https://github.com/Jayphen/homeclaw/commit/79bc3265145d43e8116464d72e65f7b1505e9c16))
+
 ## [0.5.6](https://github.com/Jayphen/homeclaw/compare/v0.5.5...v0.5.6) (2026-03-20)
 
 
