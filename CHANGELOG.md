@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.6](https://github.com/Jayphen/homeclaw/compare/v0.5.5...v0.5.6) (2026-03-20)
+
+
+### Bug Fixes
+
+* improve system prompt tone for smaller models like Gemini Flash ([ff5e364](https://github.com/Jayphen/homeclaw/commit/ff5e364b9d8a000541b313cb8bdcb6fa6c07169f))
+
 ## [0.5.5](https://github.com/Jayphen/homeclaw/compare/v0.5.4...v0.5.5) (2026-03-20)
 
 
