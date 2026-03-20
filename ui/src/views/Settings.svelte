@@ -92,6 +92,7 @@
   let whatsappEnabled: boolean = $state(false);
   let whatsappPhoneNumber: string = $state("");
   let whatsappAllowedUsers: string = $state("");
+  let timezoneValue: string = $state("");
   let newPassword: string = $state("");
   let newPasswordConfirm: string = $state("");
 
@@ -160,6 +161,7 @@
       whatsappEnabled = setup!.whatsapp_configured;
       whatsappPhoneNumber = setup!.whatsapp_phone_number || "";
       whatsappAllowedUsers = setup!.whatsapp_allowed_users || "";
+      timezoneValue = setup!.timezone || "";
       pageState = "ready";
     } catch (e: any) {
       error = e.message;
@@ -198,6 +200,7 @@
     if (whatsappAllowedUsers !== (setup?.whatsapp_allowed_users || "")) {
       body.whatsapp_allowed_users = whatsappAllowedUsers || null;
     }
+    if (timezoneValue !== (setup?.timezone || "")) body.timezone = timezoneValue || null;
     if (newPassword) body.web_password = newPassword;
 
     if (Object.keys(body).length === 0) {
@@ -224,6 +227,7 @@
       whatsappEnabled = setup!.whatsapp_configured;
       whatsappPhoneNumber = setup!.whatsapp_phone_number || "";
       whatsappAllowedUsers = setup!.whatsapp_allowed_users || "";
+      timezoneValue = setup!.timezone || "";
 
       // Clear secret inputs after save
       anthropicKey = "";
@@ -380,6 +384,16 @@
           <small class="field-hint">Comma-separated, no + prefix. Leave blank for unrestricted.</small>
         </div>
       {/if}
+    </section>
+
+    <section class="card">
+      <h2>Timezone</h2>
+      <div class="field">
+        <label for="timezone">Timezone</label>
+        <input id="timezone" type="text" bind:value={timezoneValue}
+          placeholder={Intl.DateTimeFormat().resolvedOptions().timeZone} />
+        <small class="field-hint">IANA timezone for schedules and logs (e.g. America/New_York, Europe/London). Leave blank for system default.</small>
+      </div>
     </section>
 
     <section class="card">
