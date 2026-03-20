@@ -213,15 +213,33 @@ class WhatsAppChannel:
             await self._handle_register(phone, text, ev)
             return
 
+        is_group: bool = ev.Info.MessageSource.IsGroup
+        chat: Any = ev.Info.MessageSource.Chat
+
         person = self._resolve_person(phone)
+
+        # In groups, auto-register unknown senders using their WhatsApp
+        # display name so they don't have to /register in a DM first.
+        if person is None and is_group:
+            push_name: str = getattr(ev.Info, "Pushname", "") or ""
+            if push_name.strip():
+                name = push_name.strip().split()[0].lower()
+                async with self._user_map_lock:
+                    self._user_map[phone] = name
+                    _save_user_map(self._workspaces, self._user_map)
+                    (self._workspaces / name).mkdir(parents=True, exist_ok=True)
+                person = name
+                logger.info(
+                    "Auto-registered group member +%s as '%s' from push name",
+                    phone, name,
+                )
+
         if person is None:
             await self._client.reply_message(
                 "I don't know who you are. Send /register <name> first.", ev
             )
             return
 
-        is_group: bool = ev.Info.MessageSource.IsGroup
-        chat: Any = ev.Info.MessageSource.Chat
         if is_group:
             user_text = f"[{person}] {text}"
             channel: str | None = f"group-{chat.User}"
