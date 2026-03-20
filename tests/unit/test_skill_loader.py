@@ -188,7 +188,8 @@ def test_skill_plugin_data_dir_and_scope(tmp_path: Path) -> None:
     defn = parse_skill_markdown(WEATHER_SKILL_MD)
     skill_dir = tmp_path / "weather"
     plugin = SkillPlugin(defn, skill_dir, "alice")
-    assert plugin.data_dir == skill_dir
+    assert plugin.data_dir == skill_dir / "data"
+    assert plugin.data_dir.is_dir()
     assert plugin.scope == "alice"
 
 
@@ -203,10 +204,15 @@ def test_skill_plugin_tools_returns_http_call(tmp_path: Path) -> None:
     plugin = SkillPlugin(defn, tmp_path, "household")
     tools = plugin.tools()
 
-    assert len(tools) == 1
-    assert tools[0].name == "http_call"
-    assert "url" in tools[0].parameters["properties"]
-    assert "method" in tools[0].parameters["properties"]
+    tool_names = [t.name for t in tools]
+    assert "data_list" in tool_names
+    assert "data_read" in tool_names
+    assert "data_write" in tool_names
+    assert "data_delete" in tool_names
+    assert "http_call" in tool_names
+    http_tool = next(t for t in tools if t.name == "http_call")
+    assert "url" in http_tool.parameters["properties"]
+    assert "method" in http_tool.parameters["properties"]
 
 
 def test_skill_plugin_log_dir_inside_skill_dir(tmp_path: Path) -> None:
@@ -327,7 +333,42 @@ def test_load_skill_reads_skill_md(tmp_path: Path) -> None:
 
     assert plugin.name == "weather"
     assert plugin.scope == "household"
-    assert plugin.data_dir == skill_dir
+    assert plugin.data_dir == skill_dir / "data"
+
+
+def test_load_skill_migrates_legacy_data_files(tmp_path: Path) -> None:
+    """Legacy skills with data files alongside skill.md get auto-migrated."""
+    skill_dir = make_skill_dir(tmp_path, "budget", MINIMAL_SKILL_MD)
+    # Simulate legacy layout: data files at skill root
+    (skill_dir / "spending.md").write_text("# Spending\n- coffee $5\n")
+    (skill_dir / "categories.json").write_text('["food","transport"]')
+
+    plugin = load_skill(skill_dir, "household")
+
+    # Data files moved into data/
+    assert not (skill_dir / "spending.md").exists()
+    assert not (skill_dir / "categories.json").exists()
+    assert (skill_dir / "data" / "spending.md").exists()
+    assert (skill_dir / "data" / "categories.json").exists()
+    # skill.md stays at root
+    assert (skill_dir / "skill.md").exists()
+    assert plugin.data_dir == skill_dir / "data"
+
+
+def test_load_skill_no_migration_when_data_dir_exists(tmp_path: Path) -> None:
+    """If data/ already exists with files, migration is skipped."""
+    skill_dir = make_skill_dir(tmp_path, "budget", MINIMAL_SKILL_MD)
+    data_dir = skill_dir / "data"
+    data_dir.mkdir()
+    (data_dir / "spending.md").write_text("# Spending\n")
+    # Stale file at root (shouldn't be moved since data/ has content)
+    (skill_dir / "old.md").write_text("stale")
+
+    load_skill(skill_dir, "household")
+
+    # old.md stays where it is — migration skipped
+    assert (skill_dir / "old.md").exists()
+    assert (data_dir / "spending.md").exists()
 
 
 # ---------------------------------------------------------------------------

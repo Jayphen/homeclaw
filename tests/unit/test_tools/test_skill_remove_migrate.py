@@ -29,7 +29,9 @@ def make_skill(workspaces: Path, owner: str, name: str) -> Path:
     skill_dir = workspaces / owner / "skills" / name
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "skill.md").write_text(SKILL_MD.format(name=name))
-    (skill_dir / "notes.md").write_text(f"# {name} notes\n\n- Some data\n")
+    data_dir = skill_dir / "data"
+    data_dir.mkdir(exist_ok=True)
+    (data_dir / "notes.md").write_text(f"# {name} notes\n\n- Some data\n")
     return skill_dir
 
 
@@ -78,7 +80,7 @@ async def test_skill_remove_archives_household_skill(
     archive_path = Path(result["archive_path"])
     assert archive_path.exists()
     assert (archive_path / "skill.md").exists()
-    assert (archive_path / "notes.md").exists()
+    assert (archive_path / "data" / "notes.md").exists()
 
     # No longer in registry
     assert plugin_reg.get("weather") is None
@@ -129,8 +131,9 @@ async def test_skill_remove_preserves_all_data_files(
     registry: ToolRegistry, workspaces: Path
 ) -> None:
     skill_dir = make_skill(workspaces, "household", "recipes")
-    (skill_dir / "index.json").write_text('{"items": []}')
-    (skill_dir / "cache.md").write_text("# Cache\n\n- item1\n")
+    data_dir = skill_dir / "data"
+    (data_dir / "index.json").write_text('{"items": []}')
+    (data_dir / "cache.md").write_text("# Cache\n\n- item1\n")
 
     result = await registry.get_handler("skill_remove")(  # type: ignore[misc]
         person="alice", name="recipes", owner="household"
@@ -138,9 +141,9 @@ async def test_skill_remove_preserves_all_data_files(
 
     archive_path = Path(result["archive_path"])
     assert (archive_path / "skill.md").exists()
-    assert (archive_path / "notes.md").exists()
-    assert (archive_path / "index.json").exists()
-    assert (archive_path / "cache.md").exists()
+    assert (archive_path / "data" / "notes.md").exists()
+    assert (archive_path / "data" / "index.json").exists()
+    assert (archive_path / "data" / "cache.md").exists()
 
 
 @pytest.mark.asyncio
@@ -189,7 +192,7 @@ async def test_skill_migrate_household_to_private(
     new_dir = workspaces / "alice" / "skills" / "weather"
     assert new_dir.exists()
     assert (new_dir / "skill.md").exists()
-    assert (new_dir / "notes.md").exists()
+    assert (new_dir / "data" / "notes.md").exists()
 
     # Re-registered with new scope
     plugin = plugin_reg.get("weather")

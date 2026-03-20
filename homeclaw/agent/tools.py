@@ -1418,8 +1418,10 @@ def register_builtin_tools(
             return {"error": f"Skill '{slug}' already exists under {owner}"}
 
         skill_dir.mkdir(parents=True, exist_ok=True)
+        data_dir = skill_dir / "data"
+        data_dir.mkdir(exist_ok=True)
 
-        # Write skill.md
+        # Write skill.md (definition — lives in skill root, not data/)
         skill_md = render_skill_markdown(
             name=slug,
             description=description,
@@ -1431,13 +1433,13 @@ def register_builtin_tools(
 
         seeded: list[str] = []
 
-        # Write initial_files
+        # Write initial_files into data/
         for f in initial_files or []:
             filename = Path(f["filename"]).name  # strip any path components
-            (skill_dir / filename).write_text(f["content"])
+            (data_dir / filename).write_text(f["content"])
             seeded.append(filename)
 
-        # Copy from source_notes
+        # Copy from source_notes into data/
         for topic in source_notes or []:
             from homeclaw.memory.markdown import memory_read_topic
 
@@ -1445,13 +1447,16 @@ def register_builtin_tools(
             if content is None:
                 content = memory_read_topic(workspaces, "household", topic)
             if content is not None:
-                dest = skill_dir / f"{topic}.md"
+                dest = data_dir / f"{topic}.md"
                 dest.write_text(content)
                 seeded.append(f"{topic}.md")
             else:
-                _logger.warning("skill_create: topic '%s' not found for %s or household", topic, person)
+                _logger.warning(
+                    "skill_create: topic '%s' not found for %s or household",
+                    topic, person,
+                )
 
-        # Export source_bookmarks as markdown
+        # Export source_bookmarks as markdown into data/
         if source_bookmarks:
             bm_category = source_bookmarks.get("category")
             bm_ids: list[str] = source_bookmarks.get("ids", [])
@@ -1470,7 +1475,7 @@ def register_builtin_tools(
                     if bm.saved_by:
                         lines.append(f"- Saved by: {bm.saved_by}")
                     lines.append("")
-                (skill_dir / "bookmarks.md").write_text("\n".join(lines))
+                (data_dir / "bookmarks.md").write_text("\n".join(lines))
                 seeded.append("bookmarks.md")
 
         # Hot-load into registry
@@ -1509,10 +1514,13 @@ def register_builtin_tools(
                 "Create a new skill — a self-contained mini-app with its own "
                 "data directory. Skills can be data-only (budget tracker, "
                 "recipe book) or wrap external APIs via http_call. Every "
-                "skill gets data_list, data_read, and data_write tools. "
-                "Choose 'household' scope to share with everyone, or "
+                "skill gets data_list, data_read, data_write, and data_delete "
+                "tools. Choose 'household' scope to share with everyone, or "
                 "'private' to keep it personal. Markdown files in the skill "
-                "directory are automatically indexed by semantic memory."
+                "directory are automatically indexed by semantic memory. "
+                "Use a single canonical file per topic (e.g. 'spending.md') "
+                "and append new entries to it — do not create date-suffixed "
+                "or numbered duplicates."
             ),
             parameters={
                 "type": "object",
@@ -1666,6 +1674,124 @@ def register_builtin_tools(
             },
         ),
         skill_remove,
+    )
+
+    async def skill_update(
+        *,
+        person: str,
+        name: str,
+        owner: str,
+        instructions: str | None = None,
+        description: str | None = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        from homeclaw.plugins.registry import PluginType
+        from homeclaw.plugins.skills.loader import (
+            load_skill,
+            parse_skill_markdown,
+            render_skill_markdown,
+        )
+
+        skill_dir = workspaces / safe_slug(owner) / "skills" / safe_slug(name)
+        skill_md_path = skill_dir / "skill.md"
+        if not skill_md_path.exists():
+            return {"error": f"Skill '{name}' not found under '{owner}'"}
+
+        defn = parse_skill_markdown(skill_md_path.read_text())
+
+        new_desc = description if description is not None else defn.description
+        new_instr = instructions if instructions is not None else defn.instructions
+
+        updated_md = render_skill_markdown(
+            name=defn.name,
+            description=new_desc,
+            allowed_domains=defn.allowed_domains,
+            instructions=new_instr,
+            tools=[
+                {
+                    "name": t.name,
+                    "description": t.description,
+                    "params": [
+                        {
+                            "name": p.name,
+                            "type": p.type,
+                            "required": p.required,
+                            "description": p.description,
+                        }
+                        for p in t.parameters
+                    ],
+                }
+                for t in defn.tools
+            ],
+        )
+        skill_md_path.write_text(updated_md)
+
+        # Re-register so the plugin picks up the new instructions
+        loaded = False
+        if plugin_registry is not None:
+            plugin_registry.unregister(name)
+            try:
+                plugin = load_skill(skill_dir, owner)
+                plugin_registry.register(plugin, PluginType.SKILL)
+                loaded = True
+            except Exception as e:
+                _logger.exception("skill_update: failed to re-load skill '%s'", name)
+                return {
+                    "status": "updated",
+                    "name": name,
+                    "loaded": False,
+                    "warning": f"Skill updated but failed to reload: {e}",
+                }
+
+        return {
+            "status": "updated",
+            "name": name,
+            "owner": owner,
+            "loaded": loaded,
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="skill_update",
+            description=(
+                "Update a skill's instructions or description without "
+                "recreating it. The skill definition (skill.md) is rewritten "
+                "and the skill is reloaded. Does not affect data files."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {
+                        "type": "string",
+                        "description": "Household member requesting the update",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Skill name to update",
+                    },
+                    "owner": {
+                        "type": "string",
+                        "description": "Who owns the skill: 'household' or a person's name",
+                    },
+                    "instructions": {
+                        "type": "string",
+                        "description": (
+                            "New instructions (replaces existing). "
+                            "Omit to keep current."
+                        ),
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": (
+                            "New description (replaces existing). "
+                            "Omit to keep current."
+                        ),
+                    },
+                },
+                "required": ["person", "name", "owner"],
+            },
+        ),
+        skill_update,
     )
 
     async def skill_migrate(

@@ -32,6 +32,10 @@ In a direct message, notes, memory updates, and reminders always belong to the p
 you are talking to. Use their name for the `person` parameter — never attribute their \
 notes or reminders to someone else, even if they mention another household member.
 
+Only your final response (after all tool calls are complete) is shown to the user. \
+The user cannot see your intermediate thoughts or tool-call responses. Never reference, \
+correct, or apologize for something you said during a tool-call round — the user never saw it.
+
 Act on what you hear. If you don't call a tool to save something, you WILL forget it next \
 conversation. These are the kinds of moments to save — not an exhaustive list, use your \
 judgment for anything worth remembering:
@@ -55,6 +59,13 @@ reviews, tips, experiences.
 When someone asks for suggestions — what to do, where to eat, what to cook — search saved \
 bookmarks with bookmark_search before answering. The household has been collecting these \
 recommendations for a reason.
+
+When working with skill data files: always call data_list before writing to check what \
+files already exist. Use one canonical file per topic (e.g. 'spending.md') and append to \
+it — never create date-suffixed or numbered variants like 'spending_march_2026.md' or \
+'spending_1.md'. If you find duplicates, consolidate into the canonical file and delete \
+the redundant ones with data_delete. Skill instructions (skill.md) are separate from data \
+— use skill_update to change instructions, data_write/data_delete to manage data files.
 
 Be proactive, not just reactive. When you notice something relevant in the context, mention \
 it briefly — a birthday coming up, a contact overdue for a check-in, a reminder that is due, \
@@ -88,6 +99,7 @@ _PERSONAL_WRITE_TOOLS = frozenset({
     "reminder_delete",
     "bookmark_save",
     "skill_create",
+    "skill_update",
     "skill_remove",
     "skill_migrate",
     "decision_log",
@@ -316,13 +328,18 @@ def _strip_images(content: str | list[Any]) -> str:
 
 def _save_history(workspaces: Path, person: str, messages: list[Message]) -> None:
     path = _history_path(workspaces, person)
-    # Strip tool messages before persisting — they contain ephemeral tool_call_ids
-    # that will be rejected by the API if replayed in a later session.
+    # Strip tool messages and intermediate assistant messages (those with
+    # tool_calls) before persisting.  Intermediate assistant content was never
+    # shown to the user, and without accompanying tool results it confuses
+    # the model in future conversations (it may reference or "correct"
+    # things the user never saw).
     persistent: list[Message] = []
     for m in messages:
-        if m.role not in ("user", "assistant"):
-            continue
-        # Replace image blocks with text placeholders to avoid storing large base64
-        persistent.append(m.model_copy(update={"content": _strip_images(m.content)}))
+        if m.role == "user":
+            # Replace image blocks with text placeholders to avoid storing large base64
+            persistent.append(m.model_copy(update={"content": _strip_images(m.content)}))
+        elif m.role == "assistant" and not m.tool_calls:
+            persistent.append(m.model_copy(update={"content": _strip_images(m.content)}))
+        # Skip tool messages and intermediate assistant messages (with tool_calls)
     lines = [m.model_dump_json() for m in persistent[-100:]]
     path.write_text("\n".join(lines) + "\n")

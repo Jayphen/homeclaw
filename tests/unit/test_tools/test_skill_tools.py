@@ -253,10 +253,10 @@ async def test_skill_create_with_initial_files(
         ],
     )
     assert result["status"] == "created"
-    skill_dir = workspaces / "alice" / "skills" / "recipes"
-    assert (skill_dir / "notes.md").exists()
-    assert "Pasta" in (skill_dir / "notes.md").read_text()
-    assert (skill_dir / "config.json").exists()
+    data_dir = workspaces / "alice" / "skills" / "recipes" / "data"
+    assert (data_dir / "notes.md").exists()
+    assert "Pasta" in (data_dir / "notes.md").read_text()
+    assert (data_dir / "config.json").exists()
     assert "seeded_files" in result
     assert "notes.md" in result["seeded_files"]
 
@@ -276,9 +276,9 @@ async def test_skill_create_initial_files_strips_path(
         initial_files=[{"filename": "../../../etc/evil.txt", "content": "evil"}],
     )
     assert result["status"] == "created"
-    skill_dir = workspaces / "alice" / "skills" / "safe_test"
+    data_dir = workspaces / "alice" / "skills" / "safe_test" / "data"
     # File is created with just the basename, not the full path
-    assert (skill_dir / "evil.txt").exists()
+    assert (data_dir / "evil.txt").exists()
     # Parent directories were not escaped
     assert not (workspaces / "etc" / "evil.txt").exists()
 
@@ -307,9 +307,9 @@ async def test_skill_create_with_source_notes(
         source_notes=["recipes"],
     )
     assert result["status"] == "created"
-    skill_dir = workspaces / "alice" / "skills" / "food_skill"
-    assert (skill_dir / "recipes.md").exists()
-    assert "Pasta carbonara" in (skill_dir / "recipes.md").read_text()
+    data_dir = workspaces / "alice" / "skills" / "food_skill" / "data"
+    assert (data_dir / "recipes.md").exists()
+    assert "Pasta carbonara" in (data_dir / "recipes.md").read_text()
     assert "recipes.md" in result["seeded_files"]
 
 
@@ -332,8 +332,8 @@ async def test_skill_create_source_notes_falls_back_to_household(
         source_notes=["house-rules"],
     )
     assert result["status"] == "created"
-    skill_dir = workspaces / "household" / "skills" / "rules_skill"
-    assert (skill_dir / "house-rules.md").exists()
+    data_dir = workspaces / "household" / "skills" / "rules_skill" / "data"
+    assert (data_dir / "house-rules.md").exists()
 
 
 @pytest.mark.asyncio
@@ -388,9 +388,9 @@ async def test_skill_create_with_source_bookmarks(
         source_bookmarks={"category": "place"},
     )
     assert result["status"] == "created"
-    skill_dir = workspaces / "household" / "skills" / "dining_skill"
-    assert (skill_dir / "bookmarks.md").exists()
-    content = (skill_dir / "bookmarks.md").read_text()
+    data_dir = workspaces / "household" / "skills" / "dining_skill" / "data"
+    assert (data_dir / "bookmarks.md").exists()
+    content = (data_dir / "bookmarks.md").read_text()
     assert "French Laundry" in content
     assert "fine-dining" in content
     assert "bookmarks.md" in result["seeded_files"]
@@ -417,8 +417,8 @@ async def test_skill_create_source_bookmarks_by_ids(
         source_bookmarks={"ids": ["keep1"]},
     )
     assert result["status"] == "created"
-    skill_dir = workspaces / "household" / "skills" / "selected_skill"
-    content = (skill_dir / "bookmarks.md").read_text()
+    data_dir = workspaces / "household" / "skills" / "selected_skill" / "data"
+    content = (data_dir / "bookmarks.md").read_text()
     assert "Keep This" in content
     assert "Skip This" not in content
 

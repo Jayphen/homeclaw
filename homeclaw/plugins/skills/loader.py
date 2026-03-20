@@ -257,14 +257,16 @@ def _parse_tools_section(lines: list[str]) -> list[SkillToolDef]:
 class SkillPlugin:
     """Adapts a ``SkillDefinition`` into the Plugin Protocol.
 
-    Every skill gets ``data_list``, ``data_read``, and ``data_write`` tools
-    for managing files in its directory.  Skills that declare
-    ``allowed_domains`` also get an ``http_call`` tool scoped to those
-    domains.
+    Every skill gets ``data_list``, ``data_read``, ``data_write``, and
+    ``data_delete`` tools for managing files in its data directory.  Skills
+    that declare ``allowed_domains`` also get an ``http_call`` tool scoped
+    to those domains.
+
+    Skill definition (``skill.md``) lives in ``skill_dir``.  Data files
+    live in ``skill_dir/data/``, keeping instructions separate from data.
 
     Attributes:
-        data_dir: The skill's directory. Skill data files (.md, .json) live
-            here alongside ``skill.md``. memsearch indexes any .md files.
+        data_dir: The skill's data directory (``skill_dir/data/``).
         scope: ``"household"`` or a person name — where the skill lives.
     """
 
@@ -272,7 +274,9 @@ class SkillPlugin:
         self.name: str = definition.name
         self.description: str = definition.description
         self.scope: str = scope
-        self.data_dir: Path = skill_dir
+        self.data_dir: Path = skill_dir / "data"
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self._skill_dir = skill_dir
         self._definition = definition
         self._config = HttpCallConfig(
             allowed_domains=definition.allowed_domains,
@@ -290,16 +294,16 @@ class SkillPlugin:
     def tools(self) -> list[ToolDefinition]:
         """Return tool definitions for this skill.
 
-        Every skill gets ``data_list``, ``data_read``, and ``data_write``
-        for managing files in its directory.  If the skill declares
-        ``allowed_domains``, it also gets ``http_call``.
+        Every skill gets ``data_list``, ``data_read``, ``data_write``, and
+        ``data_delete`` for managing files in its directory.  If the skill
+        declares ``allowed_domains``, it also gets ``http_call``.
         """
         defs: list[ToolDefinition] = [
             ToolDefinition(
                 name="data_list",
                 description=(
                     f"List data files in the '{self.name}' skill directory. "
-                    f"Returns filenames (excluding skill.md and logs/)."
+                    f"Returns filenames of data files."
                 ),
                 parameters={
                     "type": "object",
@@ -328,7 +332,10 @@ class SkillPlugin:
                 name="data_write",
                 description=(
                     f"Write or overwrite a data file in the '{self.name}' "
-                    f"skill directory. Use for creating or updating files."
+                    f"skill directory. IMPORTANT: Before creating a new file, "
+                    f"call data_list first to check for existing files that "
+                    f"cover the same topic — update the existing file instead "
+                    f"of creating a duplicate."
                 ),
                 parameters={
                     "type": "object",
@@ -345,6 +352,25 @@ class SkillPlugin:
                         },
                     },
                     "required": ["filename", "content"],
+                },
+            ),
+            ToolDefinition(
+                name="data_delete",
+                description=(
+                    f"Delete a data file from the '{self.name}' skill "
+                    f"directory. Use to remove redundant or obsolete files."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "filename": {
+                            "type": "string",
+                            "description": (
+                                "Name of the file to delete"
+                            ),
+                        },
+                    },
+                    "required": ["filename"],
                 },
             ),
         ]
@@ -391,11 +417,9 @@ class SkillPlugin:
         return defs
 
     def _safe_path(self, filename: str) -> Path | None:
-        """Resolve *filename* inside the skill directory, rejecting traversal."""
+        """Resolve *filename* inside the data directory, rejecting traversal."""
         resolved = (self.data_dir / filename).resolve()
         if not resolved.is_relative_to(self.data_dir.resolve()):
-            return None
-        if resolved.name == "skill.md":
             return None
         return resolved
 
@@ -409,6 +433,8 @@ class SkillPlugin:
             return self._handle_data_write(
                 args.get("filename", ""), args.get("content", ""),
             )
+        if name == "data_delete":
+            return self._handle_data_delete(args.get("filename", ""))
         if name == "http_call":
             return await http_call(
                 url=args.get("url", ""),
@@ -423,7 +449,7 @@ class SkillPlugin:
         files: list[str] = []
         if self.data_dir.is_dir():
             for child in sorted(self.data_dir.iterdir()):
-                if child.name == "skill.md" or child.is_dir():
+                if child.is_dir():
                     continue
                 files.append(child.name)
         return {"files": files}
@@ -452,6 +478,17 @@ class SkillPlugin:
             "size": len(content),
             "status": "written",
         }
+
+    def _handle_data_delete(self, filename: str) -> dict[str, Any]:
+        if not filename:
+            return {"error": "filename is required"}
+        path = self._safe_path(filename)
+        if path is None:
+            return {"error": f"Invalid filename: {filename}"}
+        if not path.is_file():
+            return {"error": f"File not found: {filename}"}
+        path.unlink()
+        return {"filename": filename, "status": "deleted"}
 
     def routines(self) -> list[RoutineDefinition]:
         """Skills don't have routines."""
@@ -496,8 +533,38 @@ def discover_skills(workspaces: Path, person: str) -> list[SkillLocation]:
     return locations
 
 
+def _migrate_skill_data(skill_dir: Path) -> None:
+    """Migrate legacy skills that stored data alongside skill.md.
+
+    Moves all non-directory files (except ``skill.md``) from the skill
+    root into a ``data/`` subdirectory.  Idempotent — does nothing if
+    ``data/`` already exists and contains files, or if there's nothing
+    to migrate.
+    """
+    data_dir = skill_dir / "data"
+    if data_dir.is_dir() and any(data_dir.iterdir()):
+        return  # Already migrated
+
+    files_to_move = [
+        f for f in skill_dir.iterdir()
+        if f.is_file() and f.name != "skill.md"
+    ]
+    if not files_to_move:
+        return
+
+    data_dir.mkdir(exist_ok=True)
+    for f in files_to_move:
+        dest = data_dir / f.name
+        f.rename(dest)
+    logger.info(
+        "Migrated %d data files into %s",
+        len(files_to_move), data_dir,
+    )
+
+
 def load_skill(skill_dir: Path, scope: str) -> SkillPlugin:
     """Parse ``skill.md`` inside *skill_dir* and return a ``SkillPlugin``."""
+    _migrate_skill_data(skill_dir)
     path = skill_dir / "skill.md"
     content = path.read_text()
     definition = parse_skill_markdown(content)
