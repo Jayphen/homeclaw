@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.9](https://github.com/Jayphen/homeclaw/compare/v0.5.8...v0.5.9) (2026-03-20)
+
+
+### Features
+
+* support sending messages to household group chat ([28a01c8](https://github.com/Jayphen/homeclaw/commit/28a01c88457b4f72816baa5f5653273957beeddf))
+
 ## [0.5.8](https://github.com/Jayphen/homeclaw/compare/v0.5.7...v0.5.8) (2026-03-20)
 
 
