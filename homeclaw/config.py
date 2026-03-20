@@ -14,6 +14,12 @@ from homeclaw.agent.routing import RoutingConfig
 
 logger = logging.getLogger(__name__)
 
+
+def _normalize_phone(raw: str) -> str:
+    """Normalize a phone number to digits only, stripping +, spaces, dashes."""
+    return raw.translate(str.maketrans("", "", "+- ()")).strip()
+
+
 # Lock for config.json read-modify-write to prevent concurrent clobber.
 _config_save_lock = asyncio.Lock()
 
@@ -98,14 +104,19 @@ class HomeclawConfig(BaseSettings):
 
     @property
     def whatsapp_allowed_phone_numbers(self) -> set[str] | None:
-        """Parse allowed phone numbers, or None if unrestricted."""
+        """Parse allowed phone numbers, or None if unrestricted.
+
+        Normalizes numbers by stripping ``+``, spaces, dashes, and
+        parentheses so users can enter numbers in any common format
+        (e.g. ``+61 412 345 678``, ``0412345678``, ``61412345678``).
+        """
         if not self.whatsapp_allowed_users:
             return None
         numbers: set[str] = set()
         for part in self.whatsapp_allowed_users.split(","):
-            part = part.strip()
-            if part:
-                numbers.add(part)
+            normalized = _normalize_phone(part)
+            if normalized:
+                numbers.add(normalized)
         return numbers if numbers else None
 
     # Web search (Jina)

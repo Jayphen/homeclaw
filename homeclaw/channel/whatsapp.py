@@ -165,7 +165,9 @@ class WhatsAppChannel:
     def _is_allowed(self, phone: str) -> bool:
         if self._allowed_phones is None:
             return True
-        return phone in self._allowed_phones
+        # Normalize incoming phone to match the normalized allowed list
+        normalized = phone.translate(str.maketrans("", "", "+- ()")).strip()
+        return normalized in self._allowed_phones
 
     def _resolve_person(self, phone: str) -> str | None:
         return self._user_map.get(phone)
@@ -178,7 +180,11 @@ class WhatsAppChannel:
         phone: str = ev.Info.MessageSource.Sender.User
 
         if not self._is_allowed(phone):
-            logger.warning("Rejected message from unauthorized phone %s", phone)
+            logger.warning(
+                "Rejected message from unauthorized phone %s — "
+                "add this number to whatsapp_allowed_users in Settings",
+                phone,
+            )
             return
 
         # Image messages are handled separately
