@@ -9,10 +9,18 @@ export function renderMarkdown(src: string): string {
 }
 
 /**
- * Render a short markdown preview — inline only (no block elements).
- * Strips headings markers, renders bold/italic/code, returns a single
- * line of HTML suitable for use inside a <p> or <span>.
+ * Render a short markdown preview — strips block-level syntax (headings,
+ * list markers, blockquotes) then renders inline formatting (bold, italic,
+ * code, links). Returns a single line of HTML for use inside a <p>.
  */
 export function renderInlineMarkdown(src: string): string {
-  return DOMPurify.sanitize(marked.parseInline(src) as string);
+  const stripped = src
+    .replace(/^#{1,6}\s+/gm, "")       // ## Heading → Heading
+    .replace(/^[-*+]\s+/gm, "")         // - item → item
+    .replace(/^\d+\.\s+/gm, "")         // 1. item → item
+    .replace(/^>\s?/gm, "")             // > quote → quote
+    .replace(/\n/g, " ")                // collapse to single line
+    .replace(/\s{2,}/g, " ")            // collapse whitespace
+    .trim();
+  return DOMPurify.sanitize(marked.parseInline(stripped) as string);
 }

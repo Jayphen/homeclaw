@@ -17,7 +17,7 @@
   } from "date-fns";
   import { querystring } from "svelte-spa-router";
   import { api } from "$lib/api";
-  import { renderInlineMarkdown } from "$lib/markdown";
+  import { renderMarkdown } from "$lib/markdown";
 
   type ViewMode = "month" | "schedule";
 
@@ -317,7 +317,7 @@
                     <a class="ev-link" href="#/notes/{ev.person}/{ev.date}">View note</a>
                   {/if}
                 </div>
-                <p class="ev-summary">{@html renderInlineMarkdown(ev.summary)}</p>
+                <div class="ev-summary">{@html renderMarkdown(ev.summary)}</div>
               </div>
             </li>
           {/each}
@@ -356,7 +356,7 @@
                         <a class="ev-link" href="#/notes/{ev.person}/{ev.date}">View note</a>
                       {/if}
                     </div>
-                    <p class="ev-summary">{@html renderInlineMarkdown(ev.summary)}</p>
+                    <div class="ev-summary">{@html renderMarkdown(ev.summary)}</div>
                   </div>
                 </div>
               {/each}
@@ -656,6 +656,28 @@
     font-size: 0.85rem;
     line-height: 1.4;
     color: var(--text);
+  }
+
+  .ev-summary :global(p) {
+    margin: 0 0 0.3rem;
+  }
+
+  .ev-summary :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  .ev-summary :global(ul),
+  .ev-summary :global(ol) {
+    margin: 0.2rem 0;
+    padding-left: 1.2rem;
+  }
+
+  .ev-summary :global(h1),
+  .ev-summary :global(h2),
+  .ev-summary :global(h3) {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0 0 0.2rem;
   }
 
   .empty-day .nothing {
