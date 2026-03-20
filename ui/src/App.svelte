@@ -156,6 +156,7 @@
       <a href="#/contacts">Contacts</a>
       <a href="#/plugins">Plugins</a>
       <a href="#/settings">Settings</a>
+      <button class="sign-out" onclick={() => { clearToken(); state = "login"; }}>Sign out</button>
     </div>
   </nav>
 
@@ -226,6 +227,24 @@
   }
 
   .links a:hover {
+    color: var(--text);
+    background: rgba(45, 41, 38, 0.04);
+  }
+
+  .sign-out {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .sign-out:hover {
     color: var(--text);
     background: rgba(45, 41, 38, 0.04);
   }

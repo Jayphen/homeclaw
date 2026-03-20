@@ -20,6 +20,8 @@
     ha_configured: boolean;
     conversation_model: string;
     routine_model: string;
+    members?: string[];
+    members_with_passwords?: string[];
   }
 
   let setup: SetupStatus | null = $state(null);
@@ -117,6 +119,10 @@
   let newPassword: string = $state("");
   let newPasswordConfirm: string = $state("");
 
+  // Member account management
+  let memberPasswords: Record<string, string> = $state({});
+  let memberSaveStatus: Record<string, "idle" | "saving" | "saved" | "error"> = $state({});
+
   async function exportData() {
     if (dataState !== "idle") return;
     dataState = "exporting";
@@ -189,6 +195,28 @@
     } catch (e: any) {
       error = e.message;
       pageState = "error";
+    }
+  }
+
+  async function saveMemberPassword(member: string) {
+    const pw = memberPasswords[member] ?? "";
+    memberSaveStatus = { ...memberSaveStatus, [member]: "saving" };
+    try {
+      const r = await api("/api/setup/members/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ member, password: pw }),
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+      memberSaveStatus = { ...memberSaveStatus, [member]: "saved" };
+      memberPasswords = { ...memberPasswords, [member]: "" };
+      // Refresh to update members_with_passwords
+      await fetchAll();
+      setTimeout(() => {
+        memberSaveStatus = { ...memberSaveStatus, [member]: "idle" };
+      }, 2000);
+    } catch {
+      memberSaveStatus = { ...memberSaveStatus, [member]: "error" };
     }
   }
 
@@ -454,7 +482,7 @@
     </section>
 
     <section class="card">
-      <h2>Change password</h2>
+      <h2>Change admin password</h2>
       <div class="field">
         <label for="new-pw">New password</label>
         <input id="new-pw" type="password" bind:value={newPassword} placeholder="Leave blank to keep current" />
@@ -464,6 +492,48 @@
         <input id="new-pw-confirm" type="password" bind:value={newPasswordConfirm} placeholder="Confirm" />
       </div>
     </section>
+
+    {#if setup.members && setup.members.length > 0}
+      <section class="card">
+        <h2>Member accounts</h2>
+        <small class="field-hint" style="margin-bottom: 0.75rem; display: block;">
+          Set passwords to allow members to log in with their own account. Members only see their own data.
+        </small>
+        {#each setup.members as member}
+          <div class="member-row">
+            <span class="member-name">
+              {member}
+              {#if setup.members_with_passwords?.includes(member)}
+                <span class="member-badge">has login</span>
+              {/if}
+            </span>
+            <div class="member-pw-row">
+              <input
+                type="password"
+                bind:value={memberPasswords[member]}
+                placeholder={setup.members_with_passwords?.includes(member) ? "New password (or blank to remove)" : "Set password"}
+              />
+              <button
+                class="btn secondary"
+                onclick={() => saveMemberPassword(member)}
+                disabled={memberSaveStatus[member] === "saving"}
+              >
+                {#if memberSaveStatus[member] === "saving"}
+                  Saving...
+                {:else if memberSaveStatus[member] === "saved"}
+                  Saved
+                {:else}
+                  Set
+                {/if}
+              </button>
+            </div>
+            {#if memberSaveStatus[member] === "error"}
+              <small class="field-hint" style="color: var(--terracotta);">Failed to update password.</small>
+            {/if}
+          </div>
+        {/each}
+      </section>
+    {/if}
 
     <div class="save-row">
       <button class="btn primary" onclick={saveConfig} disabled={saveState === "saving"}>
@@ -765,6 +835,54 @@
     border-radius: 8px;
     border: 1px solid var(--border);
     margin-bottom: 0.5rem;
+  }
+
+  /* ---- Member accounts ---- */
+  .member-row {
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .member-row:last-child { border-bottom: none; }
+
+  .member-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.35rem;
+  }
+
+  .member-badge {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--sage);
+    background: rgba(106, 153, 78, 0.1);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+  }
+
+  .member-pw-row {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .member-pw-row input {
+    flex: 1;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-family: var(--font-sans);
+    background: #fdfcfa;
+    color: var(--text);
+  }
+
+  .member-pw-row input:focus {
+    outline: none;
+    border-color: var(--terracotta);
   }
 
   /* ---- Save row ---- */

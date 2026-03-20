@@ -75,7 +75,8 @@ async def setup_status(request: Request) -> dict[str, Any]:
             return base
 
     base.update({
-        "members": members_with_passwords,
+        "members": members,
+        "members_with_passwords": members_with_passwords,
         "provider": config.provider,
         "model": config.model,
         "anthropic_api_key": _mask(config.anthropic_api_key),
