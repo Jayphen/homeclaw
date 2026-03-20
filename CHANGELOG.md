@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.5](https://github.com/Jayphen/homeclaw/compare/v0.4.4...v0.4.5) (2026-03-20)
+
+
+### Bug Fixes
+
+* calendar route uses real reminder store, reads notes efficiently ([247f8f3](https://github.com/Jayphen/homeclaw/commit/247f8f3cd47a5dd095578fe0046dbf95cc66c90e))
+* import clearToken so sign-out button works ([09a348f](https://github.com/Jayphen/homeclaw/commit/09a348f9062931a86970e1fb98be54b9119e83cc))
+* render markdown in calendar summaries and note previews ([73650d5](https://github.com/Jayphen/homeclaw/commit/73650d5e8aa0b44dbeed24483e45adc87796a13a))
+
 ## [0.4.4](https://github.com/Jayphen/homeclaw/compare/v0.4.3...v0.4.4) (2026-03-20)
 
 
