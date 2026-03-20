@@ -35,6 +35,23 @@ class Scheduler:
             return CronTrigger(**trigger_kwargs)
         return IntervalTrigger(**trigger_kwargs)
 
+    def _make_routine_func(self, description: str) -> Any:
+        """Create the async callable for a routine job."""
+        loop = self._loop
+
+        async def _run_routine() -> None:
+            logger.info("Routine fired: %s", description)
+            try:
+                await loop.run(
+                    f"[Scheduled routine] {description}",
+                    HOUSEHOLD_WORKSPACE,
+                    call_type=CallType.ROUTINE,
+                )
+            except Exception:
+                logger.exception("Routine failed: %s", description)
+
+        return _run_routine
+
     def _add_routine_job(
         self,
         job_id: str,
@@ -44,23 +61,13 @@ class Scheduler:
     ) -> None:
         trigger = self._make_trigger(trigger_type, trigger_kwargs)
 
-        async def _run_routine() -> None:
-            logger.info("Routine fired: %s", description)
-            try:
-                await self._loop.run(
-                    f"[Scheduled routine] {description}",
-                    HOUSEHOLD_WORKSPACE,
-                    call_type=CallType.ROUTINE,
-                )
-            except Exception:
-                logger.exception("Routine failed: %s", description)
-
         self._scheduler.add_job(
-            _run_routine,
+            self._make_routine_func(description),
             trigger=trigger,
             id=job_id,
             name=description,
             replace_existing=True,
+            misfire_grace_time=900,  # 15 min grace period to avoid silent skips
         )
         self._job_count += 1
         logger.info("Registered routine: %s (%s)", job_id, trigger)
@@ -135,6 +142,17 @@ class Scheduler:
             self._scheduler.start()
             logger.info("Scheduler started after reload with %d routines", count)
         return count
+
+    async def run_now(self, name: str) -> bool:
+        """Trigger a routine by slug name immediately. Returns True if found."""
+        job_id = f"routine:{name}"
+        job = self._scheduler.get_job(job_id)
+        if job is None:
+            return False
+        logger.info("Manual trigger: %s", job.name)
+        # Run the routine function directly (same as scheduled execution)
+        await job.func()
+        return True
 
     @property
     def job_count(self) -> int:

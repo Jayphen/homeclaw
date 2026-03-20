@@ -72,6 +72,7 @@ def register_builtin_tools(
     registry: ToolRegistry,
     workspaces: Path,
     on_routines_changed: Callable[[], None] | None = None,
+    on_routine_run: Callable[[str], Coroutine[Any, Any, bool]] | None = None,
     config: Any = None,
     plugin_registry: Any = None,  # PluginRegistry | None — avoided to prevent circular import
     dispatcher: Any = None,  # ChannelDispatcher | None — avoided to prevent circular import
@@ -1308,6 +1309,36 @@ def register_builtin_tools(
             },
         ),
         routine_remove,
+    )
+
+    async def routine_run(*, name: str, **_: Any) -> dict[str, Any]:
+        if on_routine_run is None:
+            return {"error": "Scheduler not available"}
+        found = await on_routine_run(name)
+        if not found:
+            return {"error": f"Routine '{name}' not found — use routine_list to see available names"}
+        return {"status": "triggered", "name": name}
+
+    registry.register(
+        ToolDefinition(
+            name="routine_run",
+            description=(
+                "Manually trigger a scheduled routine to run right now. "
+                "Use this when a routine was missed or a user asks to run one immediately. "
+                "The routine executes in the background as if it fired on schedule."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The routine slug name (e.g. 'morning_briefing')",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        routine_run,
     )
 
     # --- Skill tools ---

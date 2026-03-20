@@ -122,6 +122,7 @@ class HomeclawApp:
                 self.registry,
                 self.workspaces,
                 on_routines_changed=self._reload_routines,
+                on_routine_run=self._run_routine,
                 config=self.config,
                 plugin_registry=self.plugin_registry,
                 dispatcher=self.dispatcher,
@@ -159,6 +160,12 @@ class HomeclawApp:
         """Called by routine tools when ROUTINES.md changes."""
         if self._scheduler:
             self._scheduler.reload_routines()
+
+    async def _run_routine(self, name: str) -> bool:
+        """Manually trigger a routine by slug name."""
+        if self._scheduler:
+            return await self._scheduler.run_now(name)
+        return False
 
     def load_scheduler(self) -> None:
         """Parse ROUTINES.md and register routines (does not start the event loop)."""
