@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/Jayphen/homeclaw/compare/v0.5.1...v0.5.2) (2026-03-20)
+
+
+### Bug Fixes
+
+* add debug logging and error handling to WhatsApp message handler ([acd658b](https://github.com/Jayphen/homeclaw/commit/acd658ba8bc41b6da92d2e6762c8679093be4387))
+
 ## [0.5.1](https://github.com/Jayphen/homeclaw/compare/v0.5.0...v0.5.1) (2026-03-20)
 
 
