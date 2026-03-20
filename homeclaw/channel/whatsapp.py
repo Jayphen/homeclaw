@@ -24,6 +24,25 @@ logger = logging.getLogger(__name__)
 
 # Maps phone numbers to household member names.
 _USER_MAP_FILE = "whatsapp_users.json"
+_GROUPS_FILE = "whatsapp_groups.json"
+
+
+def _load_known_groups(workspaces: Path) -> set[str]:
+    import json
+    path = workspaces / "household" / _GROUPS_FILE
+    if not path.exists():
+        return set()
+    try:
+        return set(json.loads(path.read_text()))
+    except (json.JSONDecodeError, OSError):
+        return set()
+
+
+def _save_known_groups(workspaces: Path, groups: set[str]) -> None:
+    import json
+    path = workspaces / "household" / _GROUPS_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(sorted(groups)) + "\n")
 
 
 def _extract_text(ev: Any) -> str | None:
@@ -132,7 +151,7 @@ class WhatsAppChannel:
 
         self._connected = False
         self._last_qr: bytes | None = None  # Raw QR data for web UI
-        self._known_groups: set[str] = set()  # Group JID Users seen
+        self._known_groups: set[str] = _load_known_groups(workspaces)
 
         # Store event types so _register_handlers can reference them
         self._ConnectedEv = ConnectedEv
@@ -267,7 +286,9 @@ class WhatsAppChannel:
         is_group: bool = ev.Info.MessageSource.IsGroup
         chat: Any = ev.Info.MessageSource.Chat
         if is_group:
-            self._known_groups.add(chat.User)
+            if chat.User not in self._known_groups:
+                self._known_groups.add(chat.User)
+                _save_known_groups(self._workspaces, self._known_groups)
             user_text = f"[{person}] {text}"
             channel: str | None = f"group-{chat.User}"
         else:
