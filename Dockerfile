@@ -10,6 +10,9 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 
+# System libraries needed at runtime (libmagic for python-magic / neonize)
+RUN apt-get update && apt-get install -y --no-install-recommends libmagic1 && rm -rf /var/lib/apt/lists/*
+
 # Install deps first (cached unless pyproject.toml changes)
 COPY pyproject.toml .
 COPY homeclaw/__init__.py homeclaw/__init__.py

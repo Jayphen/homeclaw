@@ -13,6 +13,7 @@
     telegram_configured: boolean;
     telegram_allowed_users: string | null;
     whatsapp_configured: boolean;
+    whatsapp_connected: boolean;
     whatsapp_phone_number: string | null;
     whatsapp_allowed_users: string | null;
     jina_api_key: string | null;
@@ -107,6 +108,9 @@
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
   let whatsappEnabled: boolean = $state(false);
+  let whatsappConnected: boolean = $state(false);
+  let whatsappQrUrl: string | null = $state(null);
+  let whatsappQrLoading: boolean = $state(false);
   let whatsappPhoneNumber: string = $state("");
   let whatsappAllowedUsers: string = $state("");
   let timezoneValue: string = $state("");
@@ -176,14 +180,33 @@
       openaiBaseUrl = setup!.openai_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
       whatsappEnabled = setup!.whatsapp_configured;
+      whatsappConnected = setup!.whatsapp_connected;
       whatsappPhoneNumber = setup!.whatsapp_phone_number || "";
       whatsappAllowedUsers = setup!.whatsapp_allowed_users || "";
       timezoneValue = setup!.timezone || "";
+      if (whatsappEnabled && !whatsappConnected) fetchWhatsAppQr();
       pageState = "ready";
     } catch (e: any) {
       error = e.message;
       pageState = "error";
     }
+  }
+
+  async function fetchWhatsAppQr() {
+    whatsappQrLoading = true;
+    try {
+      const r = await api("/api/setup/whatsapp/qr");
+      if (r.ok) {
+        const blob = await r.blob();
+        if (whatsappQrUrl) URL.revokeObjectURL(whatsappQrUrl);
+        whatsappQrUrl = URL.createObjectURL(blob);
+      } else {
+        whatsappQrUrl = null;
+      }
+    } catch {
+      whatsappQrUrl = null;
+    }
+    whatsappQrLoading = false;
   }
 
   async function saveConfig() {
@@ -242,6 +265,7 @@
       openaiBaseUrl = setup!.openai_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
       whatsappEnabled = setup!.whatsapp_configured;
+      whatsappConnected = setup!.whatsapp_connected;
       whatsappPhoneNumber = setup!.whatsapp_phone_number || "";
       whatsappAllowedUsers = setup!.whatsapp_allowed_users || "";
       timezoneValue = setup!.timezone || "";
@@ -384,10 +408,26 @@
         </label>
         <small class="field-hint">
           Connects as a linked device via QR code. Requires <code>homeclaw[whatsapp]</code>.
-          Scan the QR code in container logs on first start.
         </small>
       </div>
       {#if whatsappEnabled}
+        <div class="wa-status" class:connected={whatsappConnected}>
+          <span class="wa-status-dot"></span>
+          {whatsappConnected ? "Connected" : "Not connected"}
+        </div>
+        {#if !whatsappConnected}
+          <div class="wa-qr">
+            {#if whatsappQrLoading}
+              <p class="wa-qr-hint">Loading QR code...</p>
+            {:else if whatsappQrUrl}
+              <p class="wa-qr-hint">Scan this QR code with WhatsApp to link this device:</p>
+              <img src={whatsappQrUrl} alt="WhatsApp QR code" class="wa-qr-img" />
+              <button class="btn secondary" onclick={fetchWhatsAppQr}>Refresh QR</button>
+            {:else}
+              <p class="wa-qr-hint">No QR code available. Save settings and restart the container to generate one.</p>
+            {/if}
+          </div>
+        {/if}
         <div class="field">
           <label for="wa-phone">Your phone number</label>
           <input id="wa-phone" type="text" bind:value={whatsappPhoneNumber} placeholder="14155551234" />
@@ -685,6 +725,46 @@
     background: rgba(45, 41, 38, 0.06);
     padding: 0.1rem 0.35rem;
     border-radius: 4px;
+  }
+
+  /* ---- WhatsApp status & QR ---- */
+  .wa-status {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .wa-status.connected { color: var(--sage); }
+
+  .wa-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+
+  .wa-status.connected .wa-status-dot { background: var(--sage); }
+
+  .wa-qr {
+    margin-bottom: 0.75rem;
+  }
+
+  .wa-qr-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0 0 0.5rem;
+  }
+
+  .wa-qr-img {
+    display: block;
+    max-width: 256px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    margin-bottom: 0.5rem;
   }
 
   /* ---- Save row ---- */

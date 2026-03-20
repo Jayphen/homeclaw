@@ -322,17 +322,18 @@ def _run_serve_with_channels(
     if config.whatsapp_enabled:
         try:
             from homeclaw.channel.whatsapp import WhatsAppChannel
+        except ImportError:
+            logger.warning(
+                "whatsapp_enabled=true but neonize is not installed; "
+                "install with: pip install homeclaw[whatsapp]"
+            )
+        else:
             wa_channel = WhatsAppChannel(
                 loop=hc_app.loop,
                 workspaces=workspaces,
                 allowed_phones=config.whatsapp_allowed_phone_numbers,
                 dispatcher=hc_app.dispatcher,
                 phone_number=config.whatsapp_phone_number,
-            )
-        except ImportError:
-            logger.warning(
-                "whatsapp_enabled=true but neonize is not installed; "
-                "install with: pip install homeclaw[whatsapp]"
             )
 
     async def _serve() -> None:
@@ -389,6 +390,12 @@ def _run_serve_with_deferred_telegram(
     if config.whatsapp_enabled and config.is_provider_configured:
         try:
             from homeclaw.channel.whatsapp import WhatsAppChannel
+        except ImportError:
+            logger.warning(
+                "whatsapp_enabled=true but neonize is not installed; "
+                "install with: pip install homeclaw[whatsapp]"
+            )
+        else:
             hc_app = HomeclawApp(workspaces=workspaces, config=config)
             from homeclaw.api.deps import set_plugin_registry as _set_pr
             _set_pr(hc_app.plugin_registry)
@@ -398,11 +405,6 @@ def _run_serve_with_deferred_telegram(
                 allowed_phones=config.whatsapp_allowed_phone_numbers,
                 dispatcher=hc_app.dispatcher,
                 phone_number=config.whatsapp_phone_number,
-            )
-        except ImportError:
-            logger.warning(
-                "whatsapp_enabled=true but neonize is not installed; "
-                "install with: pip install homeclaw[whatsapp]"
             )
 
     async def _start_telegram(token: str) -> None:
