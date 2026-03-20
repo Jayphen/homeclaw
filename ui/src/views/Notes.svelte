@@ -1,7 +1,7 @@
 <script lang="ts">
   import { format, parseISO } from "date-fns";
   import { api } from "$lib/api";
-  import { renderMarkdown, renderInlineMarkdown } from "$lib/markdown";
+  import { renderMarkdown, renderPreviewMarkdown } from "$lib/markdown";
   import MarkdownEditor from "$lib/MarkdownEditor.svelte";
 
   // Route params from svelte-spa-router
@@ -224,7 +224,7 @@
               <span class="note-card-date">{formatDateShort(note.date)}</span>
               <span class="note-card-updated">{formatTime(note.updated_at)}</span>
             </div>
-            <p class="note-card-preview">{@html renderInlineMarkdown(note.preview)}</p>
+            <div class="note-card-preview">{@html renderPreviewMarkdown(note.preview)}</div>
           </a>
         {/each}
       </div>
@@ -255,7 +255,7 @@
                   <span class="note-card-date">{formatDateShort(note.date)}</span>
                   <span class="note-card-updated">{formatTime(note.updated_at)}</span>
                 </div>
-                <p class="note-card-preview">{@html renderInlineMarkdown(note.preview)}</p>
+                <div class="note-card-preview">{@html renderPreviewMarkdown(note.preview)}</div>
               </a>
             {/each}
             {#if notes.length > 5}
@@ -408,6 +408,25 @@
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+  }
+
+  .note-card-preview :global(p) {
+    margin: 0;
+  }
+
+  .note-card-preview :global(ul),
+  .note-card-preview :global(ol) {
+    margin: 0;
+    padding-left: 1.2rem;
+  }
+
+  .note-card-preview :global(h1),
+  .note-card-preview :global(h2),
+  .note-card-preview :global(h3),
+  .note-card-preview :global(h4) {
+    font-size: inherit;
+    font-weight: 600;
+    margin: 0;
   }
 
   .show-all {
