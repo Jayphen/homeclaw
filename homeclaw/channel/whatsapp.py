@@ -160,7 +160,10 @@ class WhatsAppChannel:
 
         @self._client.event(self._MessageEv)
         async def _on_message(_: Any, ev: Any) -> None:
-            await self._handle_message(ev)
+            try:
+                await self._handle_message(ev)
+            except Exception:
+                logger.exception("Unhandled error in WhatsApp message handler")
 
     def _is_allowed(self, phone: str) -> bool:
         if self._allowed_phones is None:
@@ -174,6 +177,12 @@ class WhatsAppChannel:
 
     async def _handle_message(self, ev: Any) -> None:
         """Route an incoming WhatsApp message through the agent loop."""
+        logger.debug(
+            "WhatsApp raw message: from_me=%s sender=%s chat=%s",
+            ev.Info.MessageSource.IsFromMe,
+            ev.Info.MessageSource.Sender,
+            ev.Info.MessageSource.Chat,
+        )
         if ev.Info.MessageSource.IsFromMe:
             return
 
