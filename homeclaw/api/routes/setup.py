@@ -15,8 +15,8 @@ from homeclaw.api.deps import (
     get_setup_token,
     hash_password,
     list_member_workspaces,
+    require_admin,
     require_auth,
-    verify_password,
     verify_setup_token,
 )
 from homeclaw.api.deps import (
@@ -143,16 +143,8 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         if not body.setup_token or not verify_setup_token(body.setup_token):
             raise HTTPException(status_code=403, detail="Invalid setup token")
     else:
-        # After initial setup, accept Bearer auth OR the password in setup_token.
-        auth = request.headers.get("Authorization", "")
-        bearer_ok = auth.startswith("Bearer ") and verify_password(
-            auth.removeprefix("Bearer "), config.web_password
-        )
-        token_ok = body.setup_token is not None and verify_password(
-            body.setup_token, config.web_password
-        )
-        if not bearer_ok and not token_ok:
-            raise HTTPException(status_code=401, detail="Unauthorized")
+        # After initial setup, require admin auth (JWT, Bearer password, etc.)
+        await require_admin(request)
 
     # Apply changes to the in-memory config.
     if body.provider is not None:
