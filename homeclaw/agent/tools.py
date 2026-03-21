@@ -2222,6 +2222,109 @@ def register_builtin_tools(
         skill_install,
     )
 
+    # --- Skill file editing ---
+
+    async def skill_edit_file(
+        *,
+        person: str,
+        name: str,
+        file: str,
+        content: str | None = None,
+        find: str | None = None,
+        replace: str | None = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        """Read or edit a file within a skill directory.
+
+        Three modes:
+        - Read: omit content, find, replace — returns file contents
+        - Write: provide content — overwrites the file
+        - Find/replace: provide find + replace — does a targeted substitution
+        """
+        from homeclaw.plugins.skills.loader import discover_skills
+
+        locations = discover_skills(workspaces, person)
+        loc = next((sk for sk in locations if sk.name == name), None)
+        if loc is None:
+            return {"error": f"Skill '{name}' not found"}
+
+        # Resolve and validate path
+        path = (loc.skill_dir / file).resolve()
+        if not path.is_relative_to(loc.skill_dir.resolve()):
+            return {"error": f"Invalid file path: {file}"}
+
+        # Read mode
+        if content is None and find is None:
+            if not path.is_file():
+                return {"error": f"File not found: {file}"}
+            text = path.read_text()
+            return {"file": file, "content": text, "size": len(text)}
+
+        # Find/replace mode
+        if find is not None:
+            if not path.is_file():
+                return {"error": f"File not found: {file}"}
+            text = path.read_text()
+            if find not in text:
+                return {"error": f"Text to find not found in {file}"}
+            new_text = text.replace(find, replace or "")
+            path.write_text(new_text)
+            return {
+                "file": file,
+                "status": "edited",
+                "replacements": text.count(find),
+                "size": len(new_text),
+            }
+
+        # Write mode
+        if content is not None:
+            if err := _check_content_length(content):
+                return err
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
+            return {"file": file, "status": "written", "size": len(content)}
+
+        return {"error": "Provide content (write), or find+replace (edit), or nothing (read)"}
+
+    registry.register(
+        ToolDefinition(
+            name="skill_edit_file",
+            description=(
+                "Read or edit a file inside a skill. Three modes: "
+                "(1) Read: just pass name + file to see contents. "
+                "(2) Find/replace: pass find + replace to make a targeted edit "
+                "without rewriting the whole file — best for adapting installed skills. "
+                "(3) Write: pass content to overwrite the entire file. "
+                "Use read_skill first to see available files."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member name"},
+                    "name": {"type": "string", "description": "Skill name"},
+                    "file": {
+                        "type": "string",
+                        "description": "File path relative to skill dir (e.g. 'SKILL.md', 'scripts/check.sh')",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Full file content (write mode — overwrites the file)",
+                    },
+                    "find": {
+                        "type": "string",
+                        "description": "Text to find (find/replace mode)",
+                    },
+                    "replace": {
+                        "type": "string",
+                        "description": "Replacement text (find/replace mode)",
+                    },
+                },
+                "required": ["person", "name", "file"],
+            },
+        ),
+        skill_edit_file,
+    )
+
     # Track activated skills per session to avoid re-injecting
     _activated_skills: set[str] = set()
 

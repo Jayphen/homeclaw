@@ -129,11 +129,26 @@ Skills with persistent state use the `data/` directory:
 - Always call `data_list` before `data_write` to check for existing files
 - Consolidate duplicates if found
 
+## Installing and adapting existing skills
+
+**Always prefer installing over recreating.** If a skill already exists online:
+1. Use `skill_install` with the GitHub URL to download it (gets all files)
+2. Use `skill_edit_file` with find/replace to adapt specific parts
+3. Never try to reproduce a large skill via `skill_create` — the instructions
+   will be truncated. Install first, then make targeted edits.
+
+Example workflow to fork a skill:
+```
+skill_install(url="https://github.com/user/some-skill")
+skill_edit_file(name="some-skill", file="SKILL.md", find="old-name", replace="new-name")
+```
+
 ## Editing existing skills
 
-To modify a skill's instructions or description, use `skill_update`.
-To move a skill between scopes, use `skill_migrate`.
-To remove a skill (archived, not deleted), use `skill_remove`.
+- `skill_edit_file` — read, write, or find/replace any file in a skill
+- `skill_update` — update a skill's description or instructions
+- `skill_migrate` — move between scopes (household ↔ private)
+- `skill_remove` — archive a skill (not permanent deletion)
 
 ## Common patterns
 
