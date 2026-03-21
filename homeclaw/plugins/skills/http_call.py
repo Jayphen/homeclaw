@@ -19,6 +19,22 @@ logger = logging.getLogger(__name__)
 _SUPPORTED_METHODS = {"GET", "POST", "PUT", "DELETE", "PATCH"}
 _MAX_RESPONSE_CHARS = 50_000
 
+# Lazy reference to the global config — avoids circular import at module load.
+_global_config: Any = None
+
+
+def set_global_config(config: Any) -> None:
+    """Set the global config reference for live setting checks."""
+    global _global_config
+    _global_config = config
+
+
+def _check_global_allow_local() -> bool:
+    """Check the live global config for skill_allow_local_network."""
+    if _global_config is None:
+        return False
+    return bool(getattr(_global_config, "skill_allow_local_network", False))
+
 
 class HttpCallConfig(BaseModel):
     allowed_domains: list[str]  # e.g. ["api.openweathermap.org"]
@@ -124,7 +140,8 @@ async def http_call(
         return {"error": str(exc)}
 
     # --- Block private IPs (unless local network access is allowed) ---
-    if not config.allow_local_network:
+    allow_local = config.allow_local_network or _check_global_allow_local()
+    if not allow_local:
         try:
             _check_private_ip(hostname)
         except ValueError as exc:

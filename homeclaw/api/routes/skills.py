@@ -109,6 +109,136 @@ async def update_skill_settings(body: SkillSettingsUpdate) -> dict[str, Any]:
     }
 
 
+
+# ---------------------------------------------------------------------------
+# Delete (archive) a skill
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/{owner}/{name}", dependencies=[AdminDep])
+async def delete_skill(owner: str, name: str) -> dict[str, Any]:
+    """Archive (soft-delete) an active skill."""
+    workspaces = get_config().workspaces.resolve()
+    skill_dir = _safe_relative(workspaces / owner / "skills", name)
+
+    if not skill_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Skill not found")
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    archive_root = workspaces / owner / "skills" / ".archive"
+    archive_root.mkdir(parents=True, exist_ok=True)
+    archive_dir = archive_root / f"{name}_{timestamp}"
+
+    shutil.move(str(skill_dir), str(archive_dir))
+
+    # Unregister from plugin registry
+    from homeclaw.api.deps import get_plugin_registry
+
+    registry = get_plugin_registry()
+    if registry is not None:
+        registry.unregister(name)
+
+    return {
+        "status": "archived",
+        "name": name,
+        "owner": owner,
+        "archive_path": str(archive_dir),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Install skill from URL
+# ---------------------------------------------------------------------------
+
+
+class SkillInstallRequest(BaseModel):
+    url: str
+    scope: str = "household"
+
+
+@router.post("/install", dependencies=[AdminDep])
+async def install_skill_from_url(body: SkillInstallRequest) -> dict[str, Any]:
+    """Install a skill from a GitHub repo or SKILL.md URL."""
+    import httpx
+
+    from homeclaw.plugins.skills.loader import load_skill, skill_md_to_definition
+
+    workspaces = get_config().workspaces.resolve()
+
+    # Normalize GitHub URLs to raw
+    url = body.url.strip()
+    if "github.com" in url and "raw.githubusercontent.com" not in url:
+        # Convert github.com/user/repo to raw URL
+        from urllib.parse import urlparse
+
+        parsed = urlparse(url)
+        parts = [p for p in parsed.path.strip("/").split("/") if p]
+        if len(parts) >= 2:
+            user, repo = parts[0], parts[1]
+            if len(parts) >= 4 and parts[2] == "tree":
+                branch = "/".join(parts[3:])
+            else:
+                branch = "main"
+            url = f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/SKILL.md"
+    elif not url.endswith("SKILL.md"):
+        url = url.rstrip("/") + "/SKILL.md"
+
+    try:
+        transport = httpx.AsyncHTTPTransport(retries=2)
+        async with httpx.AsyncClient(timeout=30, transport=transport) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            content = resp.text
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch: HTTP {e.response.status_code}")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch: {e}")
+
+    try:
+        defn = skill_md_to_definition(content)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Invalid SKILL.md: {e}")
+
+    from homeclaw.pathutil import safe_slug
+
+    slug = safe_slug(defn.name)
+    owner = "household" if body.scope == "household" else body.scope
+    skill_dir = workspaces / owner / "skills" / slug
+
+    if skill_dir.exists():
+        raise HTTPException(status_code=409, detail=f"Skill '{slug}' already exists")
+
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    (skill_dir / "SKILL.md").write_text(content)
+
+    # Download additional files from GitHub (scripts, references, etc.)
+    from homeclaw.plugins.skills.github import download_skill_repo
+    extra_files = await download_skill_repo(body.url, skill_dir)
+
+    # Hot-load
+    from homeclaw.api.deps import get_plugin_registry
+    from homeclaw.plugins.registry import PluginType
+
+    registry = get_plugin_registry()
+    loaded = False
+    if registry is not None:
+        try:
+            allow_local = get_config().skill_allow_local_network
+            plugin = load_skill(skill_dir, owner, allow_local_network=allow_local)
+            registry.register(plugin, PluginType.SKILL)
+            loaded = True
+        except Exception:
+            pass
+
+    return {
+        "status": "installed",
+        "name": slug,
+        "description": defn.description,
+        "scope": body.scope,
+        "loaded": loaded,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Active skills — browse and edit
 # ---------------------------------------------------------------------------

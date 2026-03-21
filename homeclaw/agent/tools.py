@@ -2079,6 +2079,138 @@ def register_builtin_tools(
         skill_reject,
     )
 
+    # --- Skill installation from URL ---
+
+    async def skill_install(
+        *,
+        person: str,
+        url: str,
+        scope: str = "household",
+        **_: Any,
+    ) -> dict[str, Any]:
+        import httpx
+
+        from homeclaw.plugins.registry import PluginType
+        from homeclaw.plugins.skills.loader import load_skill, skill_md_to_definition
+
+        from homeclaw.plugins.skills.github import raw_skill_md_url
+
+        # Determine the SKILL.md download URL
+        skill_md_url = raw_skill_md_url(url)
+        if skill_md_url is None:
+            if url.endswith("SKILL.md") or url.endswith("skill.md"):
+                skill_md_url = url
+            else:
+                return {"error": "URL must point to a GitHub repo or a SKILL.md file"}
+
+        # Fetch the SKILL.md
+        try:
+            transport = httpx.AsyncHTTPTransport(retries=2)
+            async with httpx.AsyncClient(timeout=30, transport=transport) as client:
+                resp = await client.get(skill_md_url)
+                resp.raise_for_status()
+                content = resp.text
+        except httpx.HTTPStatusError as e:
+            return {"error": f"Failed to fetch SKILL.md: HTTP {e.response.status_code}"}
+        except httpx.RequestError as e:
+            return {"error": f"Failed to fetch SKILL.md: {e}"}
+
+        # Validate
+        try:
+            defn = skill_md_to_definition(content)
+        except ValueError as e:
+            return {"error": f"Invalid SKILL.md: {e}"}
+
+        slug = safe_slug(defn.name)
+        if not slug:
+            return {"error": f"Invalid skill name in SKILL.md: '{defn.name}'"}
+
+        # Check approval flow
+        pending = _needs_approval(person)
+        owner = "household" if scope == "household" else person
+        if pending:
+            skill_dir = _pending_dir() / slug
+        else:
+            skill_dir = workspaces / owner / "skills" / slug
+
+        live_dir = workspaces / owner / "skills" / slug
+        if live_dir.exists():
+            return {"error": f"Skill '{slug}' already exists under {owner}"}
+
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(content)
+
+        # Try to fetch additional files from the repo
+        from homeclaw.plugins.skills.github import download_skill_repo
+        fetched_extras = await download_skill_repo(url, skill_dir)
+
+        if pending:
+            return {
+                "status": "pending_approval",
+                "name": slug,
+                "scope": scope,
+                "requested_by": person,
+                "fetched_files": ["SKILL.md", *fetched_extras],
+            }
+
+        # Hot-load
+        loaded = False
+        if plugin_registry is not None:
+            try:
+                plugin = load_skill(
+                    skill_dir, owner, allow_local_network=_skill_allow_local(),
+                )
+                plugin_registry.register(plugin, PluginType.SKILL)
+                loaded = True
+            except Exception as e:
+                _logger.exception("skill_install: failed to load '%s'", slug)
+                return {
+                    "status": "installed",
+                    "name": slug,
+                    "loaded": False,
+                    "warning": f"Installed but failed to load: {e}",
+                }
+
+        return {
+            "status": "installed",
+            "name": slug,
+            "scope": scope,
+            "loaded": loaded,
+            "fetched_files": ["SKILL.md", *fetched_extras],
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="skill_install",
+            description=(
+                "Install a skill from a URL. Accepts a GitHub repo URL or a "
+                "direct link to a SKILL.md file. The skill is downloaded, "
+                "validated, and activated. Example: "
+                "skill_install(url='https://github.com/user/my-skill')"
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member name"},
+                    "url": {
+                        "type": "string",
+                        "description": (
+                            "URL to install from — GitHub repo URL or "
+                            "direct link to a SKILL.md file"
+                        ),
+                    },
+                    "scope": {
+                        "type": "string",
+                        "enum": ["household", "private"],
+                        "description": "Who can use this skill (default: household)",
+                    },
+                },
+                "required": ["person", "url"],
+            },
+        ),
+        skill_install,
+    )
+
     # Track activated skills per session to avoid re-injecting
     _activated_skills: set[str] = set()
 

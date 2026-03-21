@@ -105,11 +105,15 @@ class HomeclawApp:
         from homeclaw.channel.dispatcher import ChannelDispatcher
         from homeclaw.plugins.loader import load_all_plugins
         from homeclaw.plugins.registry import PluginRegistry
+        from homeclaw.plugins.skills.http_call import set_global_config
         from homeclaw.plugins.skills.loader import load_all_skills
 
         self.dispatcher = ChannelDispatcher(self.workspaces)
         self.registry = ToolRegistry()
         self.plugin_registry = PluginRegistry(tool_registry=self.registry)
+
+        # Set global config so http_call can check live settings
+        set_global_config(self.config)
 
         # Load household-wide skills at startup (private skills hot-loaded on skill_create)
         load_all_skills(

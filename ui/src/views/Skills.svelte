@@ -4,7 +4,10 @@
   import MarkdownEditor from "$lib/MarkdownEditor.svelte";
   import CodeEditor from "$lib/CodeEditor.svelte";
 
-  let { params = {} }: { params?: { owner?: string; name?: string; file?: string } } = $props();
+  let { params = {} }: { params?: { owner?: string; name?: string; wild?: string } } = $props();
+
+  // svelte-spa-router passes wildcard paths as params.wild
+  const filePath = $derived(params.wild || null);
 
   interface SkillFile {
     path: string;
@@ -43,7 +46,14 @@
   let error: string | null = $state(null);
   let editing: boolean = $state(false);
   let editContent: string = $state("");
+  let deleting: boolean = $state(false);
+  let confirmDelete: boolean = $state(false);
   let saving: boolean = $state(false);
+
+  // Install
+  let installUrl: string = $state("");
+  let installing: boolean = $state(false);
+  let installResult: { status: string; name?: string; error?: string } | null = $state(null);
 
   // Settings
   let settingsLoaded: boolean = $state(false);
@@ -52,7 +62,7 @@
   let savingSettings: boolean = $state(false);
 
   const mode = $derived.by(() => {
-    if (params.owner && params.name && params.file) return "file" as const;
+    if (params.owner && params.name && filePath) return "file" as const;
     if (params.owner && params.name) return "detail" as const;
     return "index" as const;
   });
@@ -94,6 +104,50 @@
       error = e.message;
     } finally {
       savingSettings = false;
+    }
+  }
+
+  async function installFromUrl() {
+    if (!installUrl.trim()) return;
+    installing = true;
+    installResult = null;
+    try {
+      const r = await api("/api/skills/install", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: installUrl.trim() }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        installResult = { status: "error", error: data.detail || `HTTP ${r.status}` };
+      } else {
+        installResult = { status: "installed", name: data.name };
+        installUrl = "";
+        fetchIndex(); // refresh the list
+      }
+    } catch (e: any) {
+      installResult = { status: "error", error: e.message };
+    } finally {
+      installing = false;
+    }
+  }
+
+  async function deleteSkill() {
+    if (!params.owner || !params.name) return;
+    deleting = true;
+    try {
+      const r = await api(`/api/skills/${params.owner}/${params.name}`, { method: "DELETE" });
+      if (!r.ok) {
+        const data = await r.json();
+        error = data.detail || `HTTP ${r.status}`;
+        deleting = false;
+        return;
+      }
+      // Navigate back to index
+      window.location.hash = "#/skills";
+    } catch (e: any) {
+      error = e.message;
+      deleting = false;
     }
   }
 
@@ -152,10 +206,10 @@
   }
 
   async function saveEdit() {
-    if (!fileContent || !params.owner || !params.name || !params.file) return;
+    if (!fileContent || !params.owner || !params.name || !filePath) return;
     saving = true;
     try {
-      const r = await api(`/api/skills/${params.owner}/${params.name}/files/${params.file}`, {
+      const r = await api(`/api/skills/${params.owner}/${params.name}/files/${filePath}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: editContent }),
@@ -171,8 +225,8 @@
   }
 
   $effect(() => {
-    if (mode === "file" && params.owner && params.name && params.file) {
-      fetchFile(params.owner, params.name, params.file);
+    if (mode === "file" && params.owner && params.name && filePath) {
+      fetchFile(params.owner, params.name, filePath);
     } else if (mode === "detail" && params.owner && params.name) {
       fetchDetail(params.owner, params.name);
     } else {
@@ -218,9 +272,9 @@
       <a href="#/skills/{params.owner}/{params.name}">{params.name}</a>
       <span class="owner-tag">{params.owner}</span>
     {/if}
-    {#if params.file}
+    {#if filePath}
       <span class="sep">/</span>
-      <span>{params.file}</span>
+      <span>{filePath}</span>
     {/if}
   </nav>
 
@@ -244,7 +298,9 @@
       </header>
       {#if editing}
         <div class="file-editor">
-          {#if isMarkdown(fileContent.path)}
+          {#if fileContent.path === "SKILL.md"}
+            <CodeEditor bind:value={editContent} disabled={saving} language="yaml+markdown" />
+          {:else if isMarkdown(fileContent.path)}
             <MarkdownEditor bind:value={editContent} disabled={saving} />
           {:else}
             <CodeEditor bind:value={editContent} disabled={saving} language={fileLang(fileContent.path)} />
@@ -259,7 +315,9 @@
       {:else}
         <div class="file-body">
           <button class="btn-edit" onclick={startEdit}>Edit</button>
-          {#if fileContent.path.endsWith(".md")}
+          {#if fileContent.path === "SKILL.md"}
+            <pre><code>{fileContent.content}</code></pre>
+          {:else if fileContent.path.endsWith(".md")}
             {@html renderMarkdown(fileContent.content)}
           {:else}
             <pre><code>{fileContent.content}</code></pre>
@@ -270,7 +328,20 @@
   {:else if mode === "detail" && detail}
     <!-- Skill detail with file list -->
     <div class="skill-header">
-      <h1 class="page-title">{detail.name}</h1>
+      <div class="skill-header-row">
+        <h1 class="page-title">{detail.name}</h1>
+        {#if confirmDelete}
+          <div class="delete-confirm">
+            <span>Delete this skill?</span>
+            <button class="btn btn-danger" onclick={deleteSkill} disabled={deleting}>
+              {deleting ? "Deleting…" : "Yes, archive it"}
+            </button>
+            <button class="btn btn-secondary" onclick={() => (confirmDelete = false)}>Cancel</button>
+          </div>
+        {:else}
+          <button class="btn-delete" onclick={() => (confirmDelete = true)}>Delete</button>
+        {/if}
+      </div>
       <p class="skill-desc">{detail.description}</p>
       {#if detail.allowed_domains.length > 0}
         <div class="skill-domains">
@@ -349,6 +420,30 @@
         </label>
       </section>
     {/if}
+
+    <section class="install-panel">
+      <h2>Install from URL</h2>
+      <form class="install-form" onsubmit={(e) => { e.preventDefault(); installFromUrl(); }}>
+        <input
+          type="url"
+          class="install-input"
+          bind:value={installUrl}
+          placeholder="https://github.com/user/skill-name or direct SKILL.md URL"
+          disabled={installing}
+        />
+        <button class="btn btn-primary" type="submit" disabled={installing || !installUrl.trim()}>
+          {installing ? "Installing…" : "Install"}
+        </button>
+      </form>
+      {#if installResult}
+        {#if installResult.status === "installed"}
+          <p class="install-success">Installed <strong>{installResult.name}</strong></p>
+        {:else}
+          <p class="install-error">{installResult.error}</p>
+        {/if}
+      {/if}
+    </section>
+
     {#if skills.length === 0}
       <div class="empty">
         <p>No skills yet.</p>
@@ -425,6 +520,42 @@
   .toggle:checked::after { transform: translateX(16px); }
   .toggle:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  /* Delete */
+  .btn-delete {
+    background: none; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 0.3rem 0.75rem; font-size: 0.78rem; color: var(--text-muted);
+    cursor: pointer; transition: border-color 0.15s, color 0.15s;
+  }
+  .btn-delete:hover { border-color: var(--rose, #c44); color: var(--rose, #c44); }
+  .delete-confirm { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; }
+  .delete-confirm span { color: var(--text-muted); }
+  .btn-danger {
+    background: var(--rose, #c44); border: 1px solid var(--rose, #c44); color: #fff;
+    padding: 0.3rem 0.75rem; border-radius: var(--radius); font-size: 0.78rem; cursor: pointer;
+  }
+  .btn-danger:hover:not(:disabled) { opacity: 0.9; }
+  .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Install panel */
+  .install-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+  }
+  .install-panel h2 {
+    font-family: var(--font-serif); font-weight: 600; font-size: 1rem;
+    margin: 0 0 0.75rem; color: var(--text);
+  }
+  .install-form { display: flex; gap: 0.5rem; }
+  .install-input {
+    flex: 1; padding: 0.45rem 0.75rem; border: 1px solid var(--border);
+    border-radius: var(--radius); font-size: 0.85rem; color: var(--text);
+    background: var(--bg); outline: none;
+  }
+  .install-input:focus { border-color: var(--terracotta); }
+  .install-input::placeholder { color: var(--text-muted); opacity: 0.7; }
+  .install-success { color: var(--sage); font-size: 0.82rem; margin: 0.5rem 0 0; }
+  .install-error { color: var(--rose, #c44); font-size: 0.82rem; margin: 0.5rem 0 0; }
+
   /* Breadcrumb */
   .breadcrumb { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 1rem; font-size: 0.82rem; }
   .breadcrumb a { color: var(--terracotta); text-decoration: none; }
@@ -476,6 +607,7 @@
 
   /* Skill detail header */
   .skill-header { margin-bottom: 1.5rem; }
+  .skill-header-row { display: flex; align-items: center; justify-content: space-between; }
   .skill-header .page-title { margin-bottom: 0.25rem; }
   .skill-desc { font-size: 0.9rem; color: var(--text-muted); margin: 0 0 0.5rem; }
   .skill-domains { display: flex; gap: 0.4rem; flex-wrap: wrap; }
