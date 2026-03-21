@@ -11,16 +11,12 @@ from homeclaw.plugins.registry import PluginRegistry, PluginType
 from homeclaw.plugins.skills.loader import load_skill
 
 SKILL_MD = """\
-# Skill: {name}
-
-Description: A test skill
-
-## Allowed Domains
-- api.example.com
-
-## Tools
-
-## Instructions
+---
+name: {name}
+description: A test skill
+allowed-domains:
+  - api.example.com
+---
 Test instructions.
 """
 
@@ -28,7 +24,7 @@ Test instructions.
 def make_skill(workspaces: Path, owner: str, name: str) -> Path:
     skill_dir = workspaces / owner / "skills" / name
     skill_dir.mkdir(parents=True, exist_ok=True)
-    (skill_dir / "skill.md").write_text(SKILL_MD.format(name=name))
+    (skill_dir / "SKILL.md").write_text(SKILL_MD.format(name=name))
     data_dir = skill_dir / "data"
     data_dir.mkdir(exist_ok=True)
     (data_dir / "notes.md").write_text(f"# {name} notes\n\n- Some data\n")
@@ -88,9 +84,7 @@ async def test_skill_remove_archives_household_skill(
     # Archive exists with data intact
     archive_path = Path(result["archive_path"])
     assert archive_path.exists()
-    # Skill definition file preserved (may be SKILL.md or skill.md)
-    has_skill_file = (archive_path / "SKILL.md").exists() or (archive_path / "skill.md").exists()
-    assert has_skill_file
+    assert (archive_path / "SKILL.md").exists()
     assert (archive_path / "data" / "notes.md").exists()
 
     # No longer in registry
@@ -151,9 +145,7 @@ async def test_skill_remove_preserves_all_data_files(
     )
 
     archive_path = Path(result["archive_path"])
-    # Skill definition file preserved (may be SKILL.md or skill.md)
-    has_skill_file = (archive_path / "SKILL.md").exists() or (archive_path / "skill.md").exists()
-    assert has_skill_file
+    assert (archive_path / "SKILL.md").exists()
     assert (archive_path / "data" / "notes.md").exists()
     assert (archive_path / "data" / "index.json").exists()
     assert (archive_path / "data" / "cache.md").exists()
@@ -204,8 +196,7 @@ async def test_skill_migrate_household_to_private(
     assert not (workspaces / "household" / "skills" / "weather").exists()
     new_dir = workspaces / "alice" / "skills" / "weather"
     assert new_dir.exists()
-    has_skill_file = (new_dir / "SKILL.md").exists() or (new_dir / "skill.md").exists()
-    assert has_skill_file
+    assert (new_dir / "SKILL.md").exists()
     assert (new_dir / "data" / "notes.md").exists()
 
     # Re-registered with new scope

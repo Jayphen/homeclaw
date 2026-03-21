@@ -104,6 +104,23 @@ Call `skill_create` with these arguments:
 - **source_notes**: Copy memory topics into skill data (optional)
 - **source_bookmarks**: Export bookmarks into skill data (optional)
 
+## How tools work
+
+Every skill automatically gets these tools, namespaced with the skill name:
+- `{name}__data_list` — list files in data/
+- `{name}__data_read` — read a data file
+- `{name}__data_write` — write a data file
+- `{name}__data_delete` — delete a data file
+
+If `allowed_domains` is set, the skill also gets:
+- `{name}__http_call` — make HTTP requests to the allowed domains
+
+You do NOT define these tools manually — they are registered automatically.
+To make API calls, just set `allowed_domains` to the API hosts and use
+`{name}__http_call` with the full URL.
+
+After creating a skill, call `read_skill` to see the exact tool names.
+
 ## Data management
 
 Skills with persistent state use the `data/` directory:

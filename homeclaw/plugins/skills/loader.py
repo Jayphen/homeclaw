@@ -1,4 +1,4 @@
-"""Skill plugin loader — parses SKILL.md (YAML frontmatter) and legacy skill.md files."""
+"""Skill plugin loader — parses SKILL.md files with YAML frontmatter."""
 
 from __future__ import annotations
 
@@ -37,32 +37,13 @@ class SkillFrontmatter(BaseModel):
     allowed_domains: list[str] = []
 
 
-class SkillParamDef(BaseModel):
-    """A single parameter definition parsed from a skill markdown."""
-
-    name: str
-    type: str  # "string", "integer", etc.
-    required: bool
-    description: str
-
-
-class SkillToolDef(BaseModel):
-    """A tool definition parsed from a skill markdown."""
-
-    name: str
-    description: str
-    parameters: list[SkillParamDef]
-
-
 class SkillDefinition(BaseModel):
-    """Parsed representation of a skill file (new SKILL.md or legacy skill.md)."""
+    """Parsed representation of a SKILL.md file."""
 
     name: str
     description: str
     allowed_domains: list[str] = []
-    tools: list[SkillToolDef] = []
     instructions: str = ""
-    # New AgentSkills fields
     license: str | None = None
     compatibility: str | None = None
     metadata: dict[str, str] = {}
@@ -74,9 +55,8 @@ class SkillLocation:
     """A discovered skill's name, scope, and directory path."""
 
     name: str
-    scope: str  # "household" or person name
+    scope: str  # "household", "builtin", or person name
     skill_dir: Path
-    skill_file: str = "SKILL.md"  # which file was found
 
 
 @dataclass
@@ -93,7 +73,7 @@ class SkillCatalogEntry:
 
 
 # ---------------------------------------------------------------------------
-# YAML frontmatter parser (new SKILL.md format)
+# YAML frontmatter parser
 # ---------------------------------------------------------------------------
 
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
@@ -151,7 +131,6 @@ def skill_md_to_definition(content: str) -> SkillDefinition:
         name=fm.name,
         description=fm.description,
         allowed_domains=fm.allowed_domains,
-        tools=[],  # new format doesn't embed tool defs in markdown
         instructions=body,
         license=fm.license,
         compatibility=fm.compatibility,
@@ -160,8 +139,12 @@ def skill_md_to_definition(content: str) -> SkillDefinition:
     )
 
 
+# Alias for callers that used the old name
+parse_skill_file = skill_md_to_definition
+
+
 # ---------------------------------------------------------------------------
-# Skill SKILL.md renderer (new format)
+# Skill SKILL.md renderer
 # ---------------------------------------------------------------------------
 
 _NAME_SLUG_RE = re.compile(r"[^a-z0-9_-]")
@@ -191,224 +174,6 @@ def render_skill_md(
         lines.append(instructions)
         lines.append("")
     return "\n".join(lines)
-
-
-# ---------------------------------------------------------------------------
-# Legacy skill.md parser (backward compatibility)
-# ---------------------------------------------------------------------------
-
-_PARAM_RE = re.compile(
-    r"^-\s+(\w+)\s+\((\w+),\s*(required|optional)\):\s*(.+)$"
-)
-
-
-def render_skill_markdown(
-    name: str,
-    description: str,
-    allowed_domains: list[str],
-    instructions: str,
-    tools: list[dict[str, Any]],
-) -> str:
-    """Render a legacy skill.md file.
-
-    .. deprecated::
-        Use ``render_skill_md`` for new skills. This is kept for backward
-        compatibility with existing code that still creates legacy format.
-    """
-    return render_skill_md(
-        name=name,
-        description=description,
-        allowed_domains=allowed_domains,
-        instructions=instructions,
-    )
-
-
-def parse_skill_markdown(content: str) -> SkillDefinition:
-    """Parse a legacy skill.md file into a ``SkillDefinition``.
-
-    Uses simple string parsing — no markdown library required.
-    """
-    lines = content.splitlines()
-
-    name = ""
-    description = ""
-    allowed_domains: list[str] = []
-    tools: list[SkillToolDef] = []
-    instructions = ""
-
-    # Parse header: ``# Skill: <name>``
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("# Skill:"):
-            name = stripped.removeprefix("# Skill:").strip()
-            break
-
-    # Find ``Description:`` line directly after the title
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("Description:"):
-            description = stripped.removeprefix("Description:").strip()
-            break
-
-    # --- Section splitter ---
-    section_map: dict[str, list[str]] = {}
-    current_section: str | None = None
-
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("## "):
-            current_section = stripped.removeprefix("## ").strip().lower()
-            section_map[current_section] = []
-        elif current_section is not None:
-            section_map[current_section].append(line)
-
-    # --- Allowed Domains ---
-    for line in section_map.get("allowed domains", []):
-        stripped = line.strip()
-        if stripped.startswith("- "):
-            domain = stripped.removeprefix("- ").strip()
-            if domain:
-                allowed_domains.append(domain)
-
-    # --- Tools ---
-    tool_lines = section_map.get("tools", [])
-    tools = _parse_tools_section(tool_lines)
-
-    # --- Instructions ---
-    instr_lines = section_map.get("instructions", [])
-    instructions = "\n".join(instr_lines).strip()
-
-    if not name:
-        raise ValueError("Skill markdown missing '# Skill: <name>' header")
-
-    return SkillDefinition(
-        name=name,
-        description=description,
-        allowed_domains=allowed_domains,
-        tools=tools,
-        instructions=instructions,
-    )
-
-
-def _parse_tools_section(lines: list[str]) -> list[SkillToolDef]:
-    """Parse the ``## Tools`` section into a list of ``SkillToolDef``."""
-    tools: list[SkillToolDef] = []
-    current_tool_name: str | None = None
-    current_tool_desc = ""
-    current_params: list[SkillParamDef] = []
-
-    for line in lines:
-        stripped = line.strip()
-
-        # New tool: ``### tool_name``
-        if stripped.startswith("### "):
-            # Flush previous tool
-            if current_tool_name is not None:
-                tools.append(
-                    SkillToolDef(
-                        name=current_tool_name,
-                        description=current_tool_desc,
-                        parameters=list(current_params),
-                    )
-                )
-            current_tool_name = stripped.removeprefix("### ").strip()
-            current_tool_desc = ""
-            current_params = []
-            continue
-
-        if current_tool_name is None:
-            continue
-
-        if stripped.startswith("Description:"):
-            current_tool_desc = stripped.removeprefix("Description:").strip()
-            continue
-
-        match = _PARAM_RE.match(stripped)
-        if match:
-            param_name, param_type, req_opt, param_desc = match.groups()
-            current_params.append(
-                SkillParamDef(
-                    name=param_name,
-                    type=param_type,
-                    required=(req_opt == "required"),
-                    description=param_desc,
-                )
-            )
-
-    # Flush last tool
-    if current_tool_name is not None:
-        tools.append(
-            SkillToolDef(
-                name=current_tool_name,
-                description=current_tool_desc,
-                parameters=list(current_params),
-            )
-        )
-
-    return tools
-
-
-# ---------------------------------------------------------------------------
-# Format-agnostic parser — tries SKILL.md first, falls back to legacy
-# ---------------------------------------------------------------------------
-
-
-def parse_skill_file(content: str) -> SkillDefinition:
-    """Parse a skill file in either SKILL.md (YAML frontmatter) or legacy skill.md format.
-
-    Tries YAML frontmatter first, then falls back to the legacy section parser.
-    """
-    if content.startswith("---"):
-        return skill_md_to_definition(content)
-    return parse_skill_markdown(content)
-
-
-# ---------------------------------------------------------------------------
-# Migration — legacy skill.md → SKILL.md
-# ---------------------------------------------------------------------------
-
-
-def migrate_legacy_skill(skill_dir: Path) -> bool:
-    """Convert legacy skill.md to SKILL.md in *skill_dir*.
-
-    Uses directory listing to check exact filenames (handles case-insensitive
-    filesystems like macOS/Windows). On case-insensitive FS, ``skill.md`` is
-    renamed in place to ``SKILL.md``. On case-sensitive FS, ``SKILL.md`` is
-    written alongside ``skill.md`` (kept as backup).
-
-    Returns True if migration was performed, False otherwise.
-    """
-    actual_skill_file = _find_skill_file(skill_dir)
-    if actual_skill_file is None or actual_skill_file == "SKILL.md":
-        return False
-
-    legacy_path = skill_dir / "skill.md"
-    try:
-        defn = parse_skill_markdown(legacy_path.read_text())
-    except Exception:
-        logger.warning("Cannot migrate '%s' — failed to parse legacy format", legacy_path)
-        return False
-
-    new_content = render_skill_md(
-        name=defn.name,
-        description=defn.description,
-        allowed_domains=defn.allowed_domains if defn.allowed_domains else None,
-        instructions=defn.instructions,
-    )
-
-    new_path = skill_dir / "SKILL.md"
-    # On case-insensitive FS, writing to SKILL.md would overwrite skill.md.
-    # Rename first to preserve the content, then write.
-    if legacy_path.resolve() == new_path.resolve():
-        # Case-insensitive FS — rename in place
-        legacy_path.rename(new_path)
-        new_path.write_text(new_content)
-    else:
-        # Case-sensitive FS — write alongside, keep legacy as backup
-        new_path.write_text(new_content)
-
-    logger.info("Migrated legacy skill.md → SKILL.md in %s", skill_dir)
-    return True
 
 
 # ---------------------------------------------------------------------------
@@ -445,10 +210,6 @@ class SkillPlugin:
     @property
     def instructions(self) -> str:
         return self._definition.instructions
-
-    @property
-    def skill_tools(self) -> list[SkillToolDef]:
-        return self._definition.tools
 
     @property
     def skill_dir(self) -> Path:
@@ -663,21 +424,12 @@ class SkillPlugin:
 # ---------------------------------------------------------------------------
 
 
-def _find_skill_file(skill_dir: Path) -> str | None:
-    """Find the skill definition file in *skill_dir*.
-
-    Uses actual directory listing to distinguish ``SKILL.md`` from ``skill.md``
-    on case-insensitive filesystems (macOS, Windows).
-    Returns the exact filename or None if neither exists.
-    """
+def _find_skill_file(skill_dir: Path) -> bool:
+    """Check if *skill_dir* contains a SKILL.md file."""
     if not skill_dir.is_dir():
-        return None
+        return False
     filenames = {f.name for f in skill_dir.iterdir() if f.is_file()}
-    if "SKILL.md" in filenames:
-        return "SKILL.md"
-    if "skill.md" in filenames:
-        return "skill.md"
-    return None
+    return "SKILL.md" in filenames
 
 
 def _builtin_skills_dir() -> Path:
@@ -695,7 +447,7 @@ def discover_skills(
 
     Scans built-in skills (unless *include_builtin* is False),
     ``workspaces/household/skills/``, and ``workspaces/{person}/skills/``
-    for subdirectories containing ``SKILL.md`` or ``skill.md``.
+    for subdirectories containing ``SKILL.md``.
     Hidden directories (starting with ``.``) are skipped.
 
     User skills override built-in skills with the same name.
@@ -720,11 +472,10 @@ def discover_skills(
         for child in sorted(skills_dir.iterdir()):
             if not child.is_dir() or child.name.startswith("."):
                 continue
-            skill_file = _find_skill_file(child)
-            if skill_file and child.name not in seen_names:
+            if _find_skill_file(child) and child.name not in seen_names:
                 seen_names.add(child.name)
                 found.append(SkillLocation(
-                    name=child.name, scope=scope, skill_dir=child, skill_file=skill_file,
+                    name=child.name, scope=scope, skill_dir=child,
                 ))
 
     # Sort: builtin first, then household, then personal
@@ -734,20 +485,19 @@ def discover_skills(
 
 
 def _migrate_skill_data(skill_dir: Path) -> None:
-    """Migrate legacy skills that stored data alongside skill.md.
+    """Migrate skills that stored data files alongside SKILL.md.
 
-    Moves all non-directory files (except ``skill.md`` and ``SKILL.md``) from
-    the skill root into a ``data/`` subdirectory.  Idempotent — does nothing if
+    Moves all non-directory files (except ``SKILL.md``) from the skill
+    root into a ``data/`` subdirectory.  Idempotent — does nothing if
     ``data/`` already exists and contains files, or if there's nothing to migrate.
     """
     data_dir = skill_dir / "data"
     if data_dir.is_dir() and any(data_dir.iterdir()):
         return  # Already migrated
 
-    skip = {"skill.md", "SKILL.md"}
     files_to_move = [
         f for f in skill_dir.iterdir()
-        if f.is_file() and f.name not in skip
+        if f.is_file() and f.name != "SKILL.md"
     ]
     if not files_to_move:
         return
@@ -763,26 +513,14 @@ def _migrate_skill_data(skill_dir: Path) -> None:
 
 
 def load_skill(skill_dir: Path, scope: str) -> SkillPlugin:
-    """Load a skill from *skill_dir*.
-
-    Tries ``SKILL.md`` first (new YAML frontmatter format), falls back to
-    ``skill.md`` (legacy). Auto-migrates legacy format to SKILL.md.
-    """
+    """Load a skill from *skill_dir* by parsing its SKILL.md."""
     _migrate_skill_data(skill_dir)
 
-    # Try SKILL.md first, then skill.md
-    skill_file = _find_skill_file(skill_dir)
-    if skill_file is None:
-        raise FileNotFoundError(f"No SKILL.md or skill.md found in {skill_dir}")
+    path = skill_dir / "SKILL.md"
+    if not path.is_file():
+        raise FileNotFoundError(f"No SKILL.md found in {skill_dir}")
 
-    path = skill_dir / skill_file
-    content = path.read_text()
-    definition = parse_skill_file(content)
-
-    # Auto-migrate legacy skill.md → SKILL.md
-    if skill_file == "skill.md":
-        migrate_legacy_skill(skill_dir)
-
+    definition = skill_md_to_definition(path.read_text())
     return SkillPlugin(definition, skill_dir, scope)
 
 
@@ -834,11 +572,10 @@ def build_skill_catalog(
 
     for loc in discover_skills(workspaces, person, include_builtin=include_builtin):
         try:
-            skill_file = _find_skill_file(loc.skill_dir)
-            if not skill_file:
+            path = loc.skill_dir / "SKILL.md"
+            if not path.is_file():
                 continue
-            content = (loc.skill_dir / skill_file).read_text()
-            defn = parse_skill_file(content)
+            defn = skill_md_to_definition(path.read_text())
             catalog.append(SkillCatalogEntry(
                 name=defn.name,
                 description=defn.description,

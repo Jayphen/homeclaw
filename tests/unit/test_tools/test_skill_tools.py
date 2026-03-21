@@ -15,29 +15,20 @@ from homeclaw.plugins.registry import PluginRegistry
 # ---------------------------------------------------------------------------
 
 WEATHER_SKILL_MD = """\
-# Skill: weather
-
-Description: Get current weather and forecasts
-
-## Allowed Domains
-- api.openweathermap.org
-
-## Tools
-
-### get_weather
-Description: Get current weather for a location
-Parameters:
-- location (string, required): City name or coordinates
-
-## Instructions
-Use get_weather when asked about current conditions.
+---
+name: weather
+description: Get current weather and forecasts
+allowed-domains:
+  - api.openweathermap.org
+---
+Use weather__http_call when asked about current conditions.
 """
 
 
 def make_skill(workspaces: Path, owner: str, name: str, md: str) -> Path:
     skill_dir = workspaces / owner / "skills" / name
     skill_dir.mkdir(parents=True, exist_ok=True)
-    (skill_dir / "skill.md").write_text(md)
+    (skill_dir / "SKILL.md").write_text(md)
     return skill_dir
 
 
@@ -92,7 +83,7 @@ async def test_skill_list_household_skill(
     assert result["skills"][0]["name"] == "weather"
     assert result["skills"][0]["scope"] == "household"
     assert result["skills"][0]["description"] == "Get current weather and forecasts"
-    assert result["skills"][0]["tool_count"] >= 0
+    assert result["skills"][0]["allowed_domains"] == ["api.openweathermap.org"]
 
 
 @pytest.mark.asyncio

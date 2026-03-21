@@ -72,21 +72,12 @@ MINIMAL_MANIFEST = json.dumps({
 })
 
 MINIMAL_SKILL_MD = """\
-# Skill: testskill
-
-Description: A test skill
-
-## Allowed Domains
-- example.com
-
-## Tools
-
-### test_action
-Description: Do a test thing
-Parameters:
-- query (string, required): The query
-
-## Instructions
+---
+name: testskill
+description: A test skill
+allowed-domains:
+  - example.com
+---
 Just a test skill.
 """
 
@@ -359,7 +350,7 @@ def test_uninstall_python_plugin(tmp_path: Path) -> None:
 def test_uninstall_skill_plugin(tmp_path: Path) -> None:
     skill_dir = tmp_path / "household" / "skills" / "testskill"
     skill_dir.mkdir(parents=True)
-    (skill_dir / "skill.md").write_text("# Skill: testskill")
+    (skill_dir / "SKILL.md").write_text("---\nname: testskill\ndescription: test\n---\n")
 
     registry = _make_registry(tmp_path)
     removed = uninstall_plugin("testskill", tmp_path, registry)

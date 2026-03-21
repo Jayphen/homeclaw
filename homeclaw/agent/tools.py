@@ -1361,23 +1361,18 @@ def register_builtin_tools(
     # --- Skill tools ---
 
     async def skill_list(*, person: str, **_: Any) -> dict[str, Any]:
-        from homeclaw.plugins.skills.loader import _find_skill_file, discover_skills, parse_skill_file
+        from homeclaw.plugins.skills.loader import discover_skills, skill_md_to_definition
 
         locations = discover_skills(workspaces, person)
         skills = []
         for loc in locations:
             try:
-                skill_file = _find_skill_file(loc.skill_dir)
-                if not skill_file:
-                    continue
-                defn = parse_skill_file((loc.skill_dir / skill_file).read_text())
+                defn = skill_md_to_definition((loc.skill_dir / "SKILL.md").read_text())
                 skills.append({
                     "name": loc.name,
                     "scope": loc.scope,
                     "description": defn.description,
-                    "tool_count": len(defn.tools),
                     "allowed_domains": defn.allowed_domains,
-                    "format": "SKILL.md" if skill_file == "SKILL.md" else "legacy",
                 })
             except Exception:
                 skills.append({"name": loc.name, "scope": loc.scope, "error": "failed to parse"})
@@ -1427,7 +1422,6 @@ def register_builtin_tools(
         scope: str,
         allowed_domains: list[str] | None = None,
         instructions: str,
-        tools: list[dict[str, Any]] | None = None,
         initial_files: list[dict[str, Any]] | None = None,
         source_notes: list[str] | None = None,
         source_bookmarks: dict[str, Any] | None = None,
@@ -1577,15 +1571,11 @@ def register_builtin_tools(
             name="skill_create",
             description=(
                 "Create a new skill — a self-contained mini-app with its own "
-                "data directory. Skills can be data-only (budget tracker, "
-                "recipe book) or wrap external APIs via http_call. Every "
-                "skill gets data_list, data_read, data_write, and data_delete "
-                "tools. Choose 'household' scope to share with everyone, or "
-                "'private' to keep it personal. Markdown files in the skill "
-                "directory are automatically indexed by semantic memory. "
-                "Use a single canonical file per topic (e.g. 'spending.md') "
-                "and append new entries to it — do not create date-suffixed "
-                "or numbered duplicates."
+                "data directory. Every skill automatically gets data_list, "
+                "data_read, data_write, and data_delete tools (namespaced "
+                "as {name}__data_read etc). Setting allowed_domains also "
+                "gives the skill an {name}__http_call tool for API access. "
+                "Choose 'household' scope to share, 'private' for one person."
             ),
             parameters={
                 "type": "object",
@@ -1611,36 +1601,16 @@ def register_builtin_tools(
                     "allowed_domains": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Domains the skill's HTTP calls are allowed to reach (e.g. 'api.example.com')",
+                        "description": (
+                            "Domains the skill is allowed to reach via HTTP. "
+                            "Setting this automatically registers a "
+                            "{name}__http_call tool for the skill. "
+                            "Example: ['api.openweathermap.org']"
+                        ),
                     },
                     "instructions": {
                         "type": "string",
                         "description": "Instructions for how to use this skill, injected into the agent's context",
-                    },
-                    "tools": {
-                        "type": "array",
-                        "description": "Tool definitions exposed by this skill",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "name": {"type": "string"},
-                                "description": {"type": "string"},
-                                "params": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "name": {"type": "string"},
-                                            "type": {"type": "string"},
-                                            "required": {"type": "boolean"},
-                                            "description": {"type": "string"},
-                                        },
-                                        "required": ["name", "type", "description"],
-                                    },
-                                },
-                            },
-                            "required": ["name", "description"],
-                        },
                     },
                     "initial_files": {
                         "type": "array",
@@ -1752,19 +1722,17 @@ def register_builtin_tools(
     ) -> dict[str, Any]:
         from homeclaw.plugins.registry import PluginType
         from homeclaw.plugins.skills.loader import (
-            _find_skill_file,
             load_skill,
-            parse_skill_file,
             render_skill_md,
+            skill_md_to_definition,
         )
 
         skill_dir = workspaces / safe_slug(owner) / "skills" / safe_slug(name)
-        skill_file = _find_skill_file(skill_dir)
-        if not skill_file:
+        skill_md_path = skill_dir / "SKILL.md"
+        if not skill_md_path.is_file():
             return {"error": f"Skill '{name}' not found under '{owner}'"}
 
-        skill_md_path = skill_dir / skill_file
-        defn = parse_skill_file(skill_md_path.read_text())
+        defn = skill_md_to_definition(skill_md_path.read_text())
 
         new_desc = description if description is not None else defn.description
         new_instr = instructions if instructions is not None else defn.instructions
@@ -1948,7 +1916,7 @@ def register_builtin_tools(
     # --- Skill approval tools ---
 
     async def skill_pending_list(*, person: str, **_: Any) -> dict[str, Any]:
-        from homeclaw.plugins.skills.loader import _find_skill_file, parse_skill_file
+        from homeclaw.plugins.skills.loader import skill_md_to_definition
 
         pending = _pending_dir()
         if not pending.is_dir():
@@ -1958,11 +1926,11 @@ def register_builtin_tools(
         for child in sorted(pending.iterdir()):
             if not child.is_dir() or child.name.startswith("."):
                 continue
-            skill_file = _find_skill_file(child)
-            if not skill_file:
+            skill_path = child / "SKILL.md"
+            if not skill_path.is_file():
                 continue
             try:
-                defn = parse_skill_file((child / skill_file).read_text())
+                defn = skill_md_to_definition(skill_path.read_text())
                 skills.append({
                     "name": defn.name,
                     "description": defn.description,
@@ -1997,11 +1965,7 @@ def register_builtin_tools(
         import shutil
 
         from homeclaw.plugins.registry import PluginType
-        from homeclaw.plugins.skills.loader import (
-            _find_skill_file,
-            load_skill,
-            parse_skill_file,
-        )
+        from homeclaw.plugins.skills.loader import load_skill, skill_md_to_definition
 
         if not _is_admin(person):
             return {"error": "Only admins can approve skills"}
@@ -2010,12 +1974,11 @@ def register_builtin_tools(
         if not pending_skill.is_dir():
             return {"error": f"No pending skill '{name}' found"}
 
-        # Read metadata to determine target location
-        skill_file = _find_skill_file(pending_skill)
-        if not skill_file:
+        skill_path = pending_skill / "SKILL.md"
+        if not skill_path.is_file():
             return {"error": f"Pending skill '{name}' has no SKILL.md"}
 
-        defn = parse_skill_file((pending_skill / skill_file).read_text())
+        defn = skill_md_to_definition(skill_path.read_text())
         owner = defn.metadata.get("requested_owner", "household")
 
         dest = workspaces / owner / "skills" / safe_slug(name)
@@ -2120,23 +2083,18 @@ def register_builtin_tools(
         name: str,
         **_: Any,
     ) -> dict[str, Any]:
-        from homeclaw.plugins.skills.loader import (
-            _find_skill_file,
-            discover_skills,
-            parse_skill_file,
-        )
+        from homeclaw.plugins.skills.loader import discover_skills, skill_md_to_definition
 
         locations = discover_skills(workspaces, person)
         loc = next((sk for sk in locations if sk.name == name), None)
         if loc is None:
             return {"error": f"Skill '{name}' not found"}
 
-        skill_file = _find_skill_file(loc.skill_dir)
-        if not skill_file:
-            return {"error": f"No SKILL.md or skill.md in '{name}'"}
+        skill_path = loc.skill_dir / "SKILL.md"
+        if not skill_path.is_file():
+            return {"error": f"No SKILL.md in '{name}'"}
 
-        content = (loc.skill_dir / skill_file).read_text()
-        defn = parse_skill_file(content)
+        defn = skill_md_to_definition(skill_path.read_text())
 
         # List available resource directories
         resources: dict[str, list[str]] = {}

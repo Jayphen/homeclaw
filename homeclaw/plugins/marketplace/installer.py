@@ -21,7 +21,7 @@ from homeclaw.plugins.marketplace.models import MarketplacePlugin, MarketplacePl
 from homeclaw.plugins.registry import PluginEntry, PluginRegistry, PluginType
 from homeclaw.plugins.skills.loader import (
     load_skill,
-    parse_skill_markdown,
+    skill_md_to_definition,
 )
 
 logger = logging.getLogger(__name__)
@@ -197,7 +197,7 @@ async def _install_skill(
 
     # Validate before writing to disk
     try:
-        parse_skill_markdown(content)
+        skill_md_to_definition(content)
     except ValueError as e:
         raise InstallError(f"Invalid skill markdown: {e}") from e
 
@@ -209,7 +209,7 @@ async def _install_skill(
         )
 
     skills_dir.mkdir(parents=True, exist_ok=True)
-    (skills_dir / "skill.md").write_text(content)
+    (skills_dir / "SKILL.md").write_text(content)
 
     skill_plugin = load_skill(skills_dir, "household")
     entry = registry.register(skill_plugin, PluginType.SKILL)
