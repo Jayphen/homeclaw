@@ -31,7 +31,7 @@ class SkillFrontmatter(BaseModel):
     description: str = ""
     license: str | None = None
     compatibility: str | None = None
-    metadata: dict[str, str] = {}
+    metadata: dict[str, Any] = {}
     allowed_tools: list[str] = []
     # homeclaw extensions (not in AgentSkills spec)
     allowed_domains: list[str] = []
@@ -46,7 +46,7 @@ class SkillDefinition(BaseModel):
     instructions: str = ""
     license: str | None = None
     compatibility: str | None = None
-    metadata: dict[str, str] = {}
+    metadata: dict[str, Any] = {}
     allowed_tools: list[str] = []
 
 
@@ -160,7 +160,7 @@ def render_skill_md(
     description: str,
     allowed_domains: list[str] | None = None,
     instructions: str = "",
-    metadata: dict[str, str] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> str:
     """Render a SKILL.md file with YAML frontmatter + markdown body."""
     fm: dict[str, Any] = {"name": name, "description": description}
