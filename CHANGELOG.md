@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.4](https://github.com/Jayphen/homeclaw/compare/v0.6.3...v0.6.4) (2026-03-21)
+
+
+### Bug Fixes
+
+* support both $VAR and ${VAR} syntax in skill env substitution ([0ff768c](https://github.com/Jayphen/homeclaw/commit/0ff768c213cca77be7e26be5e8b1fb770bdcdfbf))
+
 ## [0.6.3](https://github.com/Jayphen/homeclaw/compare/v0.6.2...v0.6.3) (2026-03-21)
 
 
