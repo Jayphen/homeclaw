@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0](https://github.com/Jayphen/homeclaw/compare/v0.5.18...v0.6.0) (2026-03-21)
+
+
+### Features
+
+* pointer-based context consolidation for long conversations ([274b57e](https://github.com/Jayphen/homeclaw/commit/274b57e2d21dbcd701c3f534900145041e372fc4))
+* skill-level .env files with automatic variable substitution ([c17dc99](https://github.com/Jayphen/homeclaw/commit/c17dc9966b334519a2e30db7339e2be11df690a2))
+
+
+### Bug Fixes
+
+* bump MAX_TOOL_ROUNDS from 10 to 25 for complex skill workflows ([bbd8795](https://github.com/Jayphen/homeclaw/commit/bbd8795b4b426db72536a6d9c2ae6440714de3b2))
+* bump MAX_TOOL_ROUNDS to 40 (matches nanobot) ([fe407a1](https://github.com/Jayphen/homeclaw/commit/fe407a16fc1a4c7df56557516e0316d73e71b893))
+* make .env files viewable and editable in skill browser ([7430507](https://github.com/Jayphen/homeclaw/commit/7430507a54d024fd9c28d43e4e97230e7cb12fc9))
+
 ## [0.5.18](https://github.com/Jayphen/homeclaw/compare/v0.5.17...v0.5.18) (2026-03-21)
 
 
