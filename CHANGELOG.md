@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/Jayphen/homeclaw/compare/v0.6.1...v0.6.2) (2026-03-21)
+
+
+### Bug Fixes
+
+* read .env fresh on every http_call, not just at load time ([5fa6184](https://github.com/Jayphen/homeclaw/commit/5fa61841cff5686c047e9c985d94fda6ea910551))
+
 ## [0.6.1](https://github.com/Jayphen/homeclaw/compare/v0.6.0...v0.6.1) (2026-03-21)
 
 
