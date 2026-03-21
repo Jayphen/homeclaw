@@ -395,6 +395,23 @@ class AgentLoop:
                 max_tokens=token_limit,
             )
 
+            # Log the LLM response
+            if response.tool_calls:
+                tool_names = [tc.name for tc in response.tool_calls]
+                c = response.content
+                text_preview = (c[:120] + "…") if c and len(c) > 120 else c
+                logger.info(
+                    "LLM response: stop=%s tools=%s text=%s",
+                    response.stop_reason, tool_names, text_preview,
+                )
+            elif response.content:
+                c = response.content
+                text_preview = (c[:200] + "…") if len(c) > 200 else c
+                logger.info(
+                    "LLM response: stop=%s text=%s",
+                    response.stop_reason, text_preview,
+                )
+
             # Always append the assistant message — include tool_calls so the
             # API can match subsequent tool result messages to their tool_use blocks.
             history.append(Message(
@@ -491,12 +508,15 @@ class AgentLoop:
 
             if self._on_tool_call is not None:
                 self._on_tool_call(tc.name, args)
+            logger.debug("Tool call: %s(%s)", tc.name, json.dumps(args, default=str)[:500])
             handler = self._registry.get_handler(tc.name)
             if handler is None:
                 results.append({"error": f"Unknown tool: {tc.name}"})
                 continue
             try:
                 result = await handler(**args)
+                result_str = json.dumps(result, default=str)
+                logger.debug("Tool result: %s → %s", tc.name, result_str[:500])
                 results.append(result)
             except Exception as e:
                 logger.exception("Tool %s failed", tc.name)

@@ -293,7 +293,8 @@ def _run_serve(workspaces: Path, port: int) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
     from homeclaw.api.logbuffer import install_log_buffer
-    install_log_buffer(timezone=config.timezone)
+    log_dir = config.workspaces.resolve() / "household" / "logs"
+    install_log_buffer(timezone=config.timezone, log_dir=log_dir)
 
     if not config.web_password:
         generate_setup_token()

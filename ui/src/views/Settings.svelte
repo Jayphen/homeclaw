@@ -28,6 +28,15 @@
   let logLoading: boolean = $state(false);
   let logSearch: string = $state("");
   let logPollTimer: ReturnType<typeof setInterval> | null = $state(null);
+  let logUseFile: boolean = $state(false);
+
+  // Date range defaults to past 24h
+  function defaultAfter(): string {
+    const d = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 16);
+  }
+  let logAfter: string = $state(defaultAfter());
+  let logBefore: string = $state("");
 
   let hiddenLoggers: Set<string> = $state(new Set());
 
@@ -55,22 +64,52 @@
     })
   );
 
+  function buildLogParams(): URLSearchParams {
+    const params = new URLSearchParams();
+    if (logLevel !== "all") params.set("level", logLevel);
+    if (logUseFile) {
+      params.set("limit", "2000");
+      if (logAfter) params.set("after", new Date(logAfter).toISOString());
+      if (logBefore) params.set("before", new Date(logBefore).toISOString());
+      if (logSearch) params.set("search", logSearch);
+    } else {
+      params.set("limit", "200");
+    }
+    return params;
+  }
+
   async function fetchLogs() {
     logLoading = true;
     try {
-      const params = new URLSearchParams();
-      params.set("limit", "200");
-      if (logLevel !== "all") params.set("level", logLevel);
+      const params = buildLogParams();
       const r = await api(`/api/settings/logs?${params}`);
       if (r.ok) logEntries = (await r.json()).entries;
     } catch {}
     logLoading = false;
   }
 
+  async function downloadLogs() {
+    const params = buildLogParams();
+    params.set("limit", "10000");
+    try {
+      const r = await api(`/api/settings/logs/download?${params}`);
+      if (!r.ok) return;
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "homeclaw-logs.txt";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {}
+  }
+
   function startLogPolling() {
     fetchLogs();
     if (logPollTimer) clearInterval(logPollTimer);
-    logPollTimer = setInterval(fetchLogs, 5000);
+    logPollTimer = setInterval(fetchLogs, logUseFile ? 15000 : 5000);
   }
 
   function stopLogPolling() {
@@ -579,10 +618,29 @@
             <option value="WARNING">WARNING</option>
             <option value="ERROR">ERROR</option>
           </select>
+          <label class="log-toggle">
+            <input type="checkbox" bind:checked={logUseFile} onchange={() => { fetchLogs(); if (logPollTimer) startLogPolling(); }} />
+            <span>File</span>
+          </label>
           <button class="btn secondary" onclick={fetchLogs} disabled={logLoading}>
             {logLoading ? "Loading..." : "Refresh"}
           </button>
+          <button class="btn secondary" onclick={downloadLogs} title="Download filtered logs">
+            Download
+          </button>
         </div>
+        {#if logUseFile}
+          <div class="log-date-range">
+            <label>
+              After
+              <input type="datetime-local" bind:value={logAfter} onchange={fetchLogs} />
+            </label>
+            <label>
+              Before
+              <input type="datetime-local" bind:value={logBefore} onchange={fetchLogs} />
+            </label>
+          </div>
+        {/if}
         {#if loggerCounts.size > 0}
           <div class="log-loggers">
             {#each [...loggerCounts.entries()].sort((a, b) => b[1] - a[1]) as [name, count]}
@@ -1075,6 +1133,50 @@
   }
 
   .log-search:focus {
+    outline: none;
+    border-color: var(--terracotta);
+  }
+
+  .log-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .log-toggle input {
+    cursor: pointer;
+    accent-color: var(--terracotta);
+  }
+
+  .log-date-range {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .log-date-range label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .log-date-range input {
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-family: var(--font-sans);
+    background: #fdfcfa;
+    color: var(--text);
+  }
+
+  .log-date-range input:focus {
     outline: none;
     border-color: var(--terracotta);
   }
