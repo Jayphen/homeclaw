@@ -959,13 +959,20 @@ def register_builtin_tools(
         person: Annotated[str, Desc("Household member name")],
         **_: Any,
     ) -> dict[str, Any]:
-        from homeclaw.plugins.skills.loader import discover_skills, skill_md_to_definition
+        from homeclaw.plugins.skills.loader import (
+            _is_admin_only,
+            discover_skills,
+            skill_md_to_definition,
+        )
 
+        is_admin = _is_admin(person)
         locations = discover_skills(workspaces, person)
         skills = []
         for loc in locations:
             try:
                 defn = skill_md_to_definition((loc.skill_dir / "SKILL.md").read_text())
+                if _is_admin_only(defn) and not is_admin:
+                    continue
                 skills.append({
                     "name": loc.name,
                     "scope": loc.scope,
@@ -1734,7 +1741,11 @@ def register_builtin_tools(
         name: Annotated[str, Desc("Skill name (as shown in the skill catalog)")],
         **_: Any,
     ) -> dict[str, Any]:
-        from homeclaw.plugins.skills.loader import discover_skills, skill_md_to_definition
+        from homeclaw.plugins.skills.loader import (
+            _is_admin_only,
+            discover_skills,
+            skill_md_to_definition,
+        )
 
         locations = discover_skills(workspaces, person)
         loc = next((sk for sk in locations if sk.name == name), None)
@@ -1746,6 +1757,9 @@ def register_builtin_tools(
             return {"error": f"No SKILL.md in '{name}'"}
 
         defn = skill_md_to_definition(skill_path.read_text())
+
+        if _is_admin_only(defn) and not _is_admin(person):
+            return {"error": f"Skill '{name}' is admin-only"}
 
         # List available resource directories
         resources: dict[str, list[str]] = {}
@@ -1929,3 +1943,48 @@ def register_builtin_tools(
             return {
                 "semantic_status": get_semantic_status(workspaces),
             }
+
+    # --- Admin-only tools ---
+
+    @_reg(
+        name="log_read",
+        description=(
+            "Read homeclaw application logs. Admin only. "
+            "Returns recent log entries with optional filtering "
+            "by level, text search, and date range."
+        ),
+    )
+    async def log_read(
+        *,
+        person: Annotated[str, Desc("Household member name")],
+        level: Annotated[
+            str, Desc("Filter by level: DEBUG, INFO, WARNING, ERROR"),
+        ] = "",
+        search: Annotated[
+            str, Desc("Text search in message or logger name"),
+        ] = "",
+        hours: Annotated[
+            int, Desc("How many hours back to search (default 24)"),
+        ] = 24,
+        limit: Annotated[
+            int, Desc("Max entries to return (default 100)"),
+        ] = 100,
+        **_: Any,
+    ) -> dict[str, Any]:
+        if not _is_admin(person):
+            return {"error": "Only admins can read logs"}
+
+        from homeclaw.api.logbuffer import get_log_entries_from_file
+
+        after = datetime.now(tz=UTC) - timedelta(hours=max(hours, 1))
+        entries = get_log_entries_from_file(
+            after=after,
+            level=level or None,
+            search=search or None,
+            limit=min(limit, 500),
+        )
+        return {
+            "entries": entries,
+            "count": len(entries),
+            "hours": hours,
+        }

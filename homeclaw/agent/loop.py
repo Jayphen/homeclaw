@@ -212,6 +212,7 @@ class AgentLoop:
         semantic_memory: SemanticMemory | None = None,
         on_tool_call: Callable[[str, dict[str, Any]], None] | None = None,
         routing: RoutingConfig | None = None,
+        admin_check: Callable[[str], bool] | None = None,
     ) -> None:
         self._provider = provider
         self._registry = registry
@@ -219,6 +220,7 @@ class AgentLoop:
         self._semantic_memory = semantic_memory
         self._on_tool_call = on_tool_call
         self._routing = routing
+        self._admin_check = admin_check or (lambda _: True)
         self._lock_pool = LockPool()
         self._on_interim: InterimCallback | None = None
         # Track last activity per session for idle-based consolidation
@@ -359,6 +361,7 @@ class AgentLoop:
             semantic_memory=self._semantic_memory,
             shared_only=shared_only,
             model=model_name,
+            is_admin=self._admin_check(person),
         )
         system = SYSTEM_PROMPT.format(context=context)
 

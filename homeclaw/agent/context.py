@@ -58,6 +58,7 @@ async def build_context(
     shared_only: bool = False,
     context_config: ContextConfig | None = None,
     model: str | None = None,
+    is_admin: bool = True,
 ) -> str:
     cfg = context_config or ContextConfig()
     parts: list[str] = []
@@ -146,7 +147,7 @@ async def build_context(
             parts.extend(person_topics)
 
     # --- Priority 2d: skill catalog ---
-    skill_catalog = _build_skill_catalog(workspaces, person)
+    skill_catalog = _build_skill_catalog(workspaces, person, is_admin=is_admin)
     if skill_catalog:
         parts.extend(skill_catalog)
 
@@ -237,7 +238,9 @@ def _build_person_memory_summary(workspaces: Path, person: str) -> list[str]:
     return [f"  - {topic}" for topic in topics]
 
 
-def _build_skill_catalog(workspaces: Path, person: str) -> list[str]:
+def _build_skill_catalog(
+    workspaces: Path, person: str, *, is_admin: bool = True,
+) -> list[str]:
     """Build a catalog of available skills for system prompt injection.
 
     Returns a compact list of skill name + description so the LLM knows
@@ -245,7 +248,7 @@ def _build_skill_catalog(workspaces: Path, person: str) -> list[str]:
     """
     from homeclaw.plugins.skills.loader import build_skill_catalog
 
-    catalog = build_skill_catalog(workspaces, person)
+    catalog = build_skill_catalog(workspaces, person, is_admin=is_admin)
     if not catalog:
         return []
 

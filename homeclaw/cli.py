@@ -150,6 +150,10 @@ class HomeclawApp:
             embedding_api_key=self.config.openai_api_key,
         )
 
+        def _admin_check(person: str) -> bool:
+            admins: list[str] = self.config.admin_members or []
+            return not admins or person in admins
+
         self.loop = AgentLoop(
             provider=provider,
             registry=self.registry,
@@ -157,6 +161,7 @@ class HomeclawApp:
             semantic_memory=self._semantic_memory,
             on_tool_call=on_tool_call,
             routing=self.config.routing,
+            admin_check=_admin_check,
         )
 
     async def initialize(self) -> None:

@@ -70,6 +70,7 @@ class SkillCatalogEntry:
     has_references: bool = False
     has_data: bool = False
     has_http: bool = False
+    admin_only: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -683,11 +684,13 @@ def build_skill_catalog(
     person: str,
     *,
     include_builtin: bool = True,
+    is_admin: bool = True,
 ) -> list[SkillCatalogEntry]:
     """Build a catalog of all skills visible to *person*.
 
     Returns lightweight entries (name + description) suitable for system prompt
-    injection. Errors parsing individual skills are logged and skipped.
+    injection. Skills with ``metadata.admin_only`` are excluded when
+    *is_admin* is False.  Errors for individual skills are logged and skipped.
     """
     catalog: list[SkillCatalogEntry] = []
 
@@ -697,6 +700,9 @@ def build_skill_catalog(
             if not path.is_file():
                 continue
             defn = skill_md_to_definition(path.read_text())
+            admin_only = _is_admin_only(defn)
+            if admin_only and not is_admin:
+                continue
             catalog.append(SkillCatalogEntry(
                 name=defn.name,
                 description=defn.description,
@@ -705,8 +711,15 @@ def build_skill_catalog(
                 has_references=(loc.skill_dir / "references").is_dir(),
                 has_data=(loc.skill_dir / "data").is_dir(),
                 has_http=bool(defn.allowed_domains),
+                admin_only=admin_only,
             ))
         except Exception:
             logger.warning("Skipping skill '%s' in catalog — parse failed", loc.name)
 
     return catalog
+
+
+def _is_admin_only(defn: SkillDefinition) -> bool:
+    """Check if a skill definition has ``metadata.admin_only`` set."""
+    val = defn.metadata.get("admin_only", False)
+    return str(val).lower() in ("true", "1", "yes")
