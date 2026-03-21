@@ -60,7 +60,11 @@ def parse_github_url(url: str) -> tuple[str, str, str, str] | None:
 
 
 def raw_skill_md_url(url: str) -> str | None:
-    """Convert a GitHub URL to a raw SKILL.md download URL."""
+    """Convert a GitHub repo URL to a raw SKILL.md download URL.
+
+    Returns None for non-GitHub-repo URLs (gists, arbitrary URLs).
+    Those should be fetched directly.
+    """
     info = parse_github_url(url)
     if info is None:
         return None
@@ -69,6 +73,29 @@ def raw_skill_md_url(url: str) -> str | None:
     if subpath:
         base += f"/{subpath}"
     return f"{base}/SKILL.md"
+
+
+def normalize_gist_url(url: str) -> str | None:
+    """Convert a gist.github.com URL to a raw download URL.
+
+    Returns None if not a gist URL.
+    """
+    parsed = urlparse(url)
+
+    # Already raw
+    if parsed.hostname == "gist.githubusercontent.com":
+        return url
+
+    if parsed.hostname != "gist.github.com":
+        return None
+
+    parts = [p for p in parsed.path.strip("/").split("/") if p]
+    if len(parts) < 2:
+        return None
+
+    # gist.github.com/user/hash[/raw] → fetch raw via API-style URL
+    user, gist_id = parts[0], parts[1]
+    return f"https://gist.githubusercontent.com/{user}/{gist_id}/raw"
 
 
 async def download_skill_repo(url: str, skill_dir: Path) -> list[str]:

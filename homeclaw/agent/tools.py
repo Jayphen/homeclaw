@@ -2093,15 +2093,14 @@ def register_builtin_tools(
         from homeclaw.plugins.registry import PluginType
         from homeclaw.plugins.skills.loader import load_skill, skill_md_to_definition
 
-        from homeclaw.plugins.skills.github import raw_skill_md_url
+        from homeclaw.plugins.skills.github import normalize_gist_url, raw_skill_md_url
 
         # Determine the SKILL.md download URL
         skill_md_url = raw_skill_md_url(url)
+        is_github_repo = skill_md_url is not None
         if skill_md_url is None:
-            if url.endswith("SKILL.md") or url.endswith("skill.md"):
-                skill_md_url = url
-            else:
-                return {"error": "URL must point to a GitHub repo or a SKILL.md file"}
+            # Try gist URL, otherwise use URL directly
+            skill_md_url = normalize_gist_url(url) or url
 
         # Fetch the SKILL.md
         try:
@@ -2140,9 +2139,11 @@ def register_builtin_tools(
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "SKILL.md").write_text(content)
 
-        # Try to fetch additional files from the repo
-        from homeclaw.plugins.skills.github import download_skill_repo
-        fetched_extras = await download_skill_repo(url, skill_dir)
+        # Try to fetch additional files from GitHub repos
+        fetched_extras: list[str] = []
+        if is_github_repo:
+            from homeclaw.plugins.skills.github import download_skill_repo
+            fetched_extras = await download_skill_repo(url, skill_dir)
 
         if pending:
             return {
@@ -2194,10 +2195,9 @@ def register_builtin_tools(
         ToolDefinition(
             name="skill_install",
             description=(
-                "Install a skill from a URL. Accepts a GitHub repo URL or a "
-                "direct link to a SKILL.md file. The skill is downloaded, "
-                "validated, and activated. Example: "
-                "skill_install(url='https://github.com/user/my-skill')"
+                "Install a skill from a URL. Accepts GitHub repos, gists, "
+                "or any URL that serves a SKILL.md file. GitHub repos also "
+                "download scripts/, references/, and other supporting files."
             ),
             parameters={
                 "type": "object",

@@ -168,30 +168,25 @@ class SkillInstallRequest(BaseModel):
 
 @router.post("/install", dependencies=[AdminDep])
 async def install_skill_from_url(body: SkillInstallRequest) -> dict[str, Any]:
-    """Install a skill from a GitHub repo or SKILL.md URL."""
+    """Install a skill from a GitHub repo, gist, or direct SKILL.md URL."""
     import httpx
 
+    from homeclaw.plugins.skills.github import (
+        download_skill_repo,
+        normalize_gist_url,
+        raw_skill_md_url,
+    )
     from homeclaw.plugins.skills.loader import load_skill, skill_md_to_definition
 
     workspaces = get_config().workspaces.resolve()
 
-    # Normalize GitHub URLs to raw
-    url = body.url.strip()
-    if "github.com" in url and "raw.githubusercontent.com" not in url:
-        # Convert github.com/user/repo to raw URL
-        from urllib.parse import urlparse
-
-        parsed = urlparse(url)
-        parts = [p for p in parsed.path.strip("/").split("/") if p]
-        if len(parts) >= 2:
-            user, repo = parts[0], parts[1]
-            if len(parts) >= 4 and parts[2] == "tree":
-                branch = "/".join(parts[3:])
-            else:
-                branch = "main"
-            url = f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/SKILL.md"
-    elif not url.endswith("SKILL.md"):
-        url = url.rstrip("/") + "/SKILL.md"
+    # Normalize URL to a fetchable SKILL.md
+    original_url = body.url.strip()
+    skill_md_url = raw_skill_md_url(original_url)
+    is_github_repo = skill_md_url is not None
+    if skill_md_url is None:
+        skill_md_url = normalize_gist_url(original_url) or original_url
+    url = skill_md_url
 
     try:
         transport = httpx.AsyncHTTPTransport(retries=2)
@@ -221,9 +216,9 @@ async def install_skill_from_url(body: SkillInstallRequest) -> dict[str, Any]:
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "SKILL.md").write_text(content)
 
-    # Download additional files from GitHub (scripts, references, etc.)
-    from homeclaw.plugins.skills.github import download_skill_repo
-    extra_files = await download_skill_repo(body.url, skill_dir)
+    # Download additional files from GitHub repos (scripts, references, etc.)
+    if is_github_repo:
+        await download_skill_repo(original_url, skill_dir)
 
     # Hot-load
     from homeclaw.api.deps import get_plugin_registry
