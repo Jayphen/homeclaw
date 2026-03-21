@@ -2183,10 +2183,10 @@ def register_builtin_tools(
         }
         if not deps["satisfied"]:
             warnings: list[str] = []
-            if deps["missing_bins"]:
-                warnings.append(f"Missing binaries: {', '.join(deps['missing_bins'])}")
-            if deps["missing_env"]:
-                warnings.append(f"Missing env vars: {', '.join(deps['missing_env'])}")
+            for b in deps["missing_bins"]:
+                warnings.append(f"Missing binary '{b['name']}': {b['hint']}")
+            for e in deps["missing_env"]:
+                warnings.append(f"Missing env var '{e}'")
             result["warnings"] = warnings
         return result
 

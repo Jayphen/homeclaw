@@ -23,10 +23,16 @@
     files: SkillFile[];
   }
 
+  interface MissingBin {
+    name: string;
+    hint: string;
+  }
+
   interface SkillDeps {
-    missing_bins: string[];
+    missing_bins: MissingBin[];
     missing_env: string[];
     satisfied: boolean;
+    runtime: string;
   }
 
   interface SkillDetail {
@@ -363,12 +369,19 @@
       {/if}
       {#if detail.deps}
         <div class="dep-warnings">
-          {#if detail.deps.missing_bins.length}
-            <p>Missing binaries: <code>{detail.deps.missing_bins.join(", ")}</code> — install them to use this skill</p>
-          {/if}
-          {#if detail.deps.missing_env.length}
-            <p>Missing env vars: <code>{detail.deps.missing_env.join(", ")}</code> — set them in your environment or .env file</p>
-          {/if}
+          <p class="dep-heading">Missing dependencies {#if detail.deps.runtime === "docker"}<span class="dep-runtime">Docker</span>{/if}</p>
+          {#each detail.deps.missing_bins as bin}
+            <div class="dep-item">
+              <code>{bin.name}</code>
+              <span class="dep-hint">{bin.hint}</span>
+            </div>
+          {/each}
+          {#each detail.deps.missing_env as env}
+            <div class="dep-item">
+              <code>{env}</code>
+              <span class="dep-hint">{detail.deps.runtime === "docker" ? `Set in docker-compose.yml environment or .env file` : `Set in your shell or .env file`}</span>
+            </div>
+          {/each}
         </div>
       {/if}
     </div>
@@ -461,12 +474,12 @@
           <p class="install-success">Installed <strong>{installResult.name}</strong></p>
           {#if installResult.deps}
             <div class="dep-warnings">
-              {#if installResult.deps.missing_bins.length}
-                <p>Missing binaries: <code>{installResult.deps.missing_bins.join(", ")}</code></p>
-              {/if}
-              {#if installResult.deps.missing_env.length}
-                <p>Missing env vars: <code>{installResult.deps.missing_env.join(", ")}</code></p>
-              {/if}
+              {#each installResult.deps.missing_bins as bin}
+                <div class="dep-item"><code>{bin.name}</code> <span class="dep-hint">{bin.hint}</span></div>
+              {/each}
+              {#each installResult.deps.missing_env as env}
+                <div class="dep-item"><code>{env}</code> <span class="dep-hint">Set in your environment or .env file</span></div>
+              {/each}
             </div>
           {/if}
         {:else}
@@ -588,10 +601,17 @@
   .install-error { color: var(--rose, #c44); font-size: 0.82rem; margin: 0.5rem 0 0; }
   .dep-warnings {
     background: #fef8ee; border: 1px solid #f0d9a8; border-radius: var(--radius);
-    padding: 0.5rem 0.75rem; margin-top: 0.5rem; font-size: 0.8rem; color: #8a6d3b;
+    padding: 0.6rem 0.85rem; margin-top: 0.5rem; font-size: 0.8rem; color: #8a6d3b;
   }
-  .dep-warnings p { margin: 0.2rem 0; }
-  .dep-warnings code { background: rgba(0,0,0,0.05); padding: 0.1rem 0.3rem; border-radius: 3px; }
+  .dep-heading { margin: 0 0 0.4rem; font-weight: 600; }
+  .dep-runtime {
+    font-size: 0.68rem; font-weight: 600; background: #e8dcc8; color: #6b563e;
+    padding: 0.1rem 0.35rem; border-radius: 3px; margin-left: 0.3rem; vertical-align: middle;
+  }
+  .dep-item { padding: 0.25rem 0; display: flex; flex-direction: column; gap: 0.1rem; }
+  .dep-item + .dep-item { border-top: 1px solid #f0d9a8; }
+  .dep-item code { background: rgba(0,0,0,0.05); padding: 0.1rem 0.3rem; border-radius: 3px; width: fit-content; }
+  .dep-hint { font-size: 0.75rem; color: #a08050; }
   .skill-compat { font-size: 0.8rem; color: var(--text-muted); margin: 0.3rem 0 0; font-style: italic; }
 
   /* Breadcrumb */
