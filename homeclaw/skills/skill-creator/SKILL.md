@@ -65,7 +65,8 @@ Include step-by-step guidance, edge cases, and examples.
 | description | Yes | What + when. Be specific — this triggers activation. |
 | allowed-domains | No | Domains for http_call (homeclaw extension). |
 | license | No | License name. |
-| metadata | No | Arbitrary key-value pairs. |
+| compatibility | No | Environment requirements (bins, network, etc.). |
+| metadata | No | Arbitrary key-value pairs (can be nested). |
 
 ### Writing good descriptions
 
@@ -91,19 +92,6 @@ Include:
 3. Edge cases and error handling
 4. Examples of inputs and expected behavior
 
-## Using the skill_create tool
-
-Call `skill_create` with these arguments:
-
-- **name**: Slug-style name (e.g., "budget-tracker", "meal-planner")
-- **description**: Clear description of what and when (see above)
-- **scope**: "household" (shared) or "private" (one person)
-- **instructions**: The markdown body of the SKILL.md
-- **allowed_domains**: List of API domains if needed (optional)
-- **initial_files**: Seed data files (optional)
-- **source_notes**: Copy memory topics into skill data (optional)
-- **source_bookmarks**: Export bookmarks into skill data (optional)
-
 ## How tools work
 
 Every skill automatically gets these tools, namespaced with the skill name:
@@ -112,14 +100,53 @@ Every skill automatically gets these tools, namespaced with the skill name:
 - `{name}__data_write` — write a data file
 - `{name}__data_delete` — delete a data file
 
-If `allowed_domains` is set, the skill also gets:
+If `allowed-domains` is set, the skill also gets:
 - `{name}__http_call` — make HTTP requests to the allowed domains
 
 You do NOT define these tools manually — they are registered automatically.
-To make API calls, just set `allowed_domains` to the API hosts and use
+To make API calls, just set `allowed-domains` to the API hosts and use
 `{name}__http_call` with the full URL.
 
-After creating a skill, call `read_skill` to see the exact tool names.
+If the skill has a `scripts/` directory, use `run_skill_script` to execute
+bundled scripts (30s timeout, path-traversal protected).
+
+After creating or installing a skill, call `read_skill` to see the exact
+tool names and available resources.
+
+## Installing and adapting existing skills
+
+**Always prefer installing over recreating.** If a skill already exists online:
+1. Use `skill_install` with the URL to download it
+2. Use `skill_edit_file` with find/replace to adapt specific parts
+3. Never try to reproduce a large skill via `skill_create` — the instructions
+   will be truncated. Install first, then make targeted edits.
+
+`skill_install` accepts:
+- GitHub repo URLs (downloads SKILL.md + scripts/, references/, assets/, data/)
+- GitHub gist URLs
+- Any URL serving a SKILL.md file directly
+
+Example workflow to fork a skill:
+```
+skill_install(url="https://github.com/user/some-skill")
+skill_edit_file(name="some-skill", file="SKILL.md", find="old text", replace="new text")
+```
+
+## Creating a skill from scratch
+
+Call `skill_create` with:
+- **name**: Slug-style (e.g. "budget-tracker", "meal-planner")
+- **description**: What + when (see Writing good descriptions)
+- **scope**: "household" (shared) or "private" (one person)
+- **instructions**: Markdown body of the SKILL.md
+- **allowed_domains**: Domains for http_call (optional)
+- **initial_files**: Seed data files as `[{filename, content}]` (optional)
+- **source_notes**: Copy memory topics into skill data (optional)
+- **source_bookmarks**: Export bookmarks into skill data (optional)
+
+Note: if skill approval is enabled and you're not an admin, the skill goes
+to a pending queue. An admin must approve it with `skill_approve` before
+it becomes active. Check pending skills with `skill_pending_list`.
 
 ## Data management
 
@@ -129,36 +156,34 @@ Skills with persistent state use the `data/` directory:
 - Always call `data_list` before `data_write` to check for existing files
 - Consolidate duplicates if found
 
-## Installing and adapting existing skills
+## All skill tools
 
-**Always prefer installing over recreating.** If a skill already exists online:
-1. Use `skill_install` with the GitHub URL to download it (gets all files)
-2. Use `skill_edit_file` with find/replace to adapt specific parts
-3. Never try to reproduce a large skill via `skill_create` — the instructions
-   will be truncated. Install first, then make targeted edits.
-
-Example workflow to fork a skill:
-```
-skill_install(url="https://github.com/user/some-skill")
-skill_edit_file(name="some-skill", file="SKILL.md", find="old-name", replace="new-name")
-```
-
-## Editing existing skills
-
-- `skill_edit_file` — read, write, or find/replace any file in a skill
-- `skill_update` — update a skill's description or instructions
-- `skill_migrate` — move between scopes (household ↔ private)
-- `skill_remove` — archive a skill (not permanent deletion)
+| Tool | Purpose |
+|------|---------|
+| `read_skill` | Load a skill's instructions and see its tools + resources |
+| `skill_list` | List all available skills |
+| `skill_create` | Create a new skill from scratch |
+| `skill_install` | Install a skill from a URL (GitHub, gist, or direct) |
+| `skill_edit_file` | Read, write, or find/replace a file in a skill |
+| `skill_update` | Update a skill's description or instructions |
+| `skill_remove` | Archive a skill (soft delete) |
+| `skill_migrate` | Move a skill between scopes (household ↔ private) |
+| `skill_pending_list` | List skills awaiting admin approval |
+| `skill_approve` | Approve a pending skill (admin only) |
+| `skill_reject` | Reject and delete a pending skill (admin only) |
+| `run_skill_script` | Execute a script in a skill's scripts/ directory |
 
 ## Common patterns
 
 ### Data-only skill (no API)
 Budget tracker, habit log, reading list — just needs data files.
-Set `allowed_domains` to empty, focus instructions on data file conventions.
+Set `allowed-domains` to empty, focus instructions on data file conventions.
 
 ### API integration skill
-Weather, transit, calendar — calls external APIs.
-Set `allowed_domains` to the API hosts, include API usage in instructions.
+Weather, transit, Home Assistant — calls external APIs.
+Set `allowed-domains` to the API hosts, include API usage in instructions.
+If the service is on LAN, the admin needs to enable "Allow local network"
+in the Skills settings.
 
 ### Workflow skill
 Morning briefing, weekly review — orchestrates multiple tools.
