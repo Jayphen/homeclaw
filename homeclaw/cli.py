@@ -112,7 +112,10 @@ class HomeclawApp:
         self.plugin_registry = PluginRegistry(tool_registry=self.registry)
 
         # Load household-wide skills at startup (private skills hot-loaded on skill_create)
-        load_all_skills(self.workspaces, "household", self.plugin_registry)
+        load_all_skills(
+            self.workspaces, "household", self.plugin_registry,
+            allow_local_network=self.config.skill_allow_local_network,
+        )
 
         # Load user-installed Python plugins (disabled by default, opt-in via enabled.json)
         load_all_plugins(self.workspaces / "plugins", self.plugin_registry)

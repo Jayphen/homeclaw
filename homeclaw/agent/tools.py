@@ -1396,6 +1396,11 @@ def register_builtin_tools(
         skill_list,
     )
 
+    def _skill_allow_local() -> bool:
+        if config is None:
+            return False
+        return bool(getattr(config, "skill_allow_local_network", False))
+
     def _is_admin(person: str) -> bool:
         """Check if *person* is an admin member."""
         if config is None:
@@ -1541,7 +1546,7 @@ def register_builtin_tools(
         loaded = False
         if plugin_registry is not None:
             try:
-                plugin = load_skill(skill_dir, owner)
+                plugin = load_skill(skill_dir, owner, allow_local_network=_skill_allow_local())
                 plugin_registry.register(plugin, PluginType.SKILL)
                 loaded = True
             except Exception as e:
@@ -1752,7 +1757,7 @@ def register_builtin_tools(
         if plugin_registry is not None:
             plugin_registry.unregister(name)
             try:
-                plugin = load_skill(skill_dir, owner)
+                plugin = load_skill(skill_dir, owner, allow_local_network=_skill_allow_local())
                 plugin_registry.register(plugin, PluginType.SKILL)
                 loaded = True
             except Exception as e:
@@ -1857,7 +1862,7 @@ def register_builtin_tools(
         loaded = False
         if plugin_registry is not None:
             try:
-                plugin = load_skill(dst_dir, new_owner)
+                plugin = load_skill(dst_dir, new_owner, allow_local_network=_skill_allow_local())
                 plugin_registry.register(plugin, PluginType.SKILL)
                 loaded = True
             except Exception as e:
@@ -1992,7 +1997,7 @@ def register_builtin_tools(
         loaded = False
         if plugin_registry is not None:
             try:
-                plugin = load_skill(dest, owner)
+                plugin = load_skill(dest, owner, allow_local_network=_skill_allow_local())
                 plugin_registry.register(plugin, PluginType.SKILL)
                 loaded = True
             except Exception as exc:

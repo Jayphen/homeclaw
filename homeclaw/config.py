@@ -138,6 +138,7 @@ class HomeclawConfig(BaseSettings):
 
     # Skills
     skill_approval_required: bool = True  # Non-admins need admin approval to create skills
+    skill_allow_local_network: bool = False  # Allow skill http_call to reach LAN services
 
     # Marketplace
     marketplace_url: str | None = None

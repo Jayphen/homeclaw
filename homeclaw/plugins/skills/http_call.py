@@ -23,6 +23,7 @@ _MAX_RESPONSE_CHARS = 50_000
 class HttpCallConfig(BaseModel):
     allowed_domains: list[str]  # e.g. ["api.openweathermap.org"]
     log_dir: Path | None = None  # where to log requests
+    allow_local_network: bool = False  # skip private IP check (for LAN services)
 
 
 def _is_private_ip(addr: str) -> bool:
@@ -122,11 +123,12 @@ async def http_call(
     except ValueError as exc:
         return {"error": str(exc)}
 
-    # --- Block private IPs ---
-    try:
-        _check_private_ip(hostname)
-    except ValueError as exc:
-        return {"error": str(exc)}
+    # --- Block private IPs (unless local network access is allowed) ---
+    if not config.allow_local_network:
+        try:
+            _check_private_ip(hostname)
+        except ValueError as exc:
+            return {"error": str(exc)}
 
     # --- Make the request ---
     status: int | None = None

@@ -194,7 +194,14 @@ class SkillPlugin:
         scope: ``"household"`` or a person name — where the skill lives.
     """
 
-    def __init__(self, definition: SkillDefinition, skill_dir: Path, scope: str) -> None:
+    def __init__(
+        self,
+        definition: SkillDefinition,
+        skill_dir: Path,
+        scope: str,
+        *,
+        allow_local_network: bool = False,
+    ) -> None:
         self.name: str = definition.name
         self.description: str = definition.description
         self.scope: str = scope
@@ -205,6 +212,7 @@ class SkillPlugin:
         self._config = HttpCallConfig(
             allowed_domains=definition.allowed_domains,
             log_dir=skill_dir / "logs",
+            allow_local_network=allow_local_network,
         )
 
     @property
@@ -512,7 +520,12 @@ def _migrate_skill_data(skill_dir: Path) -> None:
     )
 
 
-def load_skill(skill_dir: Path, scope: str) -> SkillPlugin:
+def load_skill(
+    skill_dir: Path,
+    scope: str,
+    *,
+    allow_local_network: bool = False,
+) -> SkillPlugin:
     """Load a skill from *skill_dir* by parsing its SKILL.md."""
     _migrate_skill_data(skill_dir)
 
@@ -521,7 +534,7 @@ def load_skill(skill_dir: Path, scope: str) -> SkillPlugin:
         raise FileNotFoundError(f"No SKILL.md found in {skill_dir}")
 
     definition = skill_md_to_definition(path.read_text())
-    return SkillPlugin(definition, skill_dir, scope)
+    return SkillPlugin(definition, skill_dir, scope, allow_local_network=allow_local_network)
 
 
 def load_all_skills(
@@ -530,6 +543,7 @@ def load_all_skills(
     registry: PluginRegistry,
     *,
     include_builtin: bool = True,
+    allow_local_network: bool = False,
 ) -> list[PluginEntry]:
     """Discover, load, and register all skills visible to *person*.
 
@@ -542,7 +556,7 @@ def load_all_skills(
 
     for loc in locations:
         try:
-            plugin = load_skill(loc.skill_dir, loc.scope)
+            plugin = load_skill(loc.skill_dir, loc.scope, allow_local_network=allow_local_network)
             entry = registry.register(plugin, PluginType.SKILL)
             entries.append(entry)
             logger.info("Loaded skill plugin '%s' (scope: %s)", loc.name, loc.scope)
