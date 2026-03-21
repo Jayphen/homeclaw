@@ -93,7 +93,7 @@ removing or updating it rather than letting it sit.
 
 {context}"""
 
-MAX_TOOL_ROUNDS = 25
+MAX_TOOL_ROUNDS = 40
 
 # Fraction of context window reserved for non-history content (system, tools, output).
 _RESERVED_FRACTION = 0.35
