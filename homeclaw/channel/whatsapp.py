@@ -487,9 +487,17 @@ class WhatsAppChannel:
             return {"status": "error", "detail": str(exc)}
 
     async def _send_image_to_person(
-        self, person: str, image_url: str, caption: str | None,
+        self,
+        person: str,
+        image_url: str,
+        caption: str | None,
+        image_data: bytes | None = None,
     ) -> dict[str, Any]:
-        """Send an image to a person via WhatsApp."""
+        """Send an image to a person via WhatsApp.
+
+        When *image_data* is provided, writes to a temp file and sends that
+        instead of the URL — needed for authenticated image sources.
+        """
         from neonize.utils.jid import build_jid  # type: ignore[import-untyped]
 
         reverse = self._reverse_user_map()
@@ -499,25 +507,41 @@ class WhatsAppChannel:
         try:
             server = "lid" if phone in self._lid_users else "s.whatsapp.net"
             jid = build_jid(phone, server=server)
-            await self._client.send_image(jid, image_url, caption=caption)
+            source = self._write_temp_image(image_data) if image_data else image_url
+            await self._client.send_image(jid, source, caption=caption)
             return {"status": "sent", "channel": "whatsapp", "person": person}
         except Exception as exc:
             logger.exception("Failed to send WhatsApp image to %s", person)
             return {"status": "error", "detail": str(exc)}
 
     async def _send_image_to_group(
-        self, group_id: str, image_url: str, caption: str | None,
+        self,
+        group_id: str,
+        image_url: str,
+        caption: str | None,
+        image_data: bytes | None = None,
     ) -> dict[str, Any]:
         """Send an image to a WhatsApp group chat."""
         from neonize.utils.jid import build_jid  # type: ignore[import-untyped]
 
         try:
             gid = build_jid(group_id, server="g.us")
-            await self._client.send_image(gid, image_url, caption=caption)
+            source = self._write_temp_image(image_data) if image_data else image_url
+            await self._client.send_image(gid, source, caption=caption)
             return {"status": "sent", "channel": "whatsapp", "group": group_id}
         except Exception as exc:
             logger.exception("Failed to send WhatsApp group image to %s", group_id)
             return {"status": "error", "detail": str(exc)}
+
+    @staticmethod
+    def _write_temp_image(data: bytes) -> str:
+        """Write image bytes to a temp file and return its path."""
+        import tempfile
+
+        fd, path = tempfile.mkstemp(suffix=".jpg")
+        with open(fd, "wb") as f:
+            f.write(data)
+        return path
 
     def _list_groups(self) -> list[str]:
         return list(self._known_groups)

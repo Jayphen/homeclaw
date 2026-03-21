@@ -22,10 +22,14 @@ _PREFS_FILE = "household/channel_preferences.json"
 SendFn = Callable[[str, str], Awaitable[dict[str, Any]]]
 # Signature: (group_id, text) → delivery result dict
 GroupSendFn = Callable[[str, str], Awaitable[dict[str, Any]]]
-# Signature: (person_name, image_url, caption | None) → delivery result dict
-SendImageFn = Callable[[str, str, str | None], Awaitable[dict[str, Any]]]
-# Signature: (group_id, image_url, caption | None) → delivery result dict
-GroupSendImageFn = Callable[[str, str, str | None], Awaitable[dict[str, Any]]]
+# Signature: (person_name, image_url, caption | None, image_data | None) → result
+SendImageFn = Callable[
+    [str, str, str | None, bytes | None], Awaitable[dict[str, Any]],
+]
+# Signature: (group_id, image_url, caption | None, image_data | None) → result
+GroupSendImageFn = Callable[
+    [str, str, str | None, bytes | None], Awaitable[dict[str, Any]],
+]
 
 
 class _ChannelEntry:
@@ -163,9 +167,18 @@ class ChannelDispatcher:
         }
 
     async def send_image(
-        self, person: str, image_url: str, caption: str | None = None,
+        self,
+        person: str,
+        image_url: str,
+        caption: str | None = None,
+        *,
+        image_data: bytes | None = None,
     ) -> dict[str, Any]:
-        """Send an image to a person via their preferred channel."""
+        """Send an image to a person via their preferred channel.
+
+        When *image_data* is provided (pre-fetched bytes), adapters can skip
+        fetching the URL themselves — useful for authenticated image sources.
+        """
         if not self._channels:
             return {"status": "error", "detail": "No channel adapters registered"}
 
@@ -173,11 +186,11 @@ class ChannelDispatcher:
         if pref and pref in self._channels:
             entry = self._channels[pref]
             if entry.send_image and entry.has_person(person):
-                return await entry.send_image(person, image_url, caption)
+                return await entry.send_image(person, image_url, caption, image_data)
 
         for _name, entry in self._channels.items():
             if entry.send_image and entry.has_person(person):
-                return await entry.send_image(person, image_url, caption)
+                return await entry.send_image(person, image_url, caption, image_data)
 
         return {
             "status": "error",
@@ -186,13 +199,18 @@ class ChannelDispatcher:
         }
 
     async def send_group_image(
-        self, group_id: str, image_url: str, caption: str | None = None,
+        self,
+        group_id: str,
+        image_url: str,
+        caption: str | None = None,
+        *,
+        image_data: bytes | None = None,
     ) -> dict[str, Any]:
         """Send an image to a group chat."""
         for _name, entry in self._channels.items():
             if entry.send_group_image and entry.group_ids and group_id in entry.group_ids():
                 return await entry.send_group_image(
-                    group_id, image_url, caption,
+                    group_id, image_url, caption, image_data,
                 )
 
         # Fall back to first channel that supports group images.
@@ -201,7 +219,7 @@ class ChannelDispatcher:
                 ids = entry.group_ids()
                 if ids:
                     return await entry.send_group_image(
-                        ids[0], image_url, caption,
+                        ids[0], image_url, caption, image_data,
                     )
 
         return {
