@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.13](https://github.com/Jayphen/homeclaw/compare/v0.5.12...v0.5.13) (2026-03-21)
+
+
+### Features
+
+* skill approval flow for non-admin users ([df8a56a](https://github.com/Jayphen/homeclaw/commit/df8a56a39d6e447d04a81cfe358ccb7e954e65a5))
+
+
+### Bug Fixes
+
+* expose skill plugin tools in read_skill and catalog ([a788b8e](https://github.com/Jayphen/homeclaw/commit/a788b8e741bc920666d26d2e58b84df529bafc6c))
+
 ## [0.5.12](https://github.com/Jayphen/homeclaw/compare/v0.5.11...v0.5.12) (2026-03-20)
 
 
