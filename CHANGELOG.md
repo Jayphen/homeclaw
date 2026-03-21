@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.16](https://github.com/Jayphen/homeclaw/compare/v0.5.15...v0.5.16) (2026-03-21)
+
+
+### Features
+
+* check skill dependencies at install and in detail view ([64fd252](https://github.com/Jayphen/homeclaw/commit/64fd252bd249966cffe6cb253f52218e98c6efbb))
+* Docker-aware dependency hints and auto-install on startup ([03ac36c](https://github.com/Jayphen/homeclaw/commit/03ac36c089eac11fc5516ad7ac4f47263590c233))
+* skill_edit_file tool for targeted edits without rewriting ([2bf3787](https://github.com/Jayphen/homeclaw/commit/2bf37875fbe1a41bfe465ce5f7768e4568f3c205))
+* skill_install accepts gists and arbitrary URLs ([6c9bc9a](https://github.com/Jayphen/homeclaw/commit/6c9bc9a8cd65bb7f3f22a1155ea36bf9cd20ddb8))
+
+
+### Bug Fixes
+
+* accept nested metadata values in SKILL.md frontmatter ([2a6ae2f](https://github.com/Jayphen/homeclaw/commit/2a6ae2f24aeb22523e0d5d5880c5d3b8191c4212))
+
 ## [0.5.15](https://github.com/Jayphen/homeclaw/compare/v0.5.14...v0.5.15) (2026-03-21)
 
 
