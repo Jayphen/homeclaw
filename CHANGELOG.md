@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.15](https://github.com/Jayphen/homeclaw/compare/v0.5.14...v0.5.15) (2026-03-21)
+
+
+### Features
+
+* skill install from URL, fix file browsing, delete skills ([c23850b](https://github.com/Jayphen/homeclaw/commit/c23850b04751df232bdb8a558a1d524c3a3ca3e0))
+* skill settings panel in web UI ([31706cd](https://github.com/Jayphen/homeclaw/commit/31706cdad9cefe432bf57f15084e1ff60f568654))
+
 ## [0.5.14](https://github.com/Jayphen/homeclaw/compare/v0.5.13...v0.5.14) (2026-03-21)
 
 
