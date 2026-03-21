@@ -771,24 +771,59 @@ def register_builtin_tools(
         name="image_send",
         description=(
             "Send an image to a household member or the household group chat. "
-            "Provide a publicly accessible image URL. Optionally include a caption."
+            "Provide either a publicly accessible image URL, or a local file_path "
+            "for images already downloaded to disk. Use headers when the URL "
+            "requires authentication (e.g. an API key)."
         ),
     )
     async def image_send(
         *,
-        url: Annotated[str, Desc("Publicly accessible image URL")],
+        url: Annotated[str | None, Desc("Image URL (use headers if auth is needed)")] = None,
+        file_path: Annotated[str | None, Desc("Local file path to an image on disk")] = None,
+        headers: Annotated[
+            dict[str, str] | None,
+            Desc("HTTP headers to send when fetching the URL (e.g. x-api-key)"),
+        ] = None,
         person: Annotated[str | None, Desc("Recipient name (for individual messages)")] = None,
         group: Annotated[bool, Desc("Send to the household group chat instead")] = False,
         caption: Annotated[str | None, Desc("Optional caption for the image")] = None,
         **_: Any,
     ) -> dict[str, Any]:
+        from pathlib import Path as _Path
+
+        import httpx
+
+        if not url and not file_path:
+            return {"error": "Either 'url' or 'file_path' is required."}
+
+        # Pre-fetch image bytes when we have auth headers or a local file,
+        # so channel adapters don't need to handle authentication themselves.
+        image_data: bytes | None = None
+        if file_path:
+            p = _Path(file_path)
+            if not p.is_file():
+                return {"error": f"File not found: {file_path}"}
+            image_data = p.read_bytes()
+        elif headers and url:
+            try:
+                async with httpx.AsyncClient(follow_redirects=True) as client:
+                    resp = await client.get(url, headers=headers, timeout=30)
+                    resp.raise_for_status()
+                    image_data = resp.content
+            except Exception as exc:
+                return {"error": f"Failed to fetch image: {exc}"}
+
         if dispatcher is None:
-            return {"status": "queued", "person": person, "url": url}
+            return {"status": "queued", "person": person, "url": url or file_path}
         if group:
-            return await dispatcher.send_group_image("", url, caption)
+            return await dispatcher.send_group_image(
+                "", url or "", caption, image_data=image_data,
+            )
         if not person:
             return {"error": "Either 'person' or 'group: true' is required."}
-        return await dispatcher.send_image(person, url, caption)
+        return await dispatcher.send_image(
+            person, url or "", caption, image_data=image_data,
+        )
 
     # --- Channel preference tool ---
 

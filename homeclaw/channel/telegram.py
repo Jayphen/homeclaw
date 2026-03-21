@@ -312,9 +312,18 @@ class TelegramChannel:
             return {"status": "error", "detail": str(exc)}
 
     async def _send_image_to_person(
-        self, person: str, image_url: str, caption: str | None,
+        self,
+        person: str,
+        image_url: str,
+        caption: str | None,
+        image_data: bytes | None = None,
     ) -> dict[str, Any]:
-        """Send an image to a person via Telegram."""
+        """Send an image to a person via Telegram.
+
+        When *image_data* is provided (pre-fetched bytes), the URL fetch is
+        skipped.  This allows authenticated image sources (e.g. Immich) to
+        work without leaking API keys to the adapter.
+        """
         import httpx
 
         reverse = self._reverse_user_map()
@@ -324,10 +333,13 @@ class TelegramChannel:
         if not hasattr(self, "_app"):
             return {"status": "error", "detail": "Telegram bot not running"}
         try:
-            async with httpx.AsyncClient(follow_redirects=True) as client:
-                resp = await client.get(image_url, timeout=30)
-                resp.raise_for_status()
-                photo_bytes = resp.content
+            if image_data is not None:
+                photo_bytes = image_data
+            else:
+                async with httpx.AsyncClient(follow_redirects=True) as client:
+                    resp = await client.get(image_url, timeout=30)
+                    resp.raise_for_status()
+                    photo_bytes = resp.content
             await self._app.bot.send_photo(
                 chat_id=int(tid), photo=photo_bytes, caption=caption,
             )
