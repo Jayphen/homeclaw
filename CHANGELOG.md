@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.12](https://github.com/Jayphen/homeclaw/compare/v0.5.11...v0.5.12) (2026-03-20)
+
+
+### Features
+
+* adopt AgentSkills SKILL.md format with progressive disclosure ([955df0d](https://github.com/Jayphen/homeclaw/commit/955df0d12c4479f909305382c8cc55e7aca370ad))
+
+
+### Bug Fixes
+
+* use correct JID server for LID vs phone number users ([0213509](https://github.com/Jayphen/homeclaw/commit/0213509aeaf9479e2b114af30e6a863cd0912fd9))
+
 ## [0.5.11](https://github.com/Jayphen/homeclaw/compare/v0.5.10...v0.5.11) (2026-03-20)
 
 
