@@ -431,7 +431,7 @@ wheels = [
 
 [[package]]
 name = "homeclaw"
-version = "0.5.11"
+version = "0.5.18"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -448,6 +448,7 @@ dependencies = [
     { name = "python-telegram-bot" },
     { name = "pyyaml" },
     { name = "telegramify-markdown" },
+    { name = "tenacity" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -493,6 +494,7 @@ requires-dist = [
     { name = "qrcode", extras = ["pil"], marker = "extra == 'whatsapp'", specifier = ">=7.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8" },
     { name = "telegramify-markdown", specifier = ">=1.1.1" },
+    { name = "tenacity", specifier = ">=9.1.4" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
 
@@ -2101,6 +2103,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b0/94/0b29f09c3c9d28cd7b8790c4bc8aa805b126ece87f2ddc5d0c28dc9cb922/telegramify_markdown-1.1.1.tar.gz", hash = "sha256:0fc66835b889e156ef47aa1c70a215368f9673f86cac23e539f5d9fa923a4c35", size = 58615 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c5/6d/71552ae1f5e959d36c9943ec5a04063ec9db69f9d524643c41a92ba422e7/telegramify_markdown-1.1.1-py3-none-any.whl", hash = "sha256:860348bae4e4e107b3fc02333ff3f592888b1e6bd9da8291aaf210e094dbd005", size = 41506 },
+]
+
+[[package]]
+name = "tenacity"
+version = "9.1.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/47/c6/ee486fd809e357697ee8a44d3d69222b344920433d3b6666ccd9b374630c/tenacity-9.1.4.tar.gz", hash = "sha256:adb31d4c263f2bd041081ab33b498309a57c77f9acf2db65aadf0898179cf93a", size = 49413 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d7/c1/eb8f9debc45d3b7918a32ab756658a0904732f75e555402972246b0b8e71/tenacity-9.1.4-py3-none-any.whl", hash = "sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55", size = 28926 },
 ]
 
 [[package]]

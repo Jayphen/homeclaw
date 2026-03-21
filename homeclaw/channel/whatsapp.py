@@ -9,6 +9,7 @@ import asyncio
 import base64
 import contextlib
 import logging
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,17 @@ from homeclaw.channel.registration import (
     register_member,
     register_self,
 )
+
+
+class WhatsAppState(StrEnum):
+    """Observable connection states for the WhatsApp channel."""
+
+    IDLE = "idle"
+    CONNECTING = "connecting"
+    AWAITING_QR = "awaiting_qr"
+    CONNECTED = "connected"
+    DISCONNECTED = "disconnected"
+    STOPPED = "stopped"
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +152,7 @@ class WhatsAppChannel:
         self._connect_task: asyncio.Task[None] | None = None
         self._dispatcher = dispatcher
 
-        self._connected = False
+        self._state = WhatsAppState.IDLE
         self._last_qr: bytes | None = None  # Raw QR data for web UI
         self._known_groups: set[str] = _load_known_groups(workspaces)
         # Track which user IDs are LIDs (server="lid") vs phone numbers
@@ -160,6 +172,7 @@ class WhatsAppChannel:
         @self._client.event.qr
         async def _on_qr(_: Any, qr_data: bytes) -> None:
             self._last_qr = qr_data
+            self._state = WhatsAppState.AWAITING_QR
             logger.info("WhatsApp QR code received — scan it or view at /api/whatsapp/qr")
 
         # Pair-code auth: if a phone number is configured, register the
@@ -186,26 +199,31 @@ class WhatsAppChannel:
                     )
 
     @property
+    def state(self) -> WhatsAppState:
+        """Current connection state."""
+        return self._state
+
+    @property
     def connected(self) -> bool:
         """Whether the WhatsApp client is currently connected."""
-        return self._connected
+        return self._state == WhatsAppState.CONNECTED
 
     @property
     def pending_qr(self) -> bytes | None:
         """Raw QR code data if awaiting scan, or None if already paired."""
-        if self._connected:
+        if self._state == WhatsAppState.CONNECTED:
             return None
         return self._last_qr
 
     def _register_handlers(self) -> None:
         @self._client.event(self._ConnectedEv)
         async def _on_connected(_: Any, __: Any) -> None:
-            self._connected = True
+            self._state = WhatsAppState.CONNECTED
             logger.info("WhatsApp connected")
 
         @self._client.event(self._DisconnectedEv)
         async def _on_disconnected(_: Any, __: Any) -> None:
-            self._connected = False
+            self._state = WhatsAppState.DISCONNECTED
             logger.warning("WhatsApp disconnected — will reconnect automatically")
 
         @self._client.event(self._PairStatusEv)
@@ -483,6 +501,7 @@ class WhatsAppChannel:
 
     async def start(self) -> None:
         """Connect to WhatsApp. Non-blocking — QR code shown in logs on first run."""
+        self._state = WhatsAppState.CONNECTING
         self._connect_task = asyncio.create_task(self._run_connect())
         self._register_with_dispatcher()
         logger.info(
@@ -500,6 +519,7 @@ class WhatsAppChannel:
 
     async def stop(self) -> None:
         """Disconnect from WhatsApp."""
+        self._state = WhatsAppState.STOPPED
         try:
             await self._client.stop()
         except Exception:

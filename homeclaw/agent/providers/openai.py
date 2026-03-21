@@ -4,11 +4,16 @@ import json
 import logging
 from typing import Any, Literal
 
-logger = logging.getLogger(__name__)
-
+import openai
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion
 from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall
+from tenacity import (
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from homeclaw.agent.providers.base import (
     LLMResponse,
@@ -16,6 +21,19 @@ from homeclaw.agent.providers.base import (
     ToolCall,
     ToolDefinition,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _is_retryable_openai(exc: BaseException) -> bool:
+    """Return True for transient OpenAI-compatible API errors worth retrying."""
+    if isinstance(exc, openai.RateLimitError):
+        return True
+    if isinstance(exc, openai.APIStatusError) and exc.status_code >= 500:
+        return True
+    if isinstance(exc, openai.APIConnectionError):
+        return True
+    return False
 
 
 class OpenAIProvider:
@@ -25,6 +43,7 @@ class OpenAIProvider:
         base_url: str | None = None,
         model: str = "gpt-4o",
         use_max_completion_tokens: bool = False,
+        context_window: int = 128_000,
     ) -> None:
         kwargs: dict[str, Any] = {}
         if api_key:
@@ -33,10 +52,22 @@ class OpenAIProvider:
             kwargs["base_url"] = base_url
         self._client = AsyncOpenAI(**kwargs)
         self.model = model
+        self.context_window = context_window
         # Direct OpenAI reasoning models (o1/o3/o4-mini) need max_completion_tokens.
         # OpenRouter and other proxies expect max_tokens.
         self._use_max_completion_tokens = use_max_completion_tokens
 
+    @retry(
+        retry=retry_if_exception(_is_retryable_openai),
+        wait=wait_exponential(multiplier=1, min=1, max=30),
+        stop=stop_after_attempt(4),
+        before_sleep=lambda rs: logger.warning(
+            "OpenAI API error (attempt %d), retrying: %s",
+            rs.attempt_number,
+            rs.outcome.exception() if rs.outcome else "unknown",
+        ),
+        reraise=True,
+    )
     async def complete(
         self,
         messages: list[Message],
@@ -130,7 +161,7 @@ def _parse_response(response: ChatCompletion) -> LLMResponse:
             response.usage,
             response.model_dump_json(indent=2) if hasattr(response, "model_dump_json") else str(response),
         )
-        return LLMResponse(content="Sorry, the LLM returned an empty response.", tool_calls=[], stop_reason="error")
+        return LLMResponse(content="Sorry, the LLM returned an empty response.", tool_calls=[], stop_reason="end_turn")
     choice = response.choices[0]
     message = choice.message
 

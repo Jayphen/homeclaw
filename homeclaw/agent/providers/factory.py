@@ -26,6 +26,7 @@ def create_provider(config: HomeclawConfig) -> LLMProvider:
             api_key=config.anthropic_api_key,
             model=model,
             enable_prompt_caching=config.routing.enable_prompt_caching,
+            context_window=config.routing.context_window,
         )
 
     if provider == "openai":
@@ -39,6 +40,7 @@ def create_provider(config: HomeclawConfig) -> LLMProvider:
             base_url=config.openai_base_url,
             model=model,
             use_max_completion_tokens=direct_openai,
+            context_window=config.routing.context_window,
         )
 
     raise ValueError(

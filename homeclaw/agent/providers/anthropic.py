@@ -4,6 +4,12 @@ import logging
 from typing import Any, Literal
 
 import anthropic
+from tenacity import (
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from homeclaw.agent.providers.base import (
     LLMResponse,
@@ -15,17 +21,41 @@ from homeclaw.agent.providers.base import (
 logger = logging.getLogger(__name__)
 
 
+def _is_retryable_anthropic(exc: BaseException) -> bool:
+    """Return True for transient Anthropic errors worth retrying."""
+    if isinstance(exc, anthropic.RateLimitError):
+        return True
+    if isinstance(exc, anthropic.APIStatusError) and exc.status_code >= 500:
+        return True
+    if isinstance(exc, anthropic.APIConnectionError):
+        return True
+    return False
+
+
 class AnthropicProvider:
     def __init__(
         self,
         api_key: str,
         model: str,
         enable_prompt_caching: bool = True,
+        context_window: int = 200_000,
     ) -> None:
         self._client = anthropic.AsyncAnthropic(api_key=api_key)
         self.model = model
+        self.context_window = context_window
         self._enable_caching = enable_prompt_caching
 
+    @retry(
+        retry=retry_if_exception(_is_retryable_anthropic),
+        wait=wait_exponential(multiplier=1, min=1, max=30),
+        stop=stop_after_attempt(4),
+        before_sleep=lambda rs: logger.warning(
+            "Anthropic API error (attempt %d), retrying: %s",
+            rs.attempt_number,
+            rs.outcome.exception() if rs.outcome else "unknown",
+        ),
+        reraise=True,
+    )
     async def complete(
         self,
         messages: list[Message],

@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from homeclaw.api.deps import AuthDep, get_config
 from homeclaw.bookmarks.models import Bookmark
 from homeclaw.bookmarks.store import (
-    delete_bookmark,
+    delete_bookmark_safe,
     get_categories,
     list_bookmarks,
     search_bookmarks,
@@ -58,6 +58,6 @@ async def bookmarks_index(
 async def bookmark_remove(bookmark_id: str) -> dict[str, str]:
     """Delete a bookmark by ID."""
     workspaces = get_config().workspaces.resolve()
-    if not delete_bookmark(workspaces, bookmark_id):
+    if not await delete_bookmark_safe(workspaces, bookmark_id):
         raise HTTPException(status_code=404, detail="Bookmark not found")
     return {"status": "deleted"}

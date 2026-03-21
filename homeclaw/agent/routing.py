@@ -32,6 +32,10 @@ class RoutingConfig(BaseSettings):
     # Batch routines (Anthropic direct only)
     enable_batch_routines: bool = True
 
+    # Context window size (tokens). Set to match your model's limit.
+    # Defaults to 200k for Anthropic models; override for others.
+    context_window: int = 200_000
+
     # Output token limits
     max_output_tokens: int = 4096
     routine_max_output_tokens: int = 2048

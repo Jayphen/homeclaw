@@ -1,17 +1,24 @@
 """Core agent loop — receive message, build context, call LLM, dispatch tools."""
 
 import asyncio
+import copy
 import json
 import logging
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from homeclaw.agent.context import build_context, estimate_tokens
 from homeclaw.agent.providers.base import LLMProvider, LLMResponse, Message, ToolCall
-from homeclaw.agent.routing import CallType, RoutingConfig, classify_tool_round, max_tokens_for, route_model
+from homeclaw.agent.routing import (
+    CallType,
+    RoutingConfig,
+    classify_tool_round,
+    max_tokens_for,
+    route_model,
+)
 from homeclaw.agent.tools import ToolRegistry
 from homeclaw.locking import LockPool
 from homeclaw.memory.semantic import SemanticMemory
@@ -123,6 +130,7 @@ _PERSONAL_WRITE_TOOLS = frozenset({
     "skill_update",
     "skill_remove",
     "skill_migrate",
+    "skill_install",
     "decision_log",
 })
 
@@ -273,19 +281,17 @@ class AgentLoop:
         chunk = unconsolidated[:chunk_end]
         person = history_key.split("-")[0] if "-" in history_key else history_key
 
-        # Use the cheap/routine model for consolidation
-        original_model = getattr(self._provider, "model", None)
+        # Use a shallow copy of the provider so we can set the cheap model
+        # without mutating the shared instance (which may be mid-request).
+        consolidation_provider = copy.copy(self._provider)
         if self._routing:
-            from homeclaw.agent.routing import CallType as CT, route_model
+            from homeclaw.agent.routing import CallType as CT
+            from homeclaw.agent.routing import route_model
             cheap_model = route_model(CT.ROUTINE, self._routing)
-            if hasattr(self._provider, "model"):
-                self._provider.model = cheap_model  # type: ignore[attr-defined]
+            if hasattr(consolidation_provider, "model"):
+                consolidation_provider.model = cheap_model  # type: ignore[attr-defined]
 
-        try:
-            result = await consolidate_chunk(chunk, person, self._provider)
-        finally:
-            if original_model is not None and hasattr(self._provider, "model"):
-                self._provider.model = original_model  # type: ignore[attr-defined]
+        result = await consolidate_chunk(chunk, person, consolidation_provider)
 
         if "error" in result:
             logger.warning("Consolidation failed for '%s': %s", history_key, result["error"])
@@ -510,15 +516,14 @@ def _append_chat_log(
     reference anything from the group conversation in their DMs.
     Rotated daily so individual files stay small.
     """
-    from datetime import datetime, timezone
 
     channel_dir = workspaces / "household" / "channels" / channel
     channel_dir.mkdir(parents=True, exist_ok=True)
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     log_path = channel_dir / f"{today}.md"
 
-    timestamp = datetime.now(timezone.utc).strftime("%H:%M")
+    timestamp = datetime.now(UTC).strftime("%H:%M")
     entry = f"- [{timestamp}] {user_text}\n- [{timestamp}] homeclaw: {assistant_text}\n"
 
     with open(log_path, "a") as f:
@@ -601,9 +606,7 @@ def _persistable_messages(messages: list[Message]) -> list[Message]:
     """Filter messages to only user + final assistant turns (no tool calls)."""
     persistent: list[Message] = []
     for m in messages:
-        if m.role == "user":
-            persistent.append(m.model_copy(update={"content": _strip_images(m.content)}))
-        elif m.role == "assistant" and not m.tool_calls:
+        if m.role == "user" or m.role == "assistant" and not m.tool_calls:
             persistent.append(m.model_copy(update={"content": _strip_images(m.content)}))
     return persistent
 

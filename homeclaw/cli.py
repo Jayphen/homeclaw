@@ -450,15 +450,18 @@ def _run_serve_with_deferred_telegram(
     async def _serve() -> None:
         nonlocal hc_app_ready
         if wa_channel and hc_app:
-            await hc_app.initialize()
+            # Acquire the lock so _start_telegram (which can fire during any
+            # await) sees a consistent hc_app_ready flag.
+            async with _telegram_lock:
+                await hc_app.initialize()
+                hc_app.load_scheduler()
+                hc_app_ready = True
             await wa_channel.start()
             from homeclaw.api.deps import set_whatsapp_connected_fn, set_whatsapp_qr_fn
             _wa = wa_channel  # capture for lambda
             set_whatsapp_connected_fn(lambda: _wa.connected)  # type: ignore[union-attr]
             set_whatsapp_qr_fn(lambda: _wa.pending_qr)  # type: ignore[union-attr]
-            hc_app.load_scheduler()
             hc_app.start_scheduler()
-            hc_app_ready = True
 
         uv_config = uvicorn.Config(app, host="0.0.0.0", port=port)
         server = uvicorn.Server(uv_config)

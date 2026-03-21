@@ -31,6 +31,8 @@ class LLMResponse(BaseModel):
 
 
 class LLMProvider(Protocol):
+    context_window: int
+
     async def complete(
         self,
         messages: list[Message],

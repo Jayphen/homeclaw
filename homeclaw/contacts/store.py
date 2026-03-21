@@ -1,11 +1,16 @@
 """Contact JSON store — one file per contact in workspaces/household/contacts/."""
 
+import asyncio
 from difflib import SequenceMatcher
 from pathlib import Path
 
 from homeclaw.contacts.models import Contact
 
 _FUZZY_THRESHOLD = 0.4
+
+# Async lock for write operations — prevents concurrent read-modify-write
+# races between API routes and agent tool calls.
+_write_lock = asyncio.Lock()
 
 
 def _contacts_dir(workspaces: Path) -> Path:
@@ -80,6 +85,12 @@ def save_contact(workspaces: Path, contact: Contact) -> None:
     path.write_text(contact.model_dump_json(indent=2))
 
 
+async def save_contact_safe(workspaces: Path, contact: Contact) -> None:
+    """Save a contact with async locking to prevent concurrent write races."""
+    async with _write_lock:
+        save_contact(workspaces, contact)
+
+
 def get_members(workspaces: Path) -> list[Contact]:
     """Return contacts that are also household members (have a linked workspace)."""
     return [c for c in list_contacts(workspaces) if c.member is not None]
@@ -91,3 +102,9 @@ def delete_contact(workspaces: Path, contact_id: str) -> bool:
         return False
     path.unlink()
     return True
+
+
+async def delete_contact_safe(workspaces: Path, contact_id: str) -> bool:
+    """Delete a contact with async locking."""
+    async with _write_lock:
+        return delete_contact(workspaces, contact_id)

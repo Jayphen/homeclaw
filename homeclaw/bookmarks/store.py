@@ -1,11 +1,16 @@
 """Bookmark JSON store — shared across the household."""
 
+import asyncio
 from difflib import SequenceMatcher
 from pathlib import Path
 
 from homeclaw.bookmarks.models import Bookmark
 
 _FUZZY_THRESHOLD = 0.4
+
+# Async lock for write operations — all bookmarks share a single JSON file,
+# so concurrent read-modify-write from API + agent must be serialized.
+_write_lock = asyncio.Lock()
 
 
 def _bookmarks_path(workspaces: Path) -> Path:
@@ -45,6 +50,12 @@ def save_bookmark(workspaces: Path, bookmark: Bookmark) -> Bookmark:
     bookmarks.append(bookmark)
     _save_all(workspaces, bookmarks)
     return bookmark
+
+
+async def save_bookmark_safe(workspaces: Path, bookmark: Bookmark) -> Bookmark:
+    """Save a bookmark with async locking to prevent concurrent write races."""
+    async with _write_lock:
+        return save_bookmark(workspaces, bookmark)
 
 
 def list_bookmarks(
@@ -118,6 +129,22 @@ def update_bookmark(
     return None
 
 
+async def update_bookmark_safe(
+    workspaces: Path,
+    bookmark_id: str,
+    url: str | None = None,
+    title: str | None = None,
+    category: str | None = None,
+    tags: list[str] | None = None,
+) -> Bookmark | None:
+    """Update a bookmark with async locking."""
+    async with _write_lock:
+        return update_bookmark(
+            workspaces, bookmark_id,
+            url=url, title=title, category=category, tags=tags,
+        )
+
+
 def delete_bookmark(workspaces: Path, bookmark_id: str) -> bool:
     bookmarks = _load_all(workspaces)
     original_len = len(bookmarks)
@@ -126,3 +153,9 @@ def delete_bookmark(workspaces: Path, bookmark_id: str) -> bool:
         return False
     _save_all(workspaces, bookmarks)
     return True
+
+
+async def delete_bookmark_safe(workspaces: Path, bookmark_id: str) -> bool:
+    """Delete a bookmark with async locking."""
+    async with _write_lock:
+        return delete_bookmark(workspaces, bookmark_id)

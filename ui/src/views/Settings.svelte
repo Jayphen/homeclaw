@@ -31,7 +31,7 @@
 
   let hiddenLoggers: Set<string> = $state(new Set());
 
-  let loggerCounts = $derived(() => {
+  let loggerCounts = $derived.by(() => {
     const counts = new Map<string, number>();
     for (const e of logEntries) {
       counts.set(e.logger, (counts.get(e.logger) ?? 0) + 1);
@@ -583,9 +583,9 @@
             {logLoading ? "Loading..." : "Refresh"}
           </button>
         </div>
-        {#if loggerCounts().size > 0}
+        {#if loggerCounts.size > 0}
           <div class="log-loggers">
-            {#each [...loggerCounts().entries()].sort((a, b) => b[1] - a[1]) as [name, count]}
+            {#each [...loggerCounts.entries()].sort((a, b) => b[1] - a[1]) as [name, count]}
               <button
                 class="logger-pill"
                 class:hidden-logger={hiddenLoggers.has(name)}

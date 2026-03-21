@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from homeclaw.api.deps import AuthDep, get_config
 from homeclaw.contacts.models import Contact
-from homeclaw.contacts.store import get_contact, list_contacts, save_contact
+from homeclaw.contacts.store import get_contact, list_contacts, save_contact_safe
 
 router = APIRouter(prefix="/api/contacts", tags=["contacts"])
 
@@ -74,5 +74,5 @@ async def contacts_update(contact_id: str, body: ContactUpdate) -> dict[str, Any
     if body.relationship is not None:
         contact.relationship = body.relationship
 
-    save_contact(workspaces, contact)
+    await save_contact_safe(workspaces, contact)
     return {"status": "updated", "id": contact.id}
