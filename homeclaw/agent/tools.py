@@ -1819,7 +1819,22 @@ def register_builtin_tools(
 
         script_env = {**os.environ, **_load_skill_env(loc.skill_dir)}
 
-        cmd = [str(script_path)] + (args or [])
+        # Use an interpreter based on file extension so scripts don't
+        # need the execute permission bit (skill_edit_file creates 0644).
+        interpreters: dict[str, list[str]] = {
+            ".sh": ["bash"],
+            ".bash": ["bash"],
+            ".py": ["python3"],
+            ".rb": ["ruby"],
+            ".js": ["node"],
+            ".ts": ["npx", "tsx"],
+        }
+        suffix = script_path.suffix.lower()
+        if suffix in interpreters:
+            cmd = [*interpreters[suffix], str(script_path)] + (args or [])
+        else:
+            # Fall back to direct execution (requires +x)
+            cmd = [str(script_path)] + (args or [])
         try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd,

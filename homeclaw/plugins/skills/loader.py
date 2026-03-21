@@ -359,29 +359,33 @@ class SkillPlugin:
             ),
         ]
 
-        if self.env:
-            defs.append(
-                ToolDefinition(
-                    name="get_env",
-                    description=(
-                        f"Get an environment variable from the '{self.name}' "
-                        f"skill's .env file. Available vars: "
-                        f"{', '.join(self.env.keys()) or 'none'}. "
-                        f"You can also use ${{VAR_NAME}} in http_call URLs, "
-                        f"headers, and body — they get substituted automatically."
-                    ),
-                    parameters={
-                        "type": "object",
-                        "properties": {
-                            "key": {
-                                "type": "string",
-                                "description": "Environment variable name",
-                            },
+        # Always register get_env — the .env may be created mid-session
+        # via skill_edit_file, and the agent needs to know about ${VAR}
+        # substitution even before the .env exists.
+        env_keys = list(self.env.keys())
+        defs.append(
+            ToolDefinition(
+                name="get_env",
+                description=(
+                    f"Get an environment variable from the '{self.name}' "
+                    f"skill's .env file. "
+                    + (f"Available vars: {', '.join(env_keys)}. " if env_keys else
+                       "No .env file yet — create one with skill_edit_file. ")
+                    + "You can also use ${VAR_NAME} in http_call URLs, "
+                    "headers, and body — they get substituted automatically."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "key": {
+                            "type": "string",
+                            "description": "Environment variable name",
                         },
-                        "required": ["key"],
                     },
-                )
+                    "required": ["key"],
+                },
             )
+        )
 
         if self._definition.allowed_domains:
             defs.append(
@@ -390,7 +394,9 @@ class SkillPlugin:
                     description=(
                         f"Make an HTTP request within the '{self.name}' "
                         f"skill. Allowed domains: "
-                        f"{', '.join(self._definition.allowed_domains)}."
+                        f"{', '.join(self._definition.allowed_domains)}. "
+                        "Tip: use ${VAR_NAME} in URLs, headers, and body "
+                        "to auto-substitute values from the skill's .env file."
                     ),
                     parameters={
                         "type": "object",
@@ -602,9 +608,11 @@ def _migrate_skill_data(skill_dir: Path) -> None:
     if data_dir.is_dir() and any(data_dir.iterdir()):
         return  # Already migrated
 
+    # Only migrate data files — leave .env and SKILL.md in the skill root.
+    _KEEP_IN_ROOT = {"SKILL.md", ".env"}
     files_to_move = [
         f for f in skill_dir.iterdir()
-        if f.is_file() and f.name != "SKILL.md"
+        if f.is_file() and f.name not in _KEEP_IN_ROOT
     ]
     if not files_to_move:
         return

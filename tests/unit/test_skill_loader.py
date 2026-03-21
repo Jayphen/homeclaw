@@ -343,6 +343,28 @@ def test_load_skill_no_migration_when_data_dir_exists(tmp_path: Path) -> None:
     assert (data_dir / "spending.md").exists()
 
 
+def test_load_skill_migration_preserves_env_file(tmp_path: Path) -> None:
+    """Migration should NOT move .env files into data/."""
+    skill_dir = make_skill_dir(tmp_path, "ha", MINIMAL_SKILL)
+    (skill_dir / ".env").write_text("HA_TOKEN=secret123\n")
+    (skill_dir / "notes.md").write_text("# Notes\n")
+
+    load_skill(skill_dir, "household")
+
+    # .env stays in root, other files get migrated
+    assert (skill_dir / ".env").exists()
+    assert not (skill_dir / "notes.md").exists()
+    assert (skill_dir / "data" / "notes.md").exists()
+
+
+def test_get_env_tool_always_registered(tmp_path: Path) -> None:
+    """get_env should be registered even when no .env file exists."""
+    skill_dir = make_skill_dir(tmp_path, "test", MINIMAL_SKILL)
+    plugin = load_skill(skill_dir, "household")
+    tool_names = [t.name for t in plugin.tools()]
+    assert "get_env" in tool_names
+
+
 def test_load_skill_missing_skill_md(tmp_path: Path) -> None:
     skill_dir = tmp_path / "empty"
     skill_dir.mkdir()
