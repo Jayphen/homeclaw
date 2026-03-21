@@ -767,6 +767,29 @@ def register_builtin_tools(
             return {"error": "Either 'person' or 'group: true' is required."}
         return await dispatcher.send(person, text)
 
+    @_reg(
+        name="image_send",
+        description=(
+            "Send an image to a household member or the household group chat. "
+            "Provide a publicly accessible image URL. Optionally include a caption."
+        ),
+    )
+    async def image_send(
+        *,
+        url: Annotated[str, Desc("Publicly accessible image URL")],
+        person: Annotated[str | None, Desc("Recipient name (for individual messages)")] = None,
+        group: Annotated[bool, Desc("Send to the household group chat instead")] = False,
+        caption: Annotated[str | None, Desc("Optional caption for the image")] = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        if dispatcher is None:
+            return {"status": "queued", "person": person, "url": url}
+        if group:
+            return await dispatcher.send_group_image("", url, caption)
+        if not person:
+            return {"error": "Either 'person' or 'group: true' is required."}
+        return await dispatcher.send_image(person, url, caption)
+
     # --- Channel preference tool ---
 
     @_reg(

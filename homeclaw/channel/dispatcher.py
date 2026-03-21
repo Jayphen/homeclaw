@@ -22,10 +22,17 @@ _PREFS_FILE = "household/channel_preferences.json"
 SendFn = Callable[[str, str], Awaitable[dict[str, Any]]]
 # Signature: (group_id, text) → delivery result dict
 GroupSendFn = Callable[[str, str], Awaitable[dict[str, Any]]]
+# Signature: (person_name, image_url, caption | None) → delivery result dict
+SendImageFn = Callable[[str, str, str | None], Awaitable[dict[str, Any]]]
+# Signature: (group_id, image_url, caption | None) → delivery result dict
+GroupSendImageFn = Callable[[str, str, str | None], Awaitable[dict[str, Any]]]
 
 
 class _ChannelEntry:
-    __slots__ = ("send", "has_person", "send_group", "group_ids")
+    __slots__ = (
+        "send", "has_person", "send_group", "group_ids",
+        "send_image", "send_group_image",
+    )
 
     def __init__(
         self,
@@ -33,11 +40,15 @@ class _ChannelEntry:
         has_person: Callable[[str], bool],
         send_group: GroupSendFn | None = None,
         group_ids: Callable[[], list[str]] | None = None,
+        send_image: SendImageFn | None = None,
+        send_group_image: GroupSendImageFn | None = None,
     ) -> None:
         self.send = send
         self.has_person = has_person
         self.send_group = send_group
         self.group_ids = group_ids
+        self.send_image = send_image
+        self.send_group_image = send_group_image
 
 
 class ChannelDispatcher:
@@ -56,11 +67,14 @@ class ChannelDispatcher:
         has_person: Callable[[str], bool],
         send_group: GroupSendFn | None = None,
         group_ids: Callable[[], list[str]] | None = None,
+        send_image: SendImageFn | None = None,
+        send_group_image: GroupSendImageFn | None = None,
     ) -> None:
         """Register a channel adapter for outbound delivery."""
         self._channels[name] = _ChannelEntry(
             send=send, has_person=has_person,
             send_group=send_group, group_ids=group_ids,
+            send_image=send_image, send_group_image=send_group_image,
         )
         logger.info("Channel dispatcher: registered '%s'", name)
 
@@ -146,6 +160,53 @@ class ChannelDispatcher:
         return {
             "status": "error",
             "detail": "No channel has a group chat registered.",
+        }
+
+    async def send_image(
+        self, person: str, image_url: str, caption: str | None = None,
+    ) -> dict[str, Any]:
+        """Send an image to a person via their preferred channel."""
+        if not self._channels:
+            return {"status": "error", "detail": "No channel adapters registered"}
+
+        pref = self.get_preference(person)
+        if pref and pref in self._channels:
+            entry = self._channels[pref]
+            if entry.send_image and entry.has_person(person):
+                return await entry.send_image(person, image_url, caption)
+
+        for _name, entry in self._channels.items():
+            if entry.send_image and entry.has_person(person):
+                return await entry.send_image(person, image_url, caption)
+
+        return {
+            "status": "error",
+            "detail": f"No channel can send images to '{person}'. "
+            "They need to /register on Telegram or WhatsApp first.",
+        }
+
+    async def send_group_image(
+        self, group_id: str, image_url: str, caption: str | None = None,
+    ) -> dict[str, Any]:
+        """Send an image to a group chat."""
+        for _name, entry in self._channels.items():
+            if entry.send_group_image and entry.group_ids and group_id in entry.group_ids():
+                return await entry.send_group_image(
+                    group_id, image_url, caption,
+                )
+
+        # Fall back to first channel that supports group images.
+        for _name, entry in self._channels.items():
+            if entry.send_group_image and entry.group_ids:
+                ids = entry.group_ids()
+                if ids:
+                    return await entry.send_group_image(
+                        ids[0], image_url, caption,
+                    )
+
+        return {
+            "status": "error",
+            "detail": "No channel can send images to a group chat.",
         }
 
     def list_groups(self) -> list[dict[str, str]]:

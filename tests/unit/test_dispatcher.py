@@ -111,3 +111,91 @@ class TestSend:
 
         assert result["status"] == "error"
         tg_send.assert_not_awaited()
+
+
+class TestSendImage:
+    @pytest.mark.asyncio
+    async def test_delivers_image_to_preferred_channel(self, tmp_path: Path) -> None:
+        dispatcher = _make_dispatcher(tmp_path)
+        tg_img = AsyncMock(return_value={"status": "sent", "channel": "telegram"})
+        wa_img = AsyncMock(return_value={"status": "sent", "channel": "whatsapp"})
+        dispatcher.register(
+            "telegram", send=AsyncMock(), has_person=lambda p: True,
+            send_image=tg_img,
+        )
+        dispatcher.register(
+            "whatsapp", send=AsyncMock(), has_person=lambda p: True,
+            send_image=wa_img,
+        )
+        dispatcher.set_preference("alice", "whatsapp")
+
+        result = await dispatcher.send_image("alice", "https://img.test/cat.jpg", "cute cat")
+
+        wa_img.assert_awaited_once_with("alice", "https://img.test/cat.jpg", "cute cat")
+        tg_img.assert_not_awaited()
+        assert result["status"] == "sent"
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_any_channel_with_send_image(self, tmp_path: Path) -> None:
+        dispatcher = _make_dispatcher(tmp_path)
+        tg_img = AsyncMock(return_value={"status": "sent", "channel": "telegram"})
+        dispatcher.register(
+            "telegram", send=AsyncMock(), has_person=lambda p: p == "bob",
+            send_image=tg_img,
+        )
+
+        result = await dispatcher.send_image("bob", "https://img.test/dog.jpg")
+
+        tg_img.assert_awaited_once_with("bob", "https://img.test/dog.jpg", None)
+        assert result["status"] == "sent"
+
+    @pytest.mark.asyncio
+    async def test_returns_error_when_no_channels(self, tmp_path: Path) -> None:
+        dispatcher = _make_dispatcher(tmp_path)
+        result = await dispatcher.send_image("alice", "https://img.test/x.jpg")
+        assert result["status"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_returns_error_when_no_image_support(self, tmp_path: Path) -> None:
+        dispatcher = _make_dispatcher(tmp_path)
+        # Register channel without send_image callback.
+        dispatcher.register(
+            "telegram", send=AsyncMock(), has_person=lambda p: True,
+        )
+        result = await dispatcher.send_image("alice", "https://img.test/x.jpg")
+        assert result["status"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_send_group_image(self, tmp_path: Path) -> None:
+        dispatcher = _make_dispatcher(tmp_path)
+        wa_group_img = AsyncMock(
+            return_value={"status": "sent", "channel": "whatsapp"},
+        )
+        dispatcher.register(
+            "whatsapp", send=AsyncMock(), has_person=lambda p: True,
+            send_group=AsyncMock(), group_ids=lambda: ["grp1"],
+            send_group_image=wa_group_img,
+        )
+
+        result = await dispatcher.send_group_image("grp1", "https://img.test/x.jpg", "hi")
+
+        wa_group_img.assert_awaited_once_with("grp1", "https://img.test/x.jpg", "hi")
+        assert result["status"] == "sent"
+
+    @pytest.mark.asyncio
+    async def test_send_group_image_falls_back(self, tmp_path: Path) -> None:
+        dispatcher = _make_dispatcher(tmp_path)
+        wa_group_img = AsyncMock(
+            return_value={"status": "sent", "channel": "whatsapp"},
+        )
+        dispatcher.register(
+            "whatsapp", send=AsyncMock(), has_person=lambda p: True,
+            send_group=AsyncMock(), group_ids=lambda: ["grp1"],
+            send_group_image=wa_group_img,
+        )
+
+        # Request with empty group_id — should fall back to first group.
+        result = await dispatcher.send_group_image("", "https://img.test/x.jpg")
+
+        wa_group_img.assert_awaited_once_with("grp1", "https://img.test/x.jpg", None)
+        assert result["status"] == "sent"

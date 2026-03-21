@@ -486,6 +486,39 @@ class WhatsAppChannel:
             logger.exception("Failed to send WhatsApp group message to %s", group_id)
             return {"status": "error", "detail": str(exc)}
 
+    async def _send_image_to_person(
+        self, person: str, image_url: str, caption: str | None,
+    ) -> dict[str, Any]:
+        """Send an image to a person via WhatsApp."""
+        from neonize.utils.jid import build_jid  # type: ignore[import-untyped]
+
+        reverse = self._reverse_user_map()
+        phone = reverse.get(person)
+        if not phone:
+            return {"status": "error", "detail": f"'{person}' not registered on WhatsApp"}
+        try:
+            server = "lid" if phone in self._lid_users else "s.whatsapp.net"
+            jid = build_jid(phone, server=server)
+            await self._client.send_image(jid, image_url, caption=caption)
+            return {"status": "sent", "channel": "whatsapp", "person": person}
+        except Exception as exc:
+            logger.exception("Failed to send WhatsApp image to %s", person)
+            return {"status": "error", "detail": str(exc)}
+
+    async def _send_image_to_group(
+        self, group_id: str, image_url: str, caption: str | None,
+    ) -> dict[str, Any]:
+        """Send an image to a WhatsApp group chat."""
+        from neonize.utils.jid import build_jid  # type: ignore[import-untyped]
+
+        try:
+            gid = build_jid(group_id, server="g.us")
+            await self._client.send_image(gid, image_url, caption=caption)
+            return {"status": "sent", "channel": "whatsapp", "group": group_id}
+        except Exception as exc:
+            logger.exception("Failed to send WhatsApp group image to %s", group_id)
+            return {"status": "error", "detail": str(exc)}
+
     def _list_groups(self) -> list[str]:
         return list(self._known_groups)
 
@@ -497,6 +530,8 @@ class WhatsAppChannel:
                 has_person=self._has_person,
                 send_group=self._send_to_group,
                 group_ids=self._list_groups,
+                send_image=self._send_image_to_person,
+                send_group_image=self._send_image_to_group,
             )
 
     async def start(self) -> None:

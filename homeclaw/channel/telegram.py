@@ -311,12 +311,38 @@ class TelegramChannel:
             logger.exception("Failed to send Telegram message to %s", person)
             return {"status": "error", "detail": str(exc)}
 
+    async def _send_image_to_person(
+        self, person: str, image_url: str, caption: str | None,
+    ) -> dict[str, Any]:
+        """Send an image to a person via Telegram."""
+        import httpx
+
+        reverse = self._reverse_user_map()
+        tid = reverse.get(person)
+        if not tid:
+            return {"status": "error", "detail": f"'{person}' not registered on Telegram"}
+        if not hasattr(self, "_app"):
+            return {"status": "error", "detail": "Telegram bot not running"}
+        try:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
+                resp = await client.get(image_url, timeout=30)
+                resp.raise_for_status()
+                photo_bytes = resp.content
+            await self._app.bot.send_photo(
+                chat_id=int(tid), photo=photo_bytes, caption=caption,
+            )
+            return {"status": "sent", "channel": "telegram", "person": person}
+        except Exception as exc:
+            logger.exception("Failed to send Telegram image to %s", person)
+            return {"status": "error", "detail": str(exc)}
+
     def _register_with_dispatcher(self) -> None:
         if self._dispatcher:
             self._dispatcher.register(
                 "telegram",
                 send=self._send_to_person,
                 has_person=self._has_person,
+                send_image=self._send_image_to_person,
             )
 
     async def _post_init(self, _app: Application) -> None:  # type: ignore[type-arg]
