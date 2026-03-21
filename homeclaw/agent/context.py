@@ -261,6 +261,8 @@ def _build_skill_catalog(workspaces: Path, person: str) -> list[str]:
             extras.append("references")
         if entry.has_data:
             extras.append("data")
+        if entry.has_http:
+            extras.append("http")
         extra_str = f" ({', '.join(extras)})" if extras else ""
         lines.append(f"  - {entry.name}: {entry.description}{scope_tag}{extra_str}")
     return lines

@@ -89,6 +89,7 @@ class SkillCatalogEntry:
     has_scripts: bool = False
     has_references: bool = False
     has_data: bool = False
+    has_http: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -845,6 +846,7 @@ def build_skill_catalog(
                 has_scripts=(loc.skill_dir / "scripts").is_dir(),
                 has_references=(loc.skill_dir / "references").is_dir(),
                 has_data=(loc.skill_dir / "data").is_dir(),
+                has_http=bool(defn.allowed_domains),
             ))
         except Exception:
             logger.warning("Skipping skill '%s' in catalog — parse failed", loc.name)

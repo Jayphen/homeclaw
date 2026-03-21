@@ -2149,6 +2149,13 @@ def register_builtin_tools(
 
         _activated_skills.add(name)
 
+        # List registered plugin tools for this skill (e.g. weather__http_call)
+        available_tools: list[str] = []
+        if plugin_registry is not None:
+            entry = plugin_registry.get_entry(name)
+            if entry is not None:
+                available_tools = list(entry.tool_names)
+
         return {
             "name": defn.name,
             "description": defn.description,
@@ -2156,6 +2163,7 @@ def register_builtin_tools(
             "skill_dir": str(loc.skill_dir),
             "scope": loc.scope,
             "resources": resources,
+            "tools": available_tools,
             "already_loaded": name in _activated_skills,
         }
 
