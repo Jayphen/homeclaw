@@ -43,6 +43,8 @@ _SAVEABLE_FIELDS = {
     "admin_members",
     "jwt_secret",
     "timezone",
+    "skill_approval_required",
+    "skill_allow_local_network",
 }
 
 # Routing model fields are saved/loaded via the nested RoutingConfig object.

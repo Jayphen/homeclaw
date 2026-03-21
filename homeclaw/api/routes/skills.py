@@ -10,7 +10,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from homeclaw.api.deps import AuthDep, MemberDep, get_config, list_member_workspaces
+from homeclaw.api.deps import AdminDep, AuthDep, MemberDep, get_config, list_member_workspaces
 
 router = APIRouter(prefix="/api/skills", tags=["skills"])
 
@@ -74,6 +74,39 @@ def _scan_active_skills(workspaces: Path) -> list[dict[str, Any]]:
             })
 
     return skills
+
+
+# ---------------------------------------------------------------------------
+# Skill settings
+# ---------------------------------------------------------------------------
+
+
+@router.get("/settings", dependencies=[AuthDep])
+async def get_skill_settings() -> dict[str, Any]:
+    config = get_config()
+    return {
+        "skill_approval_required": config.skill_approval_required,
+        "skill_allow_local_network": config.skill_allow_local_network,
+    }
+
+
+class SkillSettingsUpdate(BaseModel):
+    skill_approval_required: bool | None = None
+    skill_allow_local_network: bool | None = None
+
+
+@router.put("/settings", dependencies=[AdminDep])
+async def update_skill_settings(body: SkillSettingsUpdate) -> dict[str, Any]:
+    config = get_config()
+    if body.skill_approval_required is not None:
+        config.skill_approval_required = body.skill_approval_required
+    if body.skill_allow_local_network is not None:
+        config.skill_allow_local_network = body.skill_allow_local_network
+    await config.save_async()
+    return {
+        "skill_approval_required": config.skill_approval_required,
+        "skill_allow_local_network": config.skill_allow_local_network,
+    }
 
 
 # ---------------------------------------------------------------------------

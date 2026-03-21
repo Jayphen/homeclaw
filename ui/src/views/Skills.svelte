@@ -45,6 +45,12 @@
   let editContent: string = $state("");
   let saving: boolean = $state(false);
 
+  // Settings
+  let settingsLoaded: boolean = $state(false);
+  let approvalRequired: boolean = $state(true);
+  let allowLocalNetwork: boolean = $state(false);
+  let savingSettings: boolean = $state(false);
+
   const mode = $derived.by(() => {
     if (params.owner && params.name && params.file) return "file" as const;
     if (params.owner && params.name) return "detail" as const;
@@ -60,6 +66,36 @@
     }
     return map;
   });
+
+  async function fetchSettings() {
+    try {
+      const r = await api("/api/skills/settings");
+      if (!r.ok) return;
+      const data = await r.json();
+      approvalRequired = data.skill_approval_required;
+      allowLocalNetwork = data.skill_allow_local_network;
+      settingsLoaded = true;
+    } catch { /* ignore — non-admin may not have access */ }
+  }
+
+  async function saveSettings(field: string, value: boolean) {
+    savingSettings = true;
+    try {
+      const r = await api("/api/skills/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+      const data = await r.json();
+      approvalRequired = data.skill_approval_required;
+      allowLocalNetwork = data.skill_allow_local_network;
+    } catch (e: any) {
+      error = e.message;
+    } finally {
+      savingSettings = false;
+    }
+  }
 
   async function fetchIndex() {
     loading = true;
@@ -141,6 +177,7 @@
       fetchDetail(params.owner, params.name);
     } else {
       fetchIndex();
+      fetchSettings();
     }
   });
 
@@ -280,6 +317,38 @@
   {:else}
     <!-- Index: all skills grouped by owner -->
     <h1 class="page-title">Skills</h1>
+
+    {#if settingsLoaded}
+      <section class="settings-panel">
+        <h2>Settings</h2>
+        <label class="toggle-row">
+          <span class="toggle-label">
+            <strong>Require admin approval</strong>
+            <small>Non-admins need approval before skills go live</small>
+          </span>
+          <input
+            type="checkbox"
+            class="toggle"
+            checked={approvalRequired}
+            disabled={savingSettings}
+            onchange={(e) => saveSettings("skill_approval_required", e.currentTarget.checked)}
+          />
+        </label>
+        <label class="toggle-row">
+          <span class="toggle-label">
+            <strong>Allow local network</strong>
+            <small>Let skills reach LAN services (Home Assistant, etc.)</small>
+          </span>
+          <input
+            type="checkbox"
+            class="toggle"
+            checked={allowLocalNetwork}
+            disabled={savingSettings}
+            onchange={(e) => saveSettings("skill_allow_local_network", e.currentTarget.checked)}
+          />
+        </label>
+      </section>
+    {/if}
     {#if skills.length === 0}
       <div class="empty">
         <p>No skills yet.</p>
@@ -324,6 +393,37 @@
   }
 
   .skills-page { animation: fadeUp 0.35s ease-out; }
+
+  /* Settings panel */
+  .settings-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+  }
+  .settings-panel h2 {
+    font-family: var(--font-serif); font-weight: 600; font-size: 1rem;
+    margin: 0 0 0.75rem; color: var(--text);
+  }
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.5rem 0; cursor: pointer;
+  }
+  .toggle-row + .toggle-row { border-top: 1px solid var(--border); }
+  .toggle-label { display: flex; flex-direction: column; gap: 0.1rem; }
+  .toggle-label strong { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+  .toggle-label small { font-size: 0.75rem; color: var(--text-muted); }
+  .toggle {
+    width: 38px; height: 22px; appearance: none; -webkit-appearance: none;
+    background: #d4cfc9; border-radius: 11px; position: relative;
+    cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: white; transition: transform 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  }
+  .toggle:checked { background: var(--sage); }
+  .toggle:checked::after { transform: translateX(16px); }
+  .toggle:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* Breadcrumb */
   .breadcrumb { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 1rem; font-size: 0.82rem; }
