@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.18](https://github.com/Jayphen/homeclaw/compare/v0.5.17...v0.5.18) (2026-03-21)
+
+
+### Bug Fixes
+
+* update skill-creator SKILL.md to match actual codebase ([fe48105](https://github.com/Jayphen/homeclaw/commit/fe48105b4164ec70a75e1057642410d4c2b4249f))
+
 ## [0.5.17](https://github.com/Jayphen/homeclaw/compare/v0.5.16...v0.5.17) (2026-03-21)
 
 
