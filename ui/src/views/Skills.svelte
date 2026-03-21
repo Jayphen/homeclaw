@@ -251,6 +251,7 @@
 
   function fileIcon(path: string): string {
     if (path === "SKILL.md") return "📋";
+    if (path === ".env") return "🔑";
     if (path.startsWith("data/")) return "📁";
     if (path.startsWith("scripts/")) return "⚙️";
     if (path.startsWith("references/")) return "📖";
@@ -265,6 +266,7 @@
     json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
     py: "python", sh: "shell", bash: "shell",
     js: "javascript", ts: "typescript", csv: "csv", txt: "text",
+    env: "env",
   };
 
   function fileLang(path: string): string {
@@ -273,8 +275,11 @@
   }
 
   function isTextFile(path: string): boolean {
-    const ext = path.split(".").pop()?.toLowerCase() ?? "";
-    return ["md", "txt", "json", "yaml", "yml", "toml", "py", "sh", "js", "ts", "csv"].includes(ext);
+    const name = path.split("/").pop() ?? "";
+    // Dotfiles like .env, .gitignore
+    if (name.startsWith(".") && !name.includes(".", 1)) return true;
+    const ext = name.split(".").pop()?.toLowerCase() ?? "";
+    return ["md", "txt", "json", "yaml", "yml", "toml", "py", "sh", "js", "ts", "csv", "env"].includes(ext);
   }
 </script>
 
