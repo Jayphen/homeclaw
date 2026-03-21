@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/Jayphen/homeclaw/compare/v0.7.0...v0.7.1) (2026-03-21)
+
+
+### Bug Fixes
+
+* log full tool call args, results, and LLM thinking at INFO level ([0d495ef](https://github.com/Jayphen/homeclaw/commit/0d495ef816206496582b4530b9281bdcaef46b92))
+
 ## [0.7.0](https://github.com/Jayphen/homeclaw/compare/v0.6.4...v0.7.0) (2026-03-21)
 
 
