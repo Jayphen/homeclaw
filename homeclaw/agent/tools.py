@@ -1236,6 +1236,7 @@ def register_builtin_tools(
         owner: Annotated[str, Desc("Who owns the skill: 'household' or a person's name")],
         instructions: Annotated[str | None, Desc("New instructions (replaces existing). Omit to keep current.")] = None,
         description: Annotated[str | None, Desc("New description (replaces existing). Omit to keep current.")] = None,
+        allowed_domains: Annotated[list[str] | None, Desc("New allowed domains for http_call. Omit to keep current.")] = None,
         **_: Any,
     ) -> dict[str, Any]:
         from homeclaw.plugins.registry import PluginType
@@ -1254,12 +1255,13 @@ def register_builtin_tools(
 
         new_desc = description if description is not None else defn.description
         new_instr = instructions if instructions is not None else defn.instructions
+        new_domains = allowed_domains if allowed_domains is not None else defn.allowed_domains
 
         # Always write back as SKILL.md (new format)
         updated_md = render_skill_md(
             name=defn.name,
             description=new_desc,
-            allowed_domains=defn.allowed_domains if defn.allowed_domains else None,
+            allowed_domains=new_domains or None,
             instructions=new_instr,
         )
         new_path = skill_dir / "SKILL.md"
@@ -1615,12 +1617,13 @@ def register_builtin_tools(
     @_reg(
         name="skill_edit_file",
         description=(
-            "Read or edit a file inside a skill. Three modes: "
-            "(1) Read: just pass name + file to see contents. "
-            "(2) Find/replace: pass find + replace to make a targeted edit "
-            "without rewriting the whole file — best for adapting installed skills. "
-            "(3) Write: pass content to overwrite the entire file. "
-            "Use read_skill first to see available files."
+            "Read, edit, or create any file in a skill directory. "
+            "Use this for .env files, scripts, references — anything in the skill root. "
+            "(1) Read: just pass name + file. "
+            "(2) Find/replace: pass find + replace for targeted edits. "
+            "(3) Write: pass content to create or overwrite a file. "
+            "For .env files: skill_edit_file(name='x', file='.env', content='KEY=value'). "
+            "Note: data_write only writes to data/ — use this tool for the skill root."
         ),
     )
     async def skill_edit_file(
@@ -1672,6 +1675,18 @@ def register_builtin_tools(
         if content is not None:
             if err := _check_content_length(content):
                 return err
+            # Safety: warn if overwriting a large file with much shorter content
+            if path.is_file():
+                old_size = path.stat().st_size
+                if old_size > 500 and len(content) < old_size * 0.2:
+                    return {
+                        "error": (
+                            f"Refusing to overwrite {file} ({old_size} bytes) with "
+                            f"much shorter content ({len(content)} bytes). This usually "
+                            f"means truncation. Use find/replace mode for targeted edits, "
+                            f"or pass the full content if you really mean to replace it."
+                        ),
+                    }
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content)
             return {"file": file, "status": "written", "size": len(content)}

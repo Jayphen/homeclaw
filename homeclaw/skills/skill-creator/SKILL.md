@@ -33,11 +33,16 @@ Every skill is a directory containing a `SKILL.md` file:
 ```
 skill-name/
 ├── SKILL.md          # Required: YAML frontmatter + instructions
+├── .env              # Optional: secrets (HA_URL, API keys) — loaded automatically
 ├── data/             # Optional: persistent data files
 ├── scripts/          # Optional: executable scripts
 ├── references/       # Optional: reference docs
 └── assets/           # Optional: templates, resources
 ```
+
+**IMPORTANT**: The `.env` file MUST be in the skill root, not in `data/`.
+Use `skill_edit_file(name='x', file='.env', content='KEY=value')` to create it.
+Do NOT use `data_write` for `.env` — that puts it in the wrong place.
 
 ## SKILL.md format
 
@@ -172,6 +177,33 @@ Skills with persistent state use the `data/` directory:
 | `skill_approve` | Approve a pending skill (admin only) |
 | `skill_reject` | Reject and delete a pending skill (admin only) |
 | `run_skill_script` | Execute a script in a skill's scripts/ directory |
+
+## Setting up .env for API skills
+
+Skills that need API keys or URLs use a `.env` file in the skill root:
+
+```
+# workspaces/household/skills/homeassistant-skill/.env
+HA_URL=http://home.local:8123
+HA_TOKEN=eyJhbGciOiJIUzI1NiIs...
+```
+
+Create it with:
+```
+skill_edit_file(name="homeassistant-skill", file=".env", content="HA_URL=http://...\nHA_TOKEN=eyJ...")
+```
+
+The env vars are automatically substituted in `http_call`:
+- `${HA_URL}` in URLs → replaced with the value from .env
+- `${HA_TOKEN}` in headers → replaced with the value from .env
+
+Example http_call:
+```
+http_call(url="${HA_URL}/api/states", headers={"Authorization": "Bearer ${HA_TOKEN}"})
+```
+
+NEVER use `data_write` for `.env` — it goes in `data/` which is wrong.
+ALWAYS use `skill_edit_file` with `file=".env"`.
 
 ## Common patterns
 
