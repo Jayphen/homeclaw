@@ -136,6 +136,9 @@ class HomeclawConfig(BaseSettings):
     # Embedding provider for semantic memory ("local" or "openai")
     embedding_provider: str | None = None
 
+    # Skills
+    skill_approval_required: bool = True  # Non-admins need admin approval to create skills
+
     # Marketplace
     marketplace_url: str | None = None
 

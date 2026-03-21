@@ -458,3 +458,188 @@ async def test_skill_create_without_plugin_registry(
     assert result["loaded"] is False
     assert "note" in result
     assert (workspaces / "household" / "skills" / "cold_skill" / "SKILL.md").exists()
+
+
+# ---------------------------------------------------------------------------
+# skill approval flow
+# ---------------------------------------------------------------------------
+
+
+class FakeConfig:
+    """Minimal config stub for testing approval flow."""
+
+    def __init__(
+        self,
+        admin_members: list[str] | None = None,
+        skill_approval_required: bool = True,
+    ) -> None:
+        self.admin_members = admin_members or []
+        self.skill_approval_required = skill_approval_required
+
+
+@pytest.fixture
+def approval_registry(
+    workspaces: Path, plugin_reg: PluginRegistry,
+) -> ToolRegistry:
+    """Registry with skill_approval_required=True and alice as admin."""
+    reg = ToolRegistry()
+    cfg = FakeConfig(admin_members=["alice"], skill_approval_required=True)
+    register_builtin_tools(reg, workspaces, plugin_registry=plugin_reg, config=cfg)
+    return reg
+
+
+@pytest.fixture
+def no_approval_registry(
+    workspaces: Path, plugin_reg: PluginRegistry,
+) -> ToolRegistry:
+    """Registry with skill_approval_required=False."""
+    reg = ToolRegistry()
+    cfg = FakeConfig(admin_members=["alice"], skill_approval_required=False)
+    register_builtin_tools(reg, workspaces, plugin_registry=plugin_reg, config=cfg)
+    return reg
+
+
+@pytest.mark.asyncio
+async def test_non_admin_skill_create_goes_to_pending(
+    approval_registry: ToolRegistry, workspaces: Path,
+) -> None:
+    result = await approval_registry.get_handler("skill_create")(  # type: ignore[misc]
+        person="bob",
+        name="budget",
+        description="Track spending",
+        scope="household",
+        instructions="Track expenses.",
+    )
+    assert result["status"] == "pending_approval"
+    assert result["requested_by"] == "bob"
+    # Pending dir exists
+    pending = workspaces / "household" / "skills" / ".pending" / "budget"
+    assert pending.is_dir()
+    assert (pending / "SKILL.md").exists()
+    # NOT in the live dir
+    assert not (workspaces / "household" / "skills" / "budget").exists()
+
+
+@pytest.mark.asyncio
+async def test_admin_skill_create_bypasses_approval(
+    approval_registry: ToolRegistry, workspaces: Path,
+) -> None:
+    result = await approval_registry.get_handler("skill_create")(  # type: ignore[misc]
+        person="alice",  # alice is admin
+        name="weather",
+        description="Weather info",
+        scope="household",
+        instructions="Get weather.",
+    )
+    assert result["status"] == "created"
+    assert (workspaces / "household" / "skills" / "weather" / "SKILL.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_approval_disabled_anyone_can_create(
+    no_approval_registry: ToolRegistry, workspaces: Path,
+) -> None:
+    result = await no_approval_registry.get_handler("skill_create")(  # type: ignore[misc]
+        person="bob",
+        name="budget",
+        description="Track spending",
+        scope="household",
+        instructions="Track expenses.",
+    )
+    assert result["status"] == "created"
+
+
+@pytest.mark.asyncio
+async def test_skill_pending_list(
+    approval_registry: ToolRegistry, workspaces: Path,
+) -> None:
+    # Create a pending skill as non-admin
+    await approval_registry.get_handler("skill_create")(  # type: ignore[misc]
+        person="bob",
+        name="budget",
+        description="Track spending",
+        scope="household",
+        instructions="Track expenses.",
+    )
+    result = await approval_registry.get_handler("skill_pending_list")(  # type: ignore[misc]
+        person="alice",
+    )
+    assert result["count"] == 1
+    assert result["pending"][0]["name"] == "budget"
+    assert result["pending"][0]["requested_by"] == "bob"
+
+
+@pytest.mark.asyncio
+async def test_skill_approve(
+    approval_registry: ToolRegistry, workspaces: Path,
+) -> None:
+    # Create pending skill
+    await approval_registry.get_handler("skill_create")(  # type: ignore[misc]
+        person="bob",
+        name="budget",
+        description="Track spending",
+        scope="household",
+        instructions="Track expenses.",
+    )
+    # Approve it
+    result = await approval_registry.get_handler("skill_approve")(  # type: ignore[misc]
+        person="alice",
+        name="budget",
+    )
+    assert result["status"] == "approved"
+    assert result["approved_by"] == "alice"
+    assert result["loaded"] is True
+    # Moved to live dir
+    assert (workspaces / "household" / "skills" / "budget" / "SKILL.md").exists()
+    # No longer pending
+    assert not (workspaces / "household" / "skills" / ".pending" / "budget").exists()
+
+
+@pytest.mark.asyncio
+async def test_skill_approve_non_admin_rejected(
+    approval_registry: ToolRegistry, workspaces: Path,
+) -> None:
+    await approval_registry.get_handler("skill_create")(  # type: ignore[misc]
+        person="bob",
+        name="budget",
+        description="desc",
+        scope="household",
+        instructions="instr",
+    )
+    result = await approval_registry.get_handler("skill_approve")(  # type: ignore[misc]
+        person="bob",
+        name="budget",
+    )
+    assert "error" in result
+    assert "admin" in result["error"].lower()
+
+
+@pytest.mark.asyncio
+async def test_skill_reject(
+    approval_registry: ToolRegistry, workspaces: Path,
+) -> None:
+    await approval_registry.get_handler("skill_create")(  # type: ignore[misc]
+        person="bob",
+        name="budget",
+        description="desc",
+        scope="household",
+        instructions="instr",
+    )
+    result = await approval_registry.get_handler("skill_reject")(  # type: ignore[misc]
+        person="alice",
+        name="budget",
+        reason="Not needed",
+    )
+    assert result["status"] == "rejected"
+    assert not (workspaces / "household" / "skills" / ".pending" / "budget").exists()
+
+
+@pytest.mark.asyncio
+async def test_skill_reject_non_admin_rejected(
+    approval_registry: ToolRegistry,
+) -> None:
+    result = await approval_registry.get_handler("skill_reject")(  # type: ignore[misc]
+        person="bob",
+        name="budget",
+    )
+    assert "error" in result

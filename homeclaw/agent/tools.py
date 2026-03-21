@@ -1401,6 +1401,24 @@ def register_builtin_tools(
         skill_list,
     )
 
+    def _is_admin(person: str) -> bool:
+        """Check if *person* is an admin member."""
+        if config is None:
+            return True  # No config = dev mode, everyone is admin
+        admin_members: list[str] = getattr(config, "admin_members", [])
+        return not admin_members or person in admin_members
+
+    def _needs_approval(person: str) -> bool:
+        """Check if *person* needs admin approval for skill creation."""
+        if _is_admin(person):
+            return False
+        if config is None:
+            return False
+        return bool(getattr(config, "skill_approval_required", True))
+
+    def _pending_dir() -> Path:
+        return workspaces / "household" / "skills" / ".pending"
+
     async def skill_create(
         *,
         person: str,
@@ -1430,21 +1448,37 @@ def register_builtin_tools(
             return {"error": f"Invalid scope '{scope}' — must be 'household' or 'private'"}
 
         owner = "household" if scope == "household" else person
-        skill_dir = workspaces / owner / "skills" / slug
 
-        if skill_dir.exists():
+        # Check if approval is required
+        pending = _needs_approval(person)
+        if pending:
+            skill_dir = _pending_dir() / slug
+        else:
+            skill_dir = workspaces / owner / "skills" / slug
+
+        # Check for conflicts in both live and pending
+        live_dir = workspaces / owner / "skills" / slug
+        if live_dir.exists():
             return {"error": f"Skill '{slug}' already exists under {owner}"}
+        if not pending and (_pending_dir() / slug).exists():
+            return {"error": f"Skill '{slug}' is already pending approval"}
 
         skill_dir.mkdir(parents=True, exist_ok=True)
         data_dir = skill_dir / "data"
         data_dir.mkdir(exist_ok=True)
 
         # Write SKILL.md (new YAML frontmatter format)
+        metadata: dict[str, str] = {}
+        if pending:
+            metadata["requested_by"] = person
+            metadata["requested_scope"] = scope
+            metadata["requested_owner"] = owner
         skill_md = render_skill_md(
             name=slug,
             description=description,
             allowed_domains=allowed_domains or None,
             instructions=instructions,
+            metadata=metadata or None,
         )
         (skill_dir / "SKILL.md").write_text(skill_md)
 
@@ -1494,6 +1528,20 @@ def register_builtin_tools(
                     lines.append("")
                 (data_dir / "bookmarks.md").write_text("\n".join(lines))
                 seeded.append("bookmarks.md")
+
+        # If pending, return early — don't load into registry
+        if pending:
+            return {
+                "status": "pending_approval",
+                "name": slug,
+                "scope": scope,
+                "requested_by": person,
+                "seeded_files": seeded,
+                "note": (
+                    "Skill created but needs admin approval before it becomes active. "
+                    "An admin can approve it with skill_approve."
+                ),
+            }
 
         # Hot-load into registry
         loaded = False
@@ -1895,6 +1943,172 @@ def register_builtin_tools(
             },
         ),
         skill_migrate,
+    )
+
+    # --- Skill approval tools ---
+
+    async def skill_pending_list(*, person: str, **_: Any) -> dict[str, Any]:
+        from homeclaw.plugins.skills.loader import _find_skill_file, parse_skill_file
+
+        pending = _pending_dir()
+        if not pending.is_dir():
+            return {"pending": [], "count": 0}
+
+        skills: list[dict[str, Any]] = []
+        for child in sorted(pending.iterdir()):
+            if not child.is_dir() or child.name.startswith("."):
+                continue
+            skill_file = _find_skill_file(child)
+            if not skill_file:
+                continue
+            try:
+                defn = parse_skill_file((child / skill_file).read_text())
+                skills.append({
+                    "name": defn.name,
+                    "description": defn.description,
+                    "requested_by": defn.metadata.get("requested_by", "unknown"),
+                    "requested_scope": defn.metadata.get("requested_scope", "household"),
+                })
+            except Exception:
+                skills.append({"name": child.name, "error": "failed to parse"})
+        return {"pending": skills, "count": len(skills)}
+
+    registry.register(
+        ToolDefinition(
+            name="skill_pending_list",
+            description=(
+                "List skills waiting for admin approval. "
+                "Only relevant when skill_approval_required is enabled."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Household member name"},
+                },
+                "required": ["person"],
+            },
+        ),
+        skill_pending_list,
+    )
+
+    async def skill_approve(
+        *, person: str, name: str, **_: Any,
+    ) -> dict[str, Any]:
+        import shutil
+
+        from homeclaw.plugins.registry import PluginType
+        from homeclaw.plugins.skills.loader import (
+            _find_skill_file,
+            load_skill,
+            parse_skill_file,
+        )
+
+        if not _is_admin(person):
+            return {"error": "Only admins can approve skills"}
+
+        pending_skill = _pending_dir() / safe_slug(name)
+        if not pending_skill.is_dir():
+            return {"error": f"No pending skill '{name}' found"}
+
+        # Read metadata to determine target location
+        skill_file = _find_skill_file(pending_skill)
+        if not skill_file:
+            return {"error": f"Pending skill '{name}' has no SKILL.md"}
+
+        defn = parse_skill_file((pending_skill / skill_file).read_text())
+        owner = defn.metadata.get("requested_owner", "household")
+
+        dest = workspaces / owner / "skills" / safe_slug(name)
+        if dest.exists():
+            return {"error": f"Skill '{name}' already exists under {owner}"}
+
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(pending_skill), str(dest))
+
+        # Hot-load
+        loaded = False
+        if plugin_registry is not None:
+            try:
+                plugin = load_skill(dest, owner)
+                plugin_registry.register(plugin, PluginType.SKILL)
+                loaded = True
+            except Exception as exc:
+                _logger.exception("skill_approve: failed to load '%s'", name)
+                return {
+                    "status": "approved",
+                    "name": name,
+                    "owner": owner,
+                    "loaded": False,
+                    "warning": f"Approved but failed to load: {exc}",
+                }
+
+        return {
+            "status": "approved",
+            "name": name,
+            "owner": owner,
+            "approved_by": person,
+            "loaded": loaded,
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="skill_approve",
+            description=(
+                "Approve a pending skill so it becomes active. Admin only."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Admin member name"},
+                    "name": {"type": "string", "description": "Skill name to approve"},
+                },
+                "required": ["person", "name"],
+            },
+        ),
+        skill_approve,
+    )
+
+    async def skill_reject(
+        *, person: str, name: str, reason: str = "", **_: Any,
+    ) -> dict[str, Any]:
+        import shutil
+
+        if not _is_admin(person):
+            return {"error": "Only admins can reject skills"}
+
+        pending_skill = _pending_dir() / safe_slug(name)
+        if not pending_skill.is_dir():
+            return {"error": f"No pending skill '{name}' found"}
+
+        shutil.rmtree(pending_skill)
+
+        return {
+            "status": "rejected",
+            "name": name,
+            "rejected_by": person,
+            "reason": reason or "No reason provided",
+        }
+
+    registry.register(
+        ToolDefinition(
+            name="skill_reject",
+            description=(
+                "Reject and delete a pending skill. Admin only."
+            ),
+            parameters={
+                "type": "object",
+                "properties": {
+                    "person": {"type": "string", "description": "Admin member name"},
+                    "name": {"type": "string", "description": "Skill name to reject"},
+                    "reason": {
+                        "type": "string",
+                        "description": "Reason for rejection (shown to requester)",
+                    },
+                },
+                "required": ["person", "name"],
+            },
+        ),
+        skill_reject,
     )
 
     # Track activated skills per session to avoid re-injecting
