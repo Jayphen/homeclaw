@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.14](https://github.com/Jayphen/homeclaw/compare/v0.5.13...v0.5.14) (2026-03-21)
+
+
+### Features
+
+* allow skill http_call to reach LAN services ([3294821](https://github.com/Jayphen/homeclaw/commit/3294821b238958f529419f4e7c6f9e1b2df5d5b4))
+* skill browser and file editor in web UI ([05fd53c](https://github.com/Jayphen/homeclaw/commit/05fd53cf10bb7a26973c027f0cca3e185f9ed967))
+
+
+### Bug Fixes
+
+* use CodeEditor for non-markdown files in skill browser ([4adcb4d](https://github.com/Jayphen/homeclaw/commit/4adcb4d3c4e91a5fac963eaa200fb56dbdb01fbf))
+
 ## [0.5.13](https://github.com/Jayphen/homeclaw/compare/v0.5.12...v0.5.13) (2026-03-21)
 
 
