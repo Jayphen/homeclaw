@@ -2,6 +2,7 @@
   import { api } from "$lib/api";
   import { renderMarkdown } from "$lib/markdown";
   import MarkdownEditor from "$lib/MarkdownEditor.svelte";
+  import CodeEditor from "$lib/CodeEditor.svelte";
 
   let { params = {} }: { params?: { owner?: string; name?: string; file?: string } } = $props();
 
@@ -151,6 +152,21 @@
     return "📄";
   }
 
+  function isMarkdown(path: string): boolean {
+    return path.endsWith(".md");
+  }
+
+  const langMap: Record<string, string> = {
+    json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
+    py: "python", sh: "shell", bash: "shell",
+    js: "javascript", ts: "typescript", csv: "csv", txt: "text",
+  };
+
+  function fileLang(path: string): string {
+    const ext = path.split(".").pop()?.toLowerCase() ?? "";
+    return langMap[ext] || ext;
+  }
+
   function isTextFile(path: string): boolean {
     const ext = path.split(".").pop()?.toLowerCase() ?? "";
     return ["md", "txt", "json", "yaml", "yml", "toml", "py", "sh", "js", "ts", "csv"].includes(ext);
@@ -191,7 +207,11 @@
       </header>
       {#if editing}
         <div class="file-editor">
-          <MarkdownEditor bind:value={editContent} disabled={saving} />
+          {#if isMarkdown(fileContent.path)}
+            <MarkdownEditor bind:value={editContent} disabled={saving} />
+          {:else}
+            <CodeEditor bind:value={editContent} disabled={saving} language={fileLang(fileContent.path)} />
+          {/if}
           <div class="editor-actions">
             <button class="btn btn-secondary" onclick={cancelEdit} disabled={saving}>Cancel</button>
             <button class="btn btn-primary" onclick={saveEdit} disabled={saving}>
