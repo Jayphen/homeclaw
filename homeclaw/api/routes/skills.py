@@ -15,11 +15,19 @@ from homeclaw.api.deps import AdminDep, AuthDep, MemberDep, get_config, list_mem
 router = APIRouter(prefix="/api/skills", tags=["skills"])
 
 
-def _check_deps(metadata: dict[str, Any]) -> dict[str, Any] | None:
+def _load_env(skill_dir: Path) -> dict[str, str]:
+    """Load .env from skill dir for dep checking."""
+    from homeclaw.plugins.skills.loader import _load_skill_env
+    return _load_skill_env(skill_dir)
+
+
+def _check_deps(
+    metadata: dict[str, Any], skill_env: dict[str, str] | None = None,
+) -> dict[str, Any] | None:
     """Check skill deps, return result only if something is missing."""
     from homeclaw.plugins.skills.deps import check_skill_deps
 
-    deps = check_skill_deps(metadata)
+    deps = check_skill_deps(metadata, skill_env=skill_env)
     if deps["satisfied"]:
         return None
     return deps
@@ -294,7 +302,7 @@ async def get_skill(owner: str, name: str) -> dict[str, Any]:
         "metadata": defn.metadata,
         "compatibility": defn.compatibility,
         "files": files,
-        "deps": _check_deps(defn.metadata),
+        "deps": _check_deps(defn.metadata, _load_env(skill_dir)),
     }
 
 

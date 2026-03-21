@@ -32,8 +32,15 @@ def _install_hint(binary: str, in_docker: bool) -> str:
     return f"Install '{binary}' with your system package manager"
 
 
-def check_skill_deps(metadata: dict[str, Any]) -> dict[str, Any]:
+def check_skill_deps(
+    metadata: dict[str, Any],
+    skill_env: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """Check skill dependencies from metadata.openclaw.requires.
+
+    Args:
+        metadata: The skill's metadata dict.
+        skill_env: Env vars from the skill's .env file (checked alongside os.environ).
 
     Returns a dict with:
     - missing_bins: list of {name, hint} for required binaries not found on PATH
@@ -51,6 +58,7 @@ def check_skill_deps(metadata: dict[str, Any]) -> dict[str, Any]:
 
     required_bins: list[str] = requires.get("bins", [])
     required_env: list[str] = requires.get("env", [])
+    env_lookup = skill_env or {}
 
     in_docker = _is_docker()
     runtime = "docker" if in_docker else "host"
@@ -60,7 +68,7 @@ def check_skill_deps(metadata: dict[str, Any]) -> dict[str, Any]:
         for b in required_bins
         if shutil.which(b) is None
     ]
-    missing_env = list(e for e in required_env if not os.environ.get(e))
+    missing_env = [e for e in required_env if not env_lookup.get(e) and not os.environ.get(e)]
 
     return {
         "missing_bins": missing_bins,

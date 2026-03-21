@@ -254,12 +254,16 @@ class SkillPlugin:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._skill_dir = skill_dir
         self._definition = definition
-        self._env = _load_skill_env(skill_dir)
         self._config = HttpCallConfig(
             allowed_domains=definition.allowed_domains,
             log_dir=skill_dir / "logs",
             allow_local_network=allow_local_network,
         )
+
+    @property
+    def env(self) -> dict[str, str]:
+        """Read the skill's .env file fresh (not cached — picks up edits)."""
+        return _load_skill_env(self._skill_dir)
 
     @property
     def instructions(self) -> str:
@@ -353,14 +357,14 @@ class SkillPlugin:
             ),
         ]
 
-        if self._env:
+        if self.env:
             defs.append(
                 ToolDefinition(
                     name="get_env",
                     description=(
                         f"Get an environment variable from the '{self.name}' "
                         f"skill's .env file. Available vars: "
-                        f"{', '.join(self._env.keys()) or 'none'}. "
+                        f"{', '.join(self.env.keys()) or 'none'}. "
                         f"You can also use ${{VAR_NAME}} in http_call URLs, "
                         f"headers, and body — they get substituted automatically."
                     ),
@@ -442,14 +446,14 @@ class SkillPlugin:
             raw_url = args.get("url", "")
             raw_headers = args.get("headers")
             raw_body = args.get("body")
-            url = _substitute_env(raw_url, self._env)
+            url = _substitute_env(raw_url, self.env)
             resolved_headers: dict[str, str] | None = None
             if raw_headers:
                 resolved_headers = {
-                    k: _substitute_env(v, self._env)
+                    k: _substitute_env(v, self.env)
                     for k, v in raw_headers.items()
                 }
-            body = _substitute_env(raw_body, self._env) if raw_body else raw_body
+            body = _substitute_env(raw_body, self.env) if raw_body else raw_body
             return await http_call(
                 url=url,
                 method=args.get("method", "GET"),
@@ -510,7 +514,7 @@ class SkillPlugin:
         import os
         if not key:
             return {"error": "key is required"}
-        value = self._env.get(key, os.environ.get(key))
+        value = self.env.get(key, os.environ.get(key))
         if value is None:
             return {"error": f"Environment variable '{key}' not set"}
         return {"key": key, "value": value}
