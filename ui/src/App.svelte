@@ -7,6 +7,7 @@
   import Notes from "./views/Notes.svelte";
   import Contacts from "./views/Contacts.svelte";
   import Plugins from "./views/Plugins.svelte";
+  import Skills from "./views/Skills.svelte";
   import Settings from "./views/Settings.svelte";
   import Setup from "./views/Setup.svelte";
   import { api, getToken, setToken, clearToken } from "$lib/api";
@@ -20,6 +21,9 @@
     "/notes/:person": Notes,
     "/notes/:person/:date": Notes,
     "/contacts": Contacts,
+    "/skills": Skills,
+    "/skills/:owner/:name": Skills,
+    "/skills/:owner/:name/*file": Skills,
     "/plugins": Plugins,
     "/settings": Settings,
   };
@@ -153,6 +157,7 @@
       <a href="#/notes">Notes</a>
       <a href="#/memory">Memory</a>
       <a href="#/contacts">Contacts</a>
+      <a href="#/skills">Skills</a>
       <a href="#/plugins">Plugins</a>
       <a href="#/settings">Settings</a>
       <button class="sign-out" onclick={() => { clearToken(); state = "login"; }}>Sign out</button>
