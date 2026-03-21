@@ -181,6 +181,51 @@ def render_skill_md(
 # ---------------------------------------------------------------------------
 
 
+_ENV_VAR_RE = re.compile(r"\$\{(\w+)\}")
+
+
+def _load_skill_env(skill_dir: Path) -> dict[str, str]:
+    """Load env vars from a .env file in the skill directory.
+
+    Also checks os.environ as fallback for each key. Format: KEY=VALUE per line,
+    # comments and blank lines ignored.
+    """
+    env: dict[str, str] = {}
+    env_path = skill_dir / ".env"
+    if env_path.is_file():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip().strip("\"'")
+                if key:
+                    env[key] = value
+
+    # Also pull from os.environ for keys the skill declares it needs
+    import os
+    for key in list(env.keys()):
+        # .env file takes precedence, but fill gaps from os.environ
+        pass
+    return env
+
+
+def _substitute_env(text: str, env: dict[str, str]) -> str:
+    """Replace ${VAR_NAME} placeholders with values from the skill env.
+
+    Also falls back to os.environ for unresolved vars.
+    """
+    import os
+
+    def _replace(m: re.Match[str]) -> str:
+        key = m.group(1)
+        return env.get(key, os.environ.get(key, m.group(0)))
+
+    return _ENV_VAR_RE.sub(_replace, text)
+
+
 class SkillPlugin:
     """Adapts a ``SkillDefinition`` into the Plugin Protocol.
 
@@ -209,6 +254,7 @@ class SkillPlugin:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._skill_dir = skill_dir
         self._definition = definition
+        self._env = _load_skill_env(skill_dir)
         self._config = HttpCallConfig(
             allowed_domains=definition.allowed_domains,
             log_dir=skill_dir / "logs",
@@ -307,6 +353,30 @@ class SkillPlugin:
             ),
         ]
 
+        if self._env:
+            defs.append(
+                ToolDefinition(
+                    name="get_env",
+                    description=(
+                        f"Get an environment variable from the '{self.name}' "
+                        f"skill's .env file. Available vars: "
+                        f"{', '.join(self._env.keys()) or 'none'}. "
+                        f"You can also use ${{VAR_NAME}} in http_call URLs, "
+                        f"headers, and body — they get substituted automatically."
+                    ),
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "key": {
+                                "type": "string",
+                                "description": "Environment variable name",
+                            },
+                        },
+                        "required": ["key"],
+                    },
+                )
+            )
+
         if self._definition.allowed_domains:
             defs.append(
                 ToolDefinition(
@@ -368,13 +438,27 @@ class SkillPlugin:
         if name == "data_delete":
             return self._handle_data_delete(args.get("filename", ""))
         if name == "http_call":
+            # Substitute ${VAR} placeholders from skill .env + os.environ
+            raw_url = args.get("url", "")
+            raw_headers = args.get("headers")
+            raw_body = args.get("body")
+            url = _substitute_env(raw_url, self._env)
+            resolved_headers: dict[str, str] | None = None
+            if raw_headers:
+                resolved_headers = {
+                    k: _substitute_env(v, self._env)
+                    for k, v in raw_headers.items()
+                }
+            body = _substitute_env(raw_body, self._env) if raw_body else raw_body
             return await http_call(
-                url=args.get("url", ""),
+                url=url,
                 method=args.get("method", "GET"),
-                headers=args.get("headers"),
-                body=args.get("body"),
+                headers=resolved_headers,
+                body=body,
                 config=self._config,
             )
+        if name == "get_env":
+            return self._handle_get_env(args.get("key", ""))
         return {"error": f"Unknown tool: {name}"}
 
     def _handle_data_list(self) -> dict[str, Any]:
@@ -421,6 +505,15 @@ class SkillPlugin:
             return {"error": f"File not found: {filename}"}
         path.unlink()
         return {"filename": filename, "status": "deleted"}
+
+    def _handle_get_env(self, key: str) -> dict[str, Any]:
+        import os
+        if not key:
+            return {"error": "key is required"}
+        value = self._env.get(key, os.environ.get(key))
+        if value is None:
+            return {"error": f"Environment variable '{key}' not set"}
+        return {"key": key, "value": value}
 
     def routines(self) -> list[RoutineDefinition]:
         """Skills don't have routines."""
