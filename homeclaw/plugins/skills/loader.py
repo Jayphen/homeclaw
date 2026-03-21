@@ -389,13 +389,39 @@ class SkillPlugin:
         )
 
         if self._definition.allowed_domains:
+            # Build a dynamic description so the LLM knows headers are
+            # already handled when DEFAULT_HEADERS is set in the .env.
+            env = self.env
+            default_hdr_raw = env.get("DEFAULT_HEADERS", "")
+            if default_hdr_raw:
+                import json as _json
+
+                try:
+                    parsed_dh = _json.loads(
+                        _substitute_env(default_hdr_raw, env),
+                    )
+                    hdr_names = ", ".join(parsed_dh.keys()) if isinstance(
+                        parsed_dh, dict,
+                    ) else ""
+                except (ValueError, _json.JSONDecodeError):
+                    hdr_names = ""
+                hdr_note = (
+                    f" Headers ({hdr_names}) are auto-injected — "
+                    "you do NOT need to set them."
+                    if hdr_names
+                    else ""
+                )
+            else:
+                hdr_note = ""
+
             defs.append(
                 ToolDefinition(
                     name="http_call",
                     description=(
                         f"Make an HTTP request within the '{self.name}' "
                         f"skill. Allowed domains: "
-                        f"{', '.join(self._definition.allowed_domains)}. "
+                        f"{', '.join(self._definition.allowed_domains)}."
+                        f"{hdr_note} "
                         "Tip: use ${VAR_NAME} in URLs, headers, and body "
                         "to auto-substitute values from the skill's .env file."
                     ),
@@ -415,7 +441,10 @@ class SkillPlugin:
                             },
                             "headers": {
                                 "type": "object",
-                                "description": "Request headers",
+                                "description": (
+                                    "Extra request headers (merged with "
+                                    "auto-injected defaults)"
+                                ),
                             },
                             "body": {
                                 "type": "string",
@@ -452,17 +481,35 @@ class SkillPlugin:
             return self._handle_data_delete(args.get("filename", ""))
         if name == "http_call":
             # Substitute ${VAR} placeholders from skill .env + os.environ
+            env = self.env
             raw_url = args.get("url", "")
             raw_headers = args.get("headers")
             raw_body = args.get("body")
-            url = _substitute_env(raw_url, self.env)
-            resolved_headers: dict[str, str] | None = None
+            url = _substitute_env(raw_url, env)
+
+            # Start with DEFAULT_HEADERS from .env (JSON object), then
+            # layer on any headers the LLM provided so it can override.
+            merged_headers: dict[str, str] = {}
+            default_hdr_raw = env.get("DEFAULT_HEADERS", "")
+            if default_hdr_raw:
+                import json as _json
+
+                try:
+                    parsed = _json.loads(
+                        _substitute_env(default_hdr_raw, env),
+                    )
+                    if isinstance(parsed, dict):
+                        merged_headers.update(parsed)
+                except (_json.JSONDecodeError, ValueError):
+                    pass  # malformed — skip silently
             if raw_headers:
-                resolved_headers = {
-                    k: _substitute_env(v, self.env)
+                merged_headers.update({
+                    k: _substitute_env(v, env)
                     for k, v in raw_headers.items()
-                }
-            body = _substitute_env(raw_body, self.env) if raw_body else raw_body
+                })
+            resolved_headers = merged_headers or None
+
+            body = _substitute_env(raw_body, env) if raw_body else raw_body
             return await http_call(
                 url=url,
                 method=args.get("method", "GET"),
