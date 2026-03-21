@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/Jayphen/homeclaw/compare/v0.6.4...v0.7.0) (2026-03-21)
+
+
+### Features
+
+* add built-in logs skill with admin-only access control ([4b54b6e](https://github.com/Jayphen/homeclaw/commit/4b54b6e07ddfe7a0f96035f4ba9ab543f2c6c727))
+* add image_send tool for sending images via Telegram/WhatsApp ([06d2fce](https://github.com/Jayphen/homeclaw/commit/06d2fce4819899c29c916b52ecea9bab2b11d4aa))
+* add persistent file logging, agent output logging, and log download ([dfe6db4](https://github.com/Jayphen/homeclaw/commit/dfe6db4b6edc469099239afd8fb78efaa6239a21))
+
+
+### Bug Fixes
+
+* skill script execution and env var reliability ([7ab33eb](https://github.com/Jayphen/homeclaw/commit/7ab33ebfe7ccd7f1151676dd1b58b8fb8dd1ecd7))
+
 ## [0.6.4](https://github.com/Jayphen/homeclaw/compare/v0.6.3...v0.6.4) (2026-03-21)
 
 
