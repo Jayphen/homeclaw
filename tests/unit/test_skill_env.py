@@ -146,6 +146,29 @@ class TestSubstituteEnv:
         result = _substitute_env("${A}${B}", {"A": "hello", "B": "world"})
         assert result == "helloworld"
 
+    def test_dollar_var_without_braces(self) -> None:
+        """$VAR (no braces) is also substituted."""
+        result = _substitute_env("url=$HA_URL/api", {"HA_URL": "http://ha.local"})
+        assert result == "url=http://ha.local/api"
+
+    def test_dollar_var_in_header(self) -> None:
+        """$TOKEN in a header value is substituted."""
+        result = _substitute_env("Bearer $HA_TOKEN", {"HA_TOKEN": "abc123"})
+        assert result == "Bearer abc123"
+
+    def test_mixed_syntax(self) -> None:
+        """$VAR and ${VAR} in the same string both work."""
+        result = _substitute_env(
+            "$HA_URL/api with ${HA_TOKEN}",
+            {"HA_URL": "http://ha", "HA_TOKEN": "tok"},
+        )
+        assert result == "http://ha/api with tok"
+
+    def test_dollar_lowercase_not_matched(self) -> None:
+        """$lowercase is not matched (only UPPER_CASE vars)."""
+        result = _substitute_env("$notavar", {})
+        assert result == "$notavar"
+
 
 # ---------------------------------------------------------------------------
 # SkillPlugin.env property

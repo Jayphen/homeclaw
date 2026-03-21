@@ -181,7 +181,8 @@ def render_skill_md(
 # ---------------------------------------------------------------------------
 
 
-_ENV_VAR_RE = re.compile(r"\$\{(\w+)\}")
+# Match both ${VAR} and $VAR (but not $$, and $VAR must be followed by non-word or end)
+_ENV_VAR_RE = re.compile(r"\$\{(\w+)\}|\$([A-Z_][A-Z0-9_]*)")
 
 
 def _load_skill_env(skill_dir: Path) -> dict[str, str]:
@@ -213,14 +214,15 @@ def _load_skill_env(skill_dir: Path) -> dict[str, str]:
 
 
 def _substitute_env(text: str, env: dict[str, str]) -> str:
-    """Replace ${VAR_NAME} placeholders with values from the skill env.
+    """Replace $VAR and ${VAR} placeholders with values from the skill env.
 
     Also falls back to os.environ for unresolved vars.
     """
     import os
 
     def _replace(m: re.Match[str]) -> str:
-        key = m.group(1)
+        # group(1) is ${VAR} capture, group(2) is $VAR capture
+        key = m.group(1) or m.group(2)
         return env.get(key, os.environ.get(key, m.group(0)))
 
     return _ENV_VAR_RE.sub(_replace, text)
