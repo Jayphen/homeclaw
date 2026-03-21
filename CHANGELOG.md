@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/Jayphen/homeclaw/compare/v0.6.0...v0.6.1) (2026-03-21)
+
+
+### Bug Fixes
+
+* prevent LLM from misplacing .env and truncating skills ([9dd0e79](https://github.com/Jayphen/homeclaw/commit/9dd0e795fb82f72a21a5ae94d3a68f1914932488))
+* state drift audit — fix race conditions, missing DM enforcement, and Svelte reactivity bug ([0635696](https://github.com/Jayphen/homeclaw/commit/06356963c24b96e0036f54928e80fbadb77ad27f))
+
 ## [0.6.0](https://github.com/Jayphen/homeclaw/compare/v0.5.18...v0.6.0) (2026-03-21)
 
 
