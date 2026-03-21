@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.17](https://github.com/Jayphen/homeclaw/compare/v0.5.16...v0.5.17) (2026-03-21)
+
+
+### Features
+
+* interim responses — LLM can update user during tool rounds ([e49c999](https://github.com/Jayphen/homeclaw/commit/e49c9991b739c4c4568ec62a66e6f2603f37bd9a))
+
+
+### Bug Fixes
+
+* prevent LLM from promising action without calling tools ([66f3821](https://github.com/Jayphen/homeclaw/commit/66f38213c9bcb9d4892cacf4c997cd1437bd4873))
+
 ## [0.5.16](https://github.com/Jayphen/homeclaw/compare/v0.5.15...v0.5.16) (2026-03-21)
 
 
