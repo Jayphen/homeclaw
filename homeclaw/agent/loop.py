@@ -1,13 +1,15 @@
 """Core agent loop — receive message, build context, call LLM, dispatch tools."""
 
+import asyncio
 import json
 import logging
+import time
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from homeclaw.agent.context import build_context
+from homeclaw.agent.context import build_context, estimate_tokens
 from homeclaw.agent.providers.base import LLMProvider, LLMResponse, Message, ToolCall
 from homeclaw.agent.routing import CallType, RoutingConfig, classify_tool_round, max_tokens_for, route_model
 from homeclaw.agent.tools import ToolRegistry
@@ -93,6 +95,10 @@ removing or updating it rather than letting it sit.
 
 MAX_TOOL_ROUNDS = 10
 
+# Fraction of context window reserved for non-history content (system, tools, output).
+_RESERVED_FRACTION = 0.35
+_DEFAULT_CONTEXT_WINDOW = 128_000
+
 # Extra instructions prepended to the user message for scheduled routines so
 # the model actively uses web tools instead of hedging with stale training data.
 _ROUTINE_PREAMBLE = (
@@ -132,7 +138,61 @@ def _is_substantive_interim(text: str) -> bool:
     return len(text) >= _INTERIM_MIN_CHARS
 
 
+def _estimate_message_tokens(msg: Message) -> int:
+    """Estimate tokens for a single message."""
+    if isinstance(msg.content, str):
+        return estimate_tokens(msg.content)
+    # Multimodal: estimate text blocks, add flat cost per image
+    total = 0
+    for block in msg.content:
+        if isinstance(block, dict) and block.get("type") == "text":
+            total += estimate_tokens(block["text"])
+        elif isinstance(block, dict) and block.get("type") == "image":
+            total += 1000  # rough estimate for image tokens
+    return total
+
+
+def _truncate_history(
+    history: list[Message], system_tokens: int, context_window: int,
+) -> list[Message]:
+    """Drop oldest messages so history fits within the model's context window."""
+    window = context_window
+    budget = int(window * (1 - _RESERVED_FRACTION)) - system_tokens
+
+    if budget <= 0:
+        return history[-2:]  # keep at least current exchange
+
+    # Walk backwards, accumulating tokens until we exceed budget.
+    kept: list[Message] = []
+    used = 0
+    for msg in reversed(history):
+        cost = _estimate_message_tokens(msg)
+        if used + cost > budget and kept:
+            break
+        kept.append(msg)
+        used += cost
+
+    kept.reverse()
+    if len(kept) < len(history):
+        logger.info(
+            "Truncated history from %d to %d messages (%d estimated tokens)",
+            len(history), len(kept), used,
+        )
+    return kept
+
+
 InterimCallback = Callable[[str], Any]
+
+
+# Consolidation triggers when unconsolidated history exceeds this fraction
+# of the context window budget (after reserving space for system + output).
+_CONSOLIDATION_THRESHOLD = 0.6
+
+# Minimum idle time (seconds) before consolidation runs for a session.
+_CONSOLIDATION_IDLE_SECS = 60
+
+# Maximum messages to consolidate in one chunk.
+_CONSOLIDATION_CHUNK_SIZE = 20
 
 
 class AgentLoop:
@@ -153,6 +213,9 @@ class AgentLoop:
         self._routing = routing
         self._lock_pool = LockPool()
         self._on_interim: InterimCallback | None = None
+        # Track last activity per session for idle-based consolidation
+        self._last_activity: dict[str, float] = {}
+        self._consolidation_task: asyncio.Task[None] | None = None
 
     def set_interim_callback(self, callback: InterimCallback | None) -> None:
         """Set a callback for interim responses during tool rounds.
@@ -163,6 +226,81 @@ class AgentLoop:
         Can be sync or async.
         """
         self._on_interim = callback
+
+    def start_background_consolidation(self) -> None:
+        """Start the background consolidation loop (call once at startup)."""
+        if self._consolidation_task is None or self._consolidation_task.done():
+            self._consolidation_task = asyncio.create_task(self._consolidation_loop())
+            logger.info("Background consolidation loop started")
+
+    async def _consolidation_loop(self) -> None:
+        """Background loop that consolidates idle sessions."""
+        while True:
+            await asyncio.sleep(30)
+            now = time.monotonic()
+            for key, last in list(self._last_activity.items()):
+                if now - last < _CONSOLIDATION_IDLE_SECS:
+                    continue
+                try:
+                    await self._consolidate_session(key)
+                except Exception:
+                    logger.exception("Consolidation failed for '%s'", key)
+                finally:
+                    # Don't re-consolidate until next activity
+                    self._last_activity.pop(key, None)
+
+    async def _consolidate_session(self, history_key: str) -> None:
+        """Consolidate old messages in a session if over budget."""
+        from homeclaw.agent.consolidation import consolidate_chunk, save_consolidated_memories
+
+        path = _history_path(self._workspaces, history_key)
+        last_consolidated, all_messages = _read_history_file(path)
+        unconsolidated = all_messages[last_consolidated:]
+
+        # Check if consolidation is needed
+        history_tokens = sum(_estimate_message_tokens(m) for m in unconsolidated)
+        context_window = getattr(self._provider, "context_window", _DEFAULT_CONTEXT_WINDOW)
+        budget = int(context_window * (1 - _RESERVED_FRACTION))
+
+        if history_tokens < budget * _CONSOLIDATION_THRESHOLD:
+            return  # Not enough to warrant consolidation
+
+        # Consolidate the oldest chunk
+        chunk_end = min(_CONSOLIDATION_CHUNK_SIZE, len(unconsolidated) - 2)
+        if chunk_end < 2:
+            return  # Need at least a couple messages to consolidate
+
+        chunk = unconsolidated[:chunk_end]
+        person = history_key.split("-")[0] if "-" in history_key else history_key
+
+        # Use the cheap/routine model for consolidation
+        original_model = getattr(self._provider, "model", None)
+        if self._routing:
+            from homeclaw.agent.routing import CallType as CT, route_model
+            cheap_model = route_model(CT.ROUTINE, self._routing)
+            if hasattr(self._provider, "model"):
+                self._provider.model = cheap_model  # type: ignore[attr-defined]
+
+        try:
+            result = await consolidate_chunk(chunk, person, self._provider)
+        finally:
+            if original_model is not None and hasattr(self._provider, "model"):
+                self._provider.model = original_model  # type: ignore[attr-defined]
+
+        if "error" in result:
+            logger.warning("Consolidation failed for '%s': %s", history_key, result["error"])
+            # Fallback: advance pointer anyway to prevent unbounded growth
+            _advance_consolidation_pointer(self._workspaces, history_key, last_consolidated + chunk_end)
+            return
+
+        # Save extracted memories
+        entries = result.get("memory_entries", [])
+        if entries:
+            saved = await save_consolidated_memories(entries, person, self._workspaces)
+            logger.info("Consolidated %d messages → %d memory entries for '%s'", len(chunk), saved, history_key)
+
+        # Advance the pointer
+        _advance_consolidation_pointer(self._workspaces, history_key, last_consolidated + chunk_end)
 
     async def run(
         self,
@@ -184,7 +322,10 @@ class AgentLoop:
         person = person.lower()
         history_key = channel or person
         async with self._lock_pool.lock_for(history_key):
-            return await self._run_inner(user_message, person, channel, call_type, history_key)
+            result = await self._run_inner(user_message, person, channel, call_type, history_key)
+            # Record activity for idle-based consolidation
+            self._last_activity[history_key] = time.monotonic()
+            return result
 
     async def _run_inner(
         self,
@@ -222,6 +363,11 @@ class AgentLoop:
             user_message = _ROUTINE_PREAMBLE + user_message
 
         history.append(Message(role="user", content=user_message))
+
+        # Truncate history to fit within the model's context window.
+        context_window = getattr(self._provider, "context_window", _DEFAULT_CONTEXT_WINDOW)
+        system_tokens = estimate_tokens(system)
+        history = _truncate_history(history, system_tokens, context_window)
 
         tools = self._registry.get_definitions()
         response: LLMResponse | None = None
@@ -390,19 +536,52 @@ def _history_path(workspaces: Path, key: str) -> Path:
     return hist_dir / "history.jsonl"
 
 
-def _load_history(workspaces: Path, person: str, max_messages: int = 50) -> list[Message]:
-    path = _history_path(workspaces, person)
+# ---------------------------------------------------------------------------
+# Pointer-based history — append-only JSONL with consolidation pointer
+# ---------------------------------------------------------------------------
+# Line 0: metadata  {"_type":"metadata","last_consolidated":N}
+# Line 1+: messages  {"role":"user","content":"..."}
+# Only messages after last_consolidated are loaded into the LLM context.
+# Consolidation extracts facts into memory, then advances the pointer.
+
+_METADATA_TYPE = "metadata"
+
+
+def _read_history_file(path: Path) -> tuple[int, list[Message]]:
+    """Read the history file. Returns (last_consolidated, all_messages)."""
     if not path.exists():
-        return []
+        return 0, []
+
+    last_consolidated = 0
     messages: list[Message] = []
+
     for line in path.read_text().strip().splitlines():
-        if line:
-            msg = Message.model_validate_json(line)
-            # Only persist user/assistant turns — tool messages reference IDs
-            # that are only valid within a single run() call.
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict) and data.get("_type") == _METADATA_TYPE:
+            last_consolidated = data.get("last_consolidated", 0)
+            continue
+        try:
+            msg = Message.model_validate(data)
             if msg.role in ("user", "assistant"):
                 messages.append(msg)
-    return messages[-max_messages:]
+        except Exception:
+            continue
+
+    return last_consolidated, messages
+
+
+def _load_history(workspaces: Path, person: str, max_messages: int = 50) -> list[Message]:
+    """Load unconsolidated history — messages after the consolidation pointer."""
+    path = _history_path(workspaces, person)
+    last_consolidated, all_messages = _read_history_file(path)
+    # Return only messages after the consolidation pointer
+    unconsolidated = all_messages[last_consolidated:]
+    return unconsolidated[-max_messages:]
 
 
 def _strip_images(content: str | list[Any]) -> str:
@@ -418,20 +597,47 @@ def _strip_images(content: str | list[Any]) -> str:
     return " ".join(parts) if parts else ""
 
 
-def _save_history(workspaces: Path, person: str, messages: list[Message]) -> None:
-    path = _history_path(workspaces, person)
-    # Strip tool messages and intermediate assistant messages (those with
-    # tool_calls) before persisting.  Intermediate assistant content was never
-    # shown to the user, and without accompanying tool results it confuses
-    # the model in future conversations (it may reference or "correct"
-    # things the user never saw).
+def _persistable_messages(messages: list[Message]) -> list[Message]:
+    """Filter messages to only user + final assistant turns (no tool calls)."""
     persistent: list[Message] = []
     for m in messages:
         if m.role == "user":
-            # Replace image blocks with text placeholders to avoid storing large base64
             persistent.append(m.model_copy(update={"content": _strip_images(m.content)}))
         elif m.role == "assistant" and not m.tool_calls:
             persistent.append(m.model_copy(update={"content": _strip_images(m.content)}))
-        # Skip tool messages and intermediate assistant messages (with tool_calls)
-    lines = [m.model_dump_json() for m in persistent[-100:]]
+    return persistent
+
+
+def _save_history(workspaces: Path, person: str, messages: list[Message]) -> None:
+    """Save history, preserving consolidated messages before the pointer.
+
+    Reads existing file to get consolidated (old) messages, then appends
+    the new turn's persistable messages. All messages are kept for future
+    consolidation.
+    """
+    path = _history_path(workspaces, person)
+    last_consolidated, old_messages = _read_history_file(path)
+
+    # Old messages up to the pointer are already consolidated — keep them.
+    # Messages after the pointer came from _load_history and are in `messages`.
+    consolidated = old_messages[:last_consolidated]
+    new_persistent = _persistable_messages(messages)
+
+    lines = [json.dumps({"_type": _METADATA_TYPE, "last_consolidated": last_consolidated})]
+    lines.extend(m.model_dump_json() for m in consolidated)
+    lines.extend(m.model_dump_json() for m in new_persistent)
+    path.write_text("\n".join(lines) + "\n")
+
+
+def _advance_consolidation_pointer(workspaces: Path, person: str, new_pointer: int) -> None:
+    """Advance the consolidation pointer without rewriting messages."""
+    path = _history_path(workspaces, person)
+    last_consolidated, all_messages = _read_history_file(path)
+
+    if new_pointer <= last_consolidated:
+        return
+
+    lines = [json.dumps({"_type": _METADATA_TYPE, "last_consolidated": new_pointer})]
+    for msg in all_messages:
+        lines.append(msg.model_dump_json())
     path.write_text("\n".join(lines) + "\n")

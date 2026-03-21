@@ -162,6 +162,7 @@ class HomeclawApp:
     async def initialize(self) -> None:
         """Async initialization — call after constructing in an event loop."""
         await self._semantic_memory.initialize()
+        self.loop.start_background_consolidation()
 
     def _reload_routines(self) -> None:
         """Called by routine tools when ROUTINES.md changes."""

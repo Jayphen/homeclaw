@@ -124,17 +124,22 @@ async def test_history_persisted(
     lines = [
         line for line in history_path.read_text().strip().splitlines() if line
     ]
-    assert len(lines) >= 2  # at least one user + one assistant
+    # First line is metadata, rest are messages
+    assert len(lines) >= 3  # metadata + at least one user + one assistant
 
-    for line in lines:
+    metadata = json.loads(lines[0])
+    assert metadata.get("_type") == "metadata"
+
+    msg_lines = lines[1:]
+    for line in msg_lines:
         msg = json.loads(line)
         assert msg["role"] in ("user", "assistant"), (
             f"Only user/assistant messages should be persisted, got {msg['role']}"
         )
 
     # Verify the content is what we expect
-    user_msg = json.loads(lines[-2])
-    assistant_msg = json.loads(lines[-1])
+    user_msg = json.loads(msg_lines[-2])
+    assistant_msg = json.loads(msg_lines[-1])
     assert user_msg["role"] == "user"
     assert user_msg["content"] == "Remember to buy milk"
     assert assistant_msg["role"] == "assistant"
