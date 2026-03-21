@@ -14,6 +14,16 @@ from homeclaw.api.deps import AdminDep, AuthDep, MemberDep, get_config, list_mem
 
 router = APIRouter(prefix="/api/skills", tags=["skills"])
 
+
+def _check_deps(metadata: dict[str, Any]) -> dict[str, Any] | None:
+    """Check skill deps, return result only if something is missing."""
+    from homeclaw.plugins.skills.deps import check_skill_deps
+
+    deps = check_skill_deps(metadata)
+    if deps["satisfied"]:
+        return None
+    return deps
+
 # The timestamp suffix appended by skill_remove: _YYYYMMDD_HHMMSS (16 chars)
 _TIMESTAMP_SUFFIX_LEN = 16
 
@@ -230,13 +240,19 @@ async def install_skill_from_url(body: SkillInstallRequest) -> dict[str, Any]:
         except Exception:
             pass
 
-    return {
+    from homeclaw.plugins.skills.deps import check_skill_deps
+
+    deps = check_skill_deps(defn.metadata)
+    result: dict[str, Any] = {
         "status": "installed",
         "name": slug,
         "description": defn.description,
         "scope": body.scope,
         "loaded": loaded,
     }
+    if not deps["satisfied"]:
+        result["deps"] = deps
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +297,9 @@ async def get_skill(owner: str, name: str) -> dict[str, Any]:
         "allowed_domains": defn.allowed_domains,
         "instructions": defn.instructions,
         "metadata": defn.metadata,
+        "compatibility": defn.compatibility,
         "files": files,
+        "deps": _check_deps(defn.metadata),
     }
 
 

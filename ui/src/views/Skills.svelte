@@ -23,14 +23,22 @@
     files: SkillFile[];
   }
 
+  interface SkillDeps {
+    missing_bins: string[];
+    missing_env: string[];
+    satisfied: boolean;
+  }
+
   interface SkillDetail {
     name: string;
     owner: string;
     description: string;
     allowed_domains: string[];
     instructions: string;
-    metadata: Record<string, string>;
+    metadata: Record<string, any>;
+    compatibility: string | null;
     files: SkillFile[];
+    deps: SkillDeps | null;
   }
 
   interface FileContent {
@@ -53,7 +61,7 @@
   // Install
   let installUrl: string = $state("");
   let installing: boolean = $state(false);
-  let installResult: { status: string; name?: string; error?: string } | null = $state(null);
+  let installResult: { status: string; name?: string; error?: string; deps?: { missing_bins: string[]; missing_env: string[] } } | null = $state(null);
 
   // Settings
   let settingsLoaded: boolean = $state(false);
@@ -350,6 +358,19 @@
           {/each}
         </div>
       {/if}
+      {#if detail.compatibility}
+        <p class="skill-compat">{detail.compatibility}</p>
+      {/if}
+      {#if detail.deps}
+        <div class="dep-warnings">
+          {#if detail.deps.missing_bins.length}
+            <p>Missing binaries: <code>{detail.deps.missing_bins.join(", ")}</code> — install them to use this skill</p>
+          {/if}
+          {#if detail.deps.missing_env.length}
+            <p>Missing env vars: <code>{detail.deps.missing_env.join(", ")}</code> — set them in your environment or .env file</p>
+          {/if}
+        </div>
+      {/if}
     </div>
 
     <section class="file-section">
@@ -438,6 +459,16 @@
       {#if installResult}
         {#if installResult.status === "installed"}
           <p class="install-success">Installed <strong>{installResult.name}</strong></p>
+          {#if installResult.deps}
+            <div class="dep-warnings">
+              {#if installResult.deps.missing_bins.length}
+                <p>Missing binaries: <code>{installResult.deps.missing_bins.join(", ")}</code></p>
+              {/if}
+              {#if installResult.deps.missing_env.length}
+                <p>Missing env vars: <code>{installResult.deps.missing_env.join(", ")}</code></p>
+              {/if}
+            </div>
+          {/if}
         {:else}
           <p class="install-error">{installResult.error}</p>
         {/if}
@@ -555,6 +586,13 @@
   .install-input::placeholder { color: var(--text-muted); opacity: 0.7; }
   .install-success { color: var(--sage); font-size: 0.82rem; margin: 0.5rem 0 0; }
   .install-error { color: var(--rose, #c44); font-size: 0.82rem; margin: 0.5rem 0 0; }
+  .dep-warnings {
+    background: #fef8ee; border: 1px solid #f0d9a8; border-radius: var(--radius);
+    padding: 0.5rem 0.75rem; margin-top: 0.5rem; font-size: 0.8rem; color: #8a6d3b;
+  }
+  .dep-warnings p { margin: 0.2rem 0; }
+  .dep-warnings code { background: rgba(0,0,0,0.05); padding: 0.1rem 0.3rem; border-radius: 3px; }
+  .skill-compat { font-size: 0.8rem; color: var(--text-muted); margin: 0.3rem 0 0; font-style: italic; }
 
   /* Breadcrumb */
   .breadcrumb { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 1rem; font-size: 0.82rem; }

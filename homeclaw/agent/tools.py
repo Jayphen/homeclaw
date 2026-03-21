@@ -2171,13 +2171,24 @@ def register_builtin_tools(
                     "warning": f"Installed but failed to load: {e}",
                 }
 
-        return {
+        from homeclaw.plugins.skills.deps import check_skill_deps
+        deps = check_skill_deps(defn.metadata)
+
+        result: dict[str, Any] = {
             "status": "installed",
             "name": slug,
             "scope": scope,
             "loaded": loaded,
             "fetched_files": ["SKILL.md", *fetched_extras],
         }
+        if not deps["satisfied"]:
+            warnings: list[str] = []
+            if deps["missing_bins"]:
+                warnings.append(f"Missing binaries: {', '.join(deps['missing_bins'])}")
+            if deps["missing_env"]:
+                warnings.append(f"Missing env vars: {', '.join(deps['missing_env'])}")
+            result["warnings"] = warnings
+        return result
 
     registry.register(
         ToolDefinition(
