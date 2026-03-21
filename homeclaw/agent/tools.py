@@ -1789,6 +1789,13 @@ def register_builtin_tools(
         if not script_path.is_file():
             return {"error": f"Script not found: {script}"}
 
+        # Merge skill .env into subprocess environment
+        import os
+
+        from homeclaw.plugins.skills.loader import _load_skill_env
+
+        script_env = {**os.environ, **_load_skill_env(loc.skill_dir)}
+
         cmd = [str(script_path)] + (args or [])
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -1796,6 +1803,7 @@ def register_builtin_tools(
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(loc.skill_dir),
+                env=script_env,
             )
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
             return {
