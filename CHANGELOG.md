@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.2](https://github.com/Jayphen/homeclaw/compare/v0.7.1...v0.7.2) (2026-03-21)
+
+
+### Bug Fixes
+
+* support authenticated image sources in image_send tool ([6e0d62a](https://github.com/Jayphen/homeclaw/commit/6e0d62ac34b34a769dad8b3895c764774c65a18d))
+* support authenticated image sources in image_send tool ([43bde49](https://github.com/Jayphen/homeclaw/commit/43bde49819d52f1ac735f4549262adbd3b61bd5d))
+
 ## [0.7.1](https://github.com/Jayphen/homeclaw/compare/v0.7.0...v0.7.1) (2026-03-21)
 
 
