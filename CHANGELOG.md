@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.3](https://github.com/Jayphen/homeclaw/compare/v0.6.2...v0.6.3) (2026-03-21)
+
+
+### Bug Fixes
+
+* inject skill .env vars into run_skill_script subprocess environment ([28ac992](https://github.com/Jayphen/homeclaw/commit/28ac9926b23b18e661aa87c90d79c55d39019cc6))
+
 ## [0.6.2](https://github.com/Jayphen/homeclaw/compare/v0.6.1...v0.6.2) (2026-03-21)
 
 
