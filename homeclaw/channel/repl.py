@@ -49,6 +49,10 @@ async def run_repl(
         if message in ("exit", "quit"):
             break
 
+        def _print_interim(text: str) -> None:
+            print(f"\n  … {text}")
+
+        loop.set_interim_callback(_print_interim)
         try:
             response = await loop.run(message, person)
         except KeyboardInterrupt:

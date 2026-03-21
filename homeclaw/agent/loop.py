@@ -45,11 +45,11 @@ In a direct message, notes, memory updates, and reminders always belong to the p
 you are talking to. Use their name for the `person` parameter — never attribute their \
 notes or reminders to someone else, even if they mention another household member.
 
-Only your final response (after all tool calls are complete) is shown to the user. \
-The user cannot see intermediate thoughts or tool-call responses. Never say "let me try", \
-"give me a moment", "I'll check" or similar without ALSO calling a tool in the same response — \
-if you don't call a tool, your text IS the final response and the user gets no follow-up. \
-Either call the tool or explain the situation — never promise action you don't take immediately.
+Your final response (after all tool calls complete) is the main message the user sees. \
+If you include text alongside a tool call, the user may see it as a brief status update — \
+so keep it useful ("Checking your Home Assistant lights..." not just "Let me check"). \
+If you don't call a tool, your text IS the final response — never promise action without \
+actually calling a tool in the same turn.
 
 Act on what you hear. If you don't call a tool to save something, you WILL forget it next \
 conversation. These are the kinds of moments to save — not an exhaustive list, use your \
@@ -121,6 +121,20 @@ _PERSONAL_WRITE_TOOLS = frozenset({
 })
 
 
+# Minimum length for an interim message to be worth sending.
+# Short filler like "Let me check" / "Un momento" / "ちょっと待って" are all
+# under this threshold regardless of language.
+_INTERIM_MIN_CHARS = 40
+
+
+def _is_substantive_interim(text: str) -> bool:
+    """Return True if the interim text is worth sending to the user."""
+    return len(text) >= _INTERIM_MIN_CHARS
+
+
+InterimCallback = Callable[[str], Any]
+
+
 class AgentLoop:
     def __init__(
         self,
@@ -138,6 +152,17 @@ class AgentLoop:
         self._on_tool_call = on_tool_call
         self._routing = routing
         self._lock_pool = LockPool()
+        self._on_interim: InterimCallback | None = None
+
+    def set_interim_callback(self, callback: InterimCallback | None) -> None:
+        """Set a callback for interim responses during tool rounds.
+
+        The callback is called with the text content when the LLM produces
+        text alongside tool calls (e.g. "Trying to connect to HA...").
+        The text is sent to the user immediately before tool execution continues.
+        Can be sync or async.
+        """
+        self._on_interim = callback
 
     async def run(
         self,
@@ -228,6 +253,16 @@ class AgentLoop:
 
             if response.stop_reason != "tool_use" or not response.tool_calls:
                 break
+
+            # Send interim text to user if the LLM said something substantive
+            # alongside its tool calls (e.g. "Connecting to Home Assistant...")
+            if response.content and self._on_interim:
+                text = response.content.strip()
+                if _is_substantive_interim(text):
+                    result = self._on_interim(text)
+                    # Support both sync and async callbacks
+                    if hasattr(result, "__await__"):
+                        await result
 
             # Dispatch tool calls
             tool_results = await self._dispatch_tools(

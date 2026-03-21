@@ -404,6 +404,12 @@ class WhatsAppChannel:
         channel: str | None,
     ) -> None:
         """Run content through the agent loop and reply with the response."""
+        # Send interim messages (e.g. "Connecting to HA...") as they happen
+        async def _send_interim(text: str) -> None:
+            formatted = _md_to_whatsapp(text)
+            await self._client.reply_message(formatted, ev)
+
+        self._loop.set_interim_callback(_send_interim)
         try:
             response = await self._loop.run(content, person, channel=channel)
         except Exception as exc:

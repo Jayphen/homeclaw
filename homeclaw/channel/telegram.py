@@ -258,6 +258,13 @@ class TelegramChannel:
         """Send content through the agent loop and reply with the response."""
         done = asyncio.Event()
         typing_task = asyncio.create_task(self._send_typing_until_done(update, done))
+
+        # Send interim messages (e.g. "Connecting to HA...") as they happen
+        async def _send_interim(text: str) -> None:
+            if update.message:
+                await _send_markdown(update.message, text)
+
+        self._loop.set_interim_callback(_send_interim)
         try:
             response = await self._loop.run(content, person, channel=channel)
         except Exception as exc:
