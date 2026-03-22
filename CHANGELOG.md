@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.1](https://github.com/Jayphen/homeclaw/compare/v0.11.0...v0.11.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* preserve tool results in conversation history across turns ([56b24ab](https://github.com/Jayphen/homeclaw/commit/56b24ab8bba4471edee20f3239012bb0639fac5b))
+* strip stale reasoning blocks from history and prevent impossible provider states ([f83ed47](https://github.com/Jayphen/homeclaw/commit/f83ed4721c7a142fc47d79770384603c9ac9f4b1))
+
 ## [0.11.0](https://github.com/Jayphen/homeclaw/compare/v0.10.0...v0.11.0) (2026-03-22)
 
 
