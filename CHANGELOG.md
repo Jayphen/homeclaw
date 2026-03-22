@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.14.0](https://github.com/Jayphen/homeclaw/compare/v0.13.0...v0.14.0) (2026-03-22)
+
+
+### Features
+
+* add debug info panel to web chat ([0f9be04](https://github.com/Jayphen/homeclaw/commit/0f9be0472971dbdf4808e1453c4a6b337d77b7e4))
+* add web UI chat channel ([1f6f1da](https://github.com/Jayphen/homeclaw/commit/1f6f1da2d44c78396b5fd006c575b8d4b9f55a3a))
+* hot-reload LLM providers when settings change ([78265cc](https://github.com/Jayphen/homeclaw/commit/78265cc59013f41a29537174b94430cabdc6c2bc))
+
+
+### Bug Fixes
+
+* always init agent loop in serve command when provider is configured ([047e52a](https://github.com/Jayphen/homeclaw/commit/047e52a20f4770d5bac056adcc90542d5c0239d3))
+* apply provider_mode to config on save ([3eade7a](https://github.com/Jayphen/homeclaw/commit/3eade7a346a281dcde8808eeb541f72a318cf12a))
+* correctly format prepareSendMessagesRequest return value ([0fc97d1](https://github.com/Jayphen/homeclaw/commit/0fc97d108d1df751c6c3ad7ba2433f373116fdbd))
+* hot-update note_detail_level without restart ([92a7094](https://github.com/Jayphen/homeclaw/commit/92a7094a14bc9477ff57f0a713eac984ba924404))
+* persist chat history across navigation and page refresh ([7515396](https://github.com/Jayphen/homeclaw/commit/75153960ad52fa01f034ae92059b2b4a2fa65582))
+* robust history sanitizer for missing tool results ([167f14f](https://github.com/Jayphen/homeclaw/commit/167f14f807084e654b489730bf47314c4b84bf02))
+* sanitize history to prevent orphaned tool results ([60a6a6c](https://github.com/Jayphen/homeclaw/commit/60a6a6cd50f619354ef1ff2c800141e1860ec2f2))
+* strip content from web_search results, return structured metadata only ([b6f8bdf](https://github.com/Jayphen/homeclaw/commit/b6f8bdfb3efbc403491323d172968a42013e05c1))
+
 ## [0.13.0](https://github.com/Jayphen/homeclaw/compare/v0.12.0...v0.13.0) (2026-03-22)
 
 
