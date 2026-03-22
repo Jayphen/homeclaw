@@ -1,5 +1,6 @@
 """Setup API routes — first-run onboarding and configuration."""
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -11,6 +12,7 @@ from homeclaw.api.deps import (
     AuthDep,
     clear_setup_token,
     create_session_token,
+    get_agent_loop,
     get_config,
     get_on_telegram_configured,
     get_setup_token,
@@ -20,6 +22,8 @@ from homeclaw.api.deps import (
     require_auth,
     verify_setup_token,
 )
+
+logger = logging.getLogger(__name__)
 from homeclaw.api.deps import (
     get_whatsapp_connected as _get_whatsapp_connected,
 )
@@ -231,6 +235,33 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
     # If a password was just set, invalidate the setup token.
     if body.web_password and get_setup_token() is not None:
         clear_setup_token()
+
+    # Hot-reload LLM providers if any provider-related field changed.
+    _provider_fields = {
+        "provider", "anthropic_api_key", "anthropic_base_url",
+        "openai_api_key", "openai_base_url",
+        "fast_provider", "fast_api_key", "fast_base_url",
+        "vision_provider", "vision_api_key", "vision_base_url",
+        "model", "conversation_model", "fast_model", "vision_model",
+    }
+    if any(getattr(body, f, None) is not None for f in _provider_fields):
+        loop = get_agent_loop()
+        if loop is not None:
+            try:
+                from homeclaw.agent.providers.factory import (
+                    create_fast_provider,
+                    create_provider,
+                    create_vision_provider,
+                )
+
+                loop.reload_providers(
+                    provider=create_provider(config),
+                    fast_provider=create_fast_provider(config),
+                    vision_provider=create_vision_provider(config),
+                )
+                logger.info("Hot-reloaded LLM providers")
+            except Exception:
+                logger.warning("Failed to reload providers", exc_info=True)
 
     # Start Telegram bot dynamically if token was just configured.
     if body.telegram_token and config.telegram_token:

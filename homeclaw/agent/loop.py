@@ -277,6 +277,18 @@ class AgentLoop:
         self._consolidation_task: asyncio.Task[None] | None = None
         self._current_model: str = getattr(provider, "model", "unknown")
 
+    def reload_providers(
+        self,
+        provider: "LLMProvider",
+        fast_provider: "LLMProvider | None" = None,
+        vision_provider: "LLMProvider | None" = None,
+    ) -> None:
+        """Hot-swap providers without restarting the agent loop."""
+        self._provider = provider
+        self._fast_provider = fast_provider
+        self._vision_provider = vision_provider
+        self._current_model = getattr(provider, "model", "unknown")
+
     def _pick_provider(self, call_type: CallType, *, has_images: bool = False) -> LLMProvider:
         """Return the appropriate provider for the call type.
 
