@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.12.0](https://github.com/Jayphen/homeclaw/compare/v0.11.1...v0.12.0) (2026-03-22)
+
+
+### Features
+
+* add model tag to tool result log lines ([02a53a9](https://github.com/Jayphen/homeclaw/commit/02a53a90118f53ce530735211a26af1ffc107181))
+* auto-activate skill instructions on first tool use ([11210e3](https://github.com/Jayphen/homeclaw/commit/11210e3e8a73be689687a14ca89c34d87d9ee80e))
+* show model name tag in log viewer ([cdd72eb](https://github.com/Jayphen/homeclaw/commit/cdd72eb863c78e0d8eac01ef211e7fa1a36694e2))
+* skip agent response in group chats when [@mentioning](https://github.com/mentioning) someone else ([4fa4e16](https://github.com/Jayphen/homeclaw/commit/4fa4e16f6489f04a3d68e5ca7f035dec8b050170))
+
+
+### Bug Fixes
+
+* align settings buttons and dropdowns with design system ([4b73dcb](https://github.com/Jayphen/homeclaw/commit/4b73dcb340b492d70ca707a495b70c241caae3c9))
+* include tracebacks in log UI and silence httpx polling spam ([8d46619](https://github.com/Jayphen/homeclaw/commit/8d46619cce0fb85aeaee18ef13a46fcb4e2e68d2))
+
 ## [0.11.1](https://github.com/Jayphen/homeclaw/compare/v0.11.0...v0.11.1) (2026-03-22)
 
 
