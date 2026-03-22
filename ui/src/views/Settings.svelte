@@ -647,7 +647,7 @@
               <input id="anthropic-base-url" type="url" bind:value={anthropicBaseUrl} placeholder="https://api.anthropic.com (default)" />
               <div class="presets">
                 {#each [
-                  ["Anthropic", ""],
+                  ["Anthropic", "https://api.anthropic.com"],
                   ["OpenRouter", "https://openrouter.ai/api"],
                   ["MiniMax", "https://api.minimax.io/anthropic"],
                 ] as [name, url]}
