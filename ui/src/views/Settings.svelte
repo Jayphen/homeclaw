@@ -21,6 +21,7 @@
     level: string;
     logger: string;
     message: string;
+    model?: string;
   }
   let logEntries: LogEntry[] = $state([]);
   let logLevel: string = $state("all");
@@ -756,6 +757,7 @@
                 <span class="log-ts">{entry.ts.slice(11, 19)}</span>
                 <span class="log-level" class:log-error={entry.level === "ERROR"} class:log-warn={entry.level === "WARNING"} class:log-debug={entry.level === "DEBUG"}>{entry.level.slice(0, 4)}</span>
                 <span class="log-name">{entry.logger}</span>
+                {#if entry.model}<span class="log-model">{entry.model}</span>{/if}
                 <span class="log-msg">{entry.message}</span>
               </div>
             {/each}
@@ -1355,6 +1357,15 @@
     max-width: 18em;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .log-model {
+    color: #c9a0dc;
+    font-size: 0.8em;
+    background: rgba(201, 160, 220, 0.1);
+    padding: 0 0.35em;
+    border-radius: 3px;
+    flex-shrink: 0;
   }
 
   .log-msg {

@@ -22,7 +22,7 @@ def _log_entry(record: logging.LogRecord, tz: tzinfo) -> dict[str, Any]:
         # Append the traceback so exceptions show up in the UI and log file
         fmt = logging.Formatter()
         msg = msg + "\n" + fmt.formatException(record.exc_info)
-    return {
+    entry: dict[str, Any] = {
         "ts": datetime.fromtimestamp(
             record.created, tz=tz,
         ).isoformat(),
@@ -30,6 +30,11 @@ def _log_entry(record: logging.LogRecord, tz: tzinfo) -> dict[str, Any]:
         "logger": record.name,
         "message": msg,
     }
+    # Propagate extra tags (e.g. model name from agent loop)
+    model = getattr(record, "model", None)
+    if model:
+        entry["model"] = model
+    return entry
 
 
 class LogBuffer(logging.Handler):

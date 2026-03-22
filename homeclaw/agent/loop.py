@@ -475,6 +475,7 @@ class AgentLoop:
         # Apply model routing if configured
         current_call_type = call_type
         active_provider = self._provider
+        model = getattr(active_provider, "model", "unknown")
         if self._routing:
             model = route_model(call_type, self._routing)
             active_provider = self._pick_provider(current_call_type)
@@ -491,15 +492,17 @@ class AgentLoop:
                 max_tokens=token_limit,
             )
 
+            extra = {"model": model}
+
             # Log the LLM response — full text and tool details
             if response.tool_calls:
                 for tc in response.tool_calls:
                     args_str = json.dumps(tc.arguments, default=str)
-                    logger.info("Tool use: %s(%s)", tc.name, args_str)
+                    logger.info("Tool use: %s(%s)", tc.name, args_str, extra=extra)
                 if response.content:
-                    logger.info("LLM thinking: %s", response.content)
+                    logger.info("LLM thinking: %s", response.content, extra=extra)
             elif response.content:
-                logger.info("LLM response: %s", response.content)
+                logger.info("LLM response: %s", response.content, extra=extra)
 
             # Always append the assistant message — include tool_calls and
             # reasoning so providers can round-trip thinking blocks between
@@ -546,6 +549,7 @@ class AgentLoop:
                 if hasattr(active_provider, "model"):
                     active_provider.model = model  # type: ignore[attr-defined]
                     logger.debug("Re-routed after tools %s → %s (%s)", tool_names, model, current_call_type.value)
+                extra = {"model": model}
 
         if response and response.stop_reason == "tool_use":
             logger.warning(
