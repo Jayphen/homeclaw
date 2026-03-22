@@ -452,23 +452,34 @@ class SkillPlugin:
             return self._handle_data_delete(args.get("filename", ""))
         if name == "http_call":
             # Substitute ${VAR} placeholders from skill .env + os.environ
+            env = self.env
             raw_url = args.get("url", "")
             raw_headers = args.get("headers")
             raw_body = args.get("body")
-            url = _substitute_env(raw_url, self.env)
+            url = _substitute_env(raw_url, env)
             resolved_headers: dict[str, str] | None = None
             if raw_headers:
                 resolved_headers = {
-                    k: _substitute_env(v, self.env)
+                    k: _substitute_env(v, env)
                     for k, v in raw_headers.items()
                 }
-            body = _substitute_env(raw_body, self.env) if raw_body else raw_body
+            body = _substitute_env(raw_body, env) if raw_body else raw_body
+            # Resolve env vars in allowed-domains so authors can use
+            # ${HOST} placeholders in the frontmatter.
+            resolved_domains = [
+                _substitute_env(d, env) for d in self._config.allowed_domains
+            ]
+            config = HttpCallConfig(
+                allowed_domains=resolved_domains,
+                log_dir=self._config.log_dir,
+                allow_local_network=self._config.allow_local_network,
+            )
             return await http_call(
                 url=url,
                 method=args.get("method", "GET"),
                 headers=resolved_headers,
                 body=body,
-                config=self._config,
+                config=config,
             )
         if name == "get_env":
             return self._handle_get_env(args.get("key", ""))
