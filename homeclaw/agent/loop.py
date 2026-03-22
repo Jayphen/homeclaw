@@ -148,16 +148,43 @@ _PERSONAL_WRITE_TOOLS = frozenset({
     "decision_log",
 })
 
+# Tools that write shared/household data. In DMs, these are blocked with
+# a message asking the LLM to confirm with the user first, so private
+# conversations don't accidentally publish to the household.
+_HOUSEHOLD_WRITE_TOOLS: dict[str, Callable[[dict[str, Any]], bool]] = {
+    # contact_note without person → household note
+    "contact_note": lambda args: "person" not in args or args.get("person") is None,
+    # memory_save to "household" workspace
+    "memory_save": lambda args: args.get("person") == HOUSEHOLD_WORKSPACE,
+    # household_share is always household-scoped
+    "household_share": lambda _: True,
+}
+
 
 # Minimum length for an interim message to be worth sending.
 # Short filler like "Let me check" / "Un momento" / "ちょっと待って" are all
 # under this threshold regardless of language.
 _INTERIM_MIN_CHARS = 40
 
+# Phrases that indicate the LLM is planning/deliberating, not addressing the user.
+# When 3+ of these appear in a single interim block, it's a self-talk chain.
+_SELF_TALK_RE = re.compile(
+    r"\b(?:Let me|I need to|I'll |I should|Actually[,: ]|I'm going to"
+    r"|I have to|I want to|Let's )\b",
+    re.IGNORECASE,
+)
+
 
 def _is_substantive_interim(text: str) -> bool:
     """Return True if the interim text is worth sending to the user."""
-    return len(text) >= _INTERIM_MIN_CHARS
+    if len(text) < _INTERIM_MIN_CHARS:
+        return False
+    # Suppress preamble that just introduces the next tool call
+    if text.rstrip().endswith(":"):
+        return False
+    # Suppress LLM deliberation / self-talk chains (e.g. "Let me try...
+    # Actually, I need to... I'll download... Actually, let me...")
+    return len(_SELF_TALK_RE.findall(text)) < 3
 
 
 def _estimate_message_tokens(msg: Message) -> int:

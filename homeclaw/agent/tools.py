@@ -776,9 +776,11 @@ def register_builtin_tools(
         name="image_send",
         description=(
             "Send an image to a household member or the household group chat. "
-            "Provide either a publicly accessible image URL, or a local file_path "
-            "for images already downloaded to disk. Use headers when the URL "
-            "requires authentication (e.g. an API key)."
+            "Provide a URL and optional headers — the tool fetches the image "
+            "server-side, so you do NOT need to download it yourself first. "
+            "For authenticated APIs (e.g. Immich), pass the auth header "
+            "directly (e.g. headers={\"x-api-key\": \"...\"}). "
+            "Use file_path only for images already on disk."
         ),
     )
     async def image_send(
