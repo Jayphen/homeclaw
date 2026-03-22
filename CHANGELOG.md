@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/Jayphen/homeclaw/compare/v0.7.2...v0.8.0) (2026-03-22)
+
+
+### Features
+
+* apply Digital Conservatory design system to entire web UI ([fc9dabe](https://github.com/Jayphen/homeclaw/commit/fc9dabe5093caeaa333549a7f1327a219e85b21e))
+* apply Digital Conservatory design system to entire web UI ([9f15d91](https://github.com/Jayphen/homeclaw/commit/9f15d91c4e3ad038aca24498cf14fa9505d3f75b))
+
 ## [0.7.2](https://github.com/Jayphen/homeclaw/compare/v0.7.1...v0.7.2) (2026-03-21)
 
 
