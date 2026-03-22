@@ -9,6 +9,7 @@
     trigger_kwargs: Record<string, string | number>;
     last_run: string | null;
     next_run: string | null;
+    last_result: string | null;
   }
 
   let routines: Routine[] = $state([]);
@@ -208,6 +209,12 @@
               <span class="meta-item">Next: {new Date(routine.next_run).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false })}</span>
             {/if}
           </div>
+          {#if routine.last_result}
+            <details class="routine-result">
+              <summary>Last result</summary>
+              <div class="result-body">{routine.last_result}</div>
+            </details>
+          {/if}
         </div>
       {/each}
     </div>
@@ -485,6 +492,36 @@
   .meta-item {
     font-size: 0.72rem;
     color: var(--text-muted);
+  }
+
+  /* ---- Result ---- */
+  .routine-result {
+    margin-top: 0.5rem;
+    font-size: 0.82rem;
+  }
+
+  .routine-result summary {
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.78rem;
+    user-select: none;
+  }
+
+  .routine-result summary:hover {
+    color: var(--text);
+  }
+
+  .result-body {
+    margin-top: 0.4rem;
+    padding: 0.6rem 0.8rem;
+    background: var(--surface-low);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 12rem;
+    overflow-y: auto;
   }
 
   /* ---- Empty ---- */

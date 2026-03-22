@@ -30,6 +30,16 @@ def _last_runs(workspaces: Path) -> dict[str, str]:
         return {}
 
 
+def _last_results(workspaces: Path) -> dict[str, str]:
+    path = workspaces / "household" / ".routine_results.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
 @router.get("", dependencies=[AuthDep])
 async def list_routines() -> dict[str, Any]:
     """List all household routines with schedule, last-run, and next-run info."""
@@ -37,6 +47,7 @@ async def list_routines() -> dict[str, Any]:
     workspaces = config.workspaces.resolve()
     routines = parse_routines_md(workspaces)
     last_runs = _last_runs(workspaces)
+    results = _last_results(workspaces)
     scheduler = get_scheduler()
 
     # Build a lookup of next-run times from the live scheduler
@@ -55,6 +66,7 @@ async def list_routines() -> dict[str, Any]:
             "trigger_kwargs": r.trigger_kwargs,
             "last_run": last_runs.get(job_id),
             "next_run": next_runs.get(job_id),
+            "last_result": results.get(job_id) or None,
         })
 
     return {"routines": items, "count": len(items)}

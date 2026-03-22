@@ -23,6 +23,7 @@ from homeclaw.scheduler.routines import parse_routines_md
 logger = logging.getLogger(__name__)
 
 _LAST_RUN_FILE = "household/.routine_last_run.json"
+_RESULTS_FILE = "household/.routine_results.json"
 
 
 class Scheduler:
@@ -57,13 +58,22 @@ class Scheduler:
         except (json.JSONDecodeError, OSError):
             return {}
 
-    def _save_last_run(self, job_id: str) -> None:
-        """Record that a routine just ran."""
+    def _save_last_run(self, job_id: str, result: str = "") -> None:
+        """Record that a routine just ran, and store its result."""
         path = self._workspaces / _LAST_RUN_FILE
         path.parent.mkdir(parents=True, exist_ok=True)
         data = self._load_last_runs()
         data[job_id] = datetime.now(UTC).isoformat()
         path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+        # Save result text (truncate to keep file reasonable)
+        results_path = self._workspaces / _RESULTS_FILE
+        try:
+            results = json.loads(results_path.read_text(encoding="utf-8")) if results_path.exists() else {}
+        except (json.JSONDecodeError, OSError):
+            results = {}
+        results[job_id] = result[:2000] if result else ""
+        results_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
 
     def _make_routine_func(self, job_id: str, description: str) -> Any:
         """Create the async callable for a routine job."""
@@ -78,7 +88,7 @@ class Scheduler:
                     HOUSEHOLD_WORKSPACE,
                     call_type=CallType.ROUTINE,
                 )
-                scheduler._save_last_run(job_id)
+                scheduler._save_last_run(job_id, result)
                 logger.info("Routine completed: %s (response length: %d)", description, len(result))
                 return result
             except Exception:
