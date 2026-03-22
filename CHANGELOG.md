@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.1](https://github.com/Jayphen/homeclaw/compare/v0.15.0...v0.15.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* detect WhatsApp group images by mimetype instead of url ([1730d43](https://github.com/Jayphen/homeclaw/commit/1730d436ea3e50354a42a2fc0a4293235b6abc23))
+
 ## [0.15.0](https://github.com/Jayphen/homeclaw/compare/v0.14.0...v0.15.0) (2026-03-22)
 
 
