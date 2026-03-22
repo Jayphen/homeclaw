@@ -148,25 +148,48 @@
     </div>
   </div>
 {:else}
-  <nav>
-    <span class="brand">homeclaw</span>
-    <div class="links">
-      <a href="#/">Dashboard</a>
-      <a href="#/bookmarks">Bookmarks</a>
-      <a href="#/calendar">Calendar</a>
-      <a href="#/notes">Notes</a>
-      <a href="#/memory">Memory</a>
-      <a href="#/contacts">Contacts</a>
-      <a href="#/skills">Skills</a>
-      <a href="#/plugins">Plugins</a>
-      <a href="#/settings">Settings</a>
-      <button class="sign-out" onclick={() => { clearToken(); state = "login"; }}>Sign out</button>
-    </div>
-  </nav>
+  <div class="shell">
+    <aside class="sidebar">
+      <a href="#/" class="brand">homeclaw</a>
 
-  <main>
-    <Router {routes} />
-  </main>
+      <nav class="nav-group">
+        <a href="#/">Home</a>
+        <a href="#/notes">Notes</a>
+        <a href="#/memory">Memory</a>
+        <a href="#/calendar">Calendar</a>
+        <a href="#/bookmarks">Bookmarks</a>
+        <a href="#/contacts">Contacts</a>
+      </nav>
+
+      <nav class="nav-group">
+        <span class="nav-label">Extend</span>
+        <a href="#/skills">Skills</a>
+        <a href="#/plugins">Plugins</a>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+
+      <nav class="nav-group nav-bottom">
+        <a href="#/settings">Settings</a>
+        <button class="sign-out" onclick={() => { clearToken(); state = "login"; }}>
+          Sign out
+        </button>
+      </nav>
+    </aside>
+
+    <main>
+      <Router {routes} />
+    </main>
+  </div>
+
+  <!-- Mobile bottom bar -->
+  <nav class="mobile-bar">
+    <a href="#/">Home</a>
+    <a href="#/notes">Notes</a>
+    <a href="#/memory">Memory</a>
+    <a href="#/contacts">Contacts</a>
+    <a href="#/settings">Settings</a>
+  </nav>
 {/if}
 
 <style>
@@ -209,57 +232,90 @@
     --shadow: 0 0 40px -10px rgba(28, 28, 23, 0.06);
   }
 
-  nav {
+  /* ---- Shell layout ---- */
+  .shell {
     display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    padding: 0.75rem 1.5rem;
-    background: var(--surface-bright);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    position: sticky;
+    min-height: 100vh;
+  }
+
+  /* ---- Sidebar ---- */
+  .sidebar {
+    position: fixed;
     top: 0;
+    left: 0;
+    width: 200px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem 1rem;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
     z-index: 100;
+    overflow-y: auto;
   }
 
   .brand {
     font-family: var(--font-serif);
     font-weight: 600;
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     color: var(--secondary);
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+    padding: 0 0.5rem;
+    margin-bottom: 1.75rem;
   }
 
-  .links {
+  .nav-group {
     display: flex;
-    gap: 0.25rem;
+    flex-direction: column;
+    gap: 0.1rem;
+    margin-bottom: 1.25rem;
   }
 
-  .links a {
+  .nav-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 0 0.5rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .nav-group a {
     color: var(--text-muted);
     text-decoration: none;
     font-size: 0.85rem;
     font-weight: 500;
-    padding: 0.3rem 0.6rem;
+    padding: 0.4rem 0.5rem;
     border-radius: var(--radius-sm);
     transition: color 0.15s, background 0.15s;
   }
 
-  .links a:hover {
+  .nav-group a:hover {
     color: var(--text);
     background: var(--surface-low);
+  }
+
+  .sidebar-spacer {
+    flex: 1;
+  }
+
+  .nav-bottom {
+    margin-bottom: 0;
   }
 
   .sign-out {
     color: var(--text-muted);
     font-size: 0.85rem;
     font-weight: 500;
-    padding: 0.3rem 0.6rem;
+    padding: 0.4rem 0.5rem;
     border-radius: var(--radius-sm);
     border: none;
     background: none;
     cursor: pointer;
     font-family: var(--font-sans);
+    text-align: left;
     transition: color 0.15s, background 0.15s;
   }
 
@@ -269,9 +325,56 @@
   }
 
   main {
+    flex: 1;
     max-width: 960px;
     margin: 2.75rem auto;
     padding: 0 1.5rem;
+    margin-left: calc(200px + max((100vw - 200px - 960px) / 2, 1.5rem));
+  }
+
+  /* ---- Mobile bottom bar ---- */
+  .mobile-bar {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    .sidebar {
+      display: none;
+    }
+
+    main {
+      margin-left: auto;
+      margin-bottom: 4rem;
+    }
+
+    .mobile-bar {
+      display: flex;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--surface-bright);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      justify-content: space-around;
+      z-index: 100;
+    }
+
+    .mobile-bar a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 0.35rem 0.5rem;
+      border-radius: var(--radius-sm);
+      transition: color 0.15s;
+    }
+
+    .mobile-bar a:hover {
+      color: var(--text);
+    }
   }
 
   /* ---- Login ---- */
