@@ -23,3 +23,8 @@ workspaces/
 
 # Dev workspace data
 workspaces-dev/
+
+# Claude Code local files
+.claude/settings.local.json
+.claude/*.lock
+.memsearch/
