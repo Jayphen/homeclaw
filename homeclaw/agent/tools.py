@@ -162,7 +162,7 @@ def register_builtin_tools(
         if contact is None:
             return {"error": f"Contact '{contact_id}' not found"}
 
-        base = workspaces / person if person else workspaces / HOUSEHOLD_WORKSPACE
+        base = workspaces / person if person and person != HOUSEHOLD_WORKSPACE else workspaces / HOUSEHOLD_WORKSPACE
         notes_dir = base / "contacts" / "notes"
         notes_dir.mkdir(parents=True, exist_ok=True)
         safe_id = safe_slug(contact.id)

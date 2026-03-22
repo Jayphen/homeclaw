@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from homeclaw.agent.context import build_context, estimate_tokens
+from homeclaw.agent.context import HOUSEHOLD_WORKSPACE, build_context, estimate_tokens
 from homeclaw.agent.providers.base import LLMProvider, LLMResponse, Message, ToolCall
 from homeclaw.agent.routing import (
     CallType,
@@ -148,15 +148,16 @@ _PERSONAL_WRITE_TOOLS = frozenset({
     "decision_log",
 })
 
-# Tools that write shared/household data. In DMs, these are blocked with
-# a message asking the LLM to confirm with the user first, so private
-# conversations don't accidentally publish to the household.
+# Tools that write shared/household data. In DMs, the first attempt is
+# blocked so the LLM asks the user to confirm. The block fires once per
+# tool name per run() call — after the user confirms, the retry goes through.
+# Each predicate returns True when the call targets household data.
 _HOUSEHOLD_WRITE_TOOLS: dict[str, Callable[[dict[str, Any]], bool]] = {
-    # contact_note without person → household note
+    # contact_note: blocked when person is absent (default → household)
     "contact_note": lambda args: "person" not in args or args.get("person") is None,
     # memory_save to "household" workspace
     "memory_save": lambda args: args.get("person") == HOUSEHOLD_WORKSPACE,
-    # household_share is always household-scoped
+    # household_share: always blocked on first attempt in DMs
     "household_share": lambda _: True,
 }
 
@@ -266,6 +267,7 @@ class AgentLoop:
         self._note_detail_level = note_detail_level
         self._lock_pool = LockPool()
         self._on_interim: InterimCallback | None = None
+        self._household_confirmed: set[str] = set()
         # Track last activity per session for idle-based consolidation
         self._last_activity: dict[str, float] = {}
         self._consolidation_task: asyncio.Task[None] | None = None
@@ -386,6 +388,9 @@ class AgentLoop:
         call_type: CallType,
         history_key: str,
     ) -> str:
+        # Reset per-run state
+        self._household_confirmed.clear()
+
         # Extract text portion for context building
         if isinstance(user_message, str):
             text_for_context = user_message
@@ -552,14 +557,37 @@ class AgentLoop:
                 args["person"] = args["person"].lower()
 
             # In DMs, force personal-write tools to use the authenticated caller.
+            # Allow "household" through — it's an explicit shared-write that the
+            # household-write guard below will handle.
             if is_dm and tc.name in _PERSONAL_WRITE_TOOLS and "person" in args:
                 requested = args["person"]
-                if requested != person:
+                if requested != person and requested != HOUSEHOLD_WORKSPACE:
                     logger.info(
                         "Tool %s: overriding person %r → %r (DM enforcement)",
                         tc.name, requested, person,
                     )
                     args["person"] = person
+
+            # In DMs, block tools that would write to household without
+            # explicit user confirmation. Return an error so the LLM asks the
+            # user. The block fires once per tool name per run() call — after
+            # the user confirms and the LLM retries, it goes through.
+            if is_dm and tc.name in _HOUSEHOLD_WRITE_TOOLS:
+                check = _HOUSEHOLD_WRITE_TOOLS[tc.name]
+                if check(args) and tc.name not in self._household_confirmed:
+                    self._household_confirmed.add(tc.name)
+                    logger.info(
+                        "Tool %s: blocked household write in DM — asking LLM to confirm",
+                        tc.name,
+                    )
+                    results.append({
+                        "error": (
+                            "This would save to the shared household — visible to all members. "
+                            "Ask the user: should this be shared with the household, or kept "
+                            "private? If private, use the person parameter with the user's name."
+                        ),
+                    })
+                    continue
 
             if self._on_tool_call is not None:
                 self._on_tool_call(tc.name, args)
