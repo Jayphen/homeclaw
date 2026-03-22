@@ -205,21 +205,73 @@ def _estimate_message_tokens(msg: Message) -> int:
 def _sanitize_history(history: list[Message]) -> list[Message]:
     """Ensure history has valid structure for the LLM API.
 
-    - Strip leading tool-result messages (orphaned by truncation)
-    - Strip trailing assistant messages with pending tool_calls but no results
+    Fixes common issues that cause 400 errors:
+    - Orphaned tool results (no preceding assistant with tool_calls)
+    - Assistant messages with tool_calls but missing tool results
+    - Consecutive same-role messages (merges them)
     """
-    # Drop orphaned tool results at the start
-    start = 0
-    while start < len(history) and history[start].role == "tool":
-        start += 1
-    if start:
-        history = history[start:]
+    if not history:
+        return history
 
-    # Drop trailing assistant with unanswered tool_calls (crashed session)
-    while history and history[-1].role == "assistant" and history[-1].tool_calls:
-        history = history[:-1]
+    cleaned: list[Message] = []
+    i = 0
+    while i < len(history):
+        msg = history[i]
 
-    return history
+        # Skip orphaned tool results
+        if msg.role == "tool" and (
+            not cleaned or cleaned[-1].role != "assistant" or not cleaned[-1].tool_calls
+        ):
+            i += 1
+            continue
+
+        # Assistant with tool_calls: check that tool results follow
+        if msg.role == "assistant" and msg.tool_calls:
+            expected_ids = {tc.id for tc in msg.tool_calls}
+            # Peek ahead for tool results
+            j = i + 1
+            found_ids: set[str] = set()
+            while j < len(history) and history[j].role == "tool":
+                tid = history[j].tool_call_id
+                if tid:
+                    found_ids.add(tid)
+                j += 1
+
+            if found_ids >= expected_ids:
+                # All tool results present — keep the full chain
+                cleaned.append(msg)
+                i += 1
+                continue
+
+            # Tool results are missing — strip tool_calls so the API
+            # sees this as a plain text message instead of a broken chain
+            text = msg.content if isinstance(msg.content, str) else ""
+            if not text:
+                i = j  # skip partial tool results
+                continue
+            msg = msg.model_copy(update={"tool_calls": []})
+            i = j  # skip partial tool results
+            # Fall through to merge/append below
+
+        else:
+            i += 1
+
+        # Merge consecutive same-role messages
+        if cleaned and msg.role == cleaned[-1].role and msg.role in ("user", "assistant"):
+            prev = cleaned[-1]
+            prev_text = prev.content if isinstance(prev.content, str) else ""
+            cur_text = msg.content if isinstance(msg.content, str) else ""
+            merged = (prev_text + "\n" + cur_text).strip()
+            cleaned[-1] = prev.model_copy(update={"content": merged})
+            continue
+
+        cleaned.append(msg)
+
+    # Final pass: drop trailing assistant with pending tool_calls
+    while cleaned and cleaned[-1].role == "assistant" and cleaned[-1].tool_calls:
+        cleaned.pop()
+
+    return cleaned
 
 
 def _truncate_history(
