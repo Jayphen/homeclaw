@@ -472,12 +472,14 @@ class AgentLoop:
             elif response.content:
                 logger.info("LLM response: %s", response.content)
 
-            # Always append the assistant message — include tool_calls so the
-            # API can match subsequent tool result messages to their tool_use blocks.
+            # Always append the assistant message — include tool_calls and
+            # reasoning so providers can round-trip thinking blocks between
+            # tool rounds (required by OpenRouter reasoning models, MiniMax, etc.)
             history.append(Message(
                 role="assistant",
                 content=response.content or "",
                 tool_calls=response.tool_calls,
+                reasoning=response.reasoning,
             ))
 
             if response.stop_reason != "tool_use" or not response.tool_calls:

@@ -14,6 +14,7 @@ from tenacity import (
 from homeclaw.agent.providers.base import (
     LLMResponse,
     Message,
+    ReasoningBlock,
     ToolCall,
     ToolDefinition,
 )
@@ -136,6 +137,28 @@ def _to_api_message(message: Message) -> dict[str, Any]:
                 }
             ],
         }
+    # Assistant messages with tool_calls or reasoning need structured content
+    # blocks — Anthropic requires tool_use blocks in the assistant message for
+    # subsequent tool_result messages to match.
+    if message.role == "assistant" and (message.tool_calls or message.reasoning):
+        blocks: list[dict[str, Any]] = []
+        for r in message.reasoning:
+            blk: dict[str, Any] = {"type": "thinking", "thinking": r.content}
+            if r.signature:
+                blk["signature"] = r.signature
+            blocks.append(blk)
+        if isinstance(message.content, str) and message.content:
+            blocks.append({"type": "text", "text": message.content})
+        elif isinstance(message.content, list):
+            blocks.extend(message.content)
+        for tc in message.tool_calls:
+            blocks.append({
+                "type": "tool_use",
+                "id": tc.id,
+                "name": tc.name,
+                "input": tc.arguments,
+            })
+        return {"role": "assistant", "content": blocks}
     return {
         "role": message.role,
         "content": message.content,
@@ -153,10 +176,17 @@ def _to_api_tool(tool: ToolDefinition) -> dict[str, Any]:
 def _parse_response(response: anthropic.types.Message) -> LLMResponse:
     content_parts: list[str] = []
     tool_calls: list[ToolCall] = []
+    reasoning: list[ReasoningBlock] = []
 
     for block in response.content:
         if block.type == "text":
             content_parts.append(block.text)
+        elif block.type == "thinking":
+            reasoning.append(ReasoningBlock(
+                type="thinking",
+                content=getattr(block, "thinking", ""),
+                signature=getattr(block, "signature", None),
+            ))
         elif block.type == "tool_use":
             tool_calls.append(
                 ToolCall(
@@ -177,4 +207,5 @@ def _parse_response(response: anthropic.types.Message) -> LLMResponse:
         content="\n".join(content_parts),
         tool_calls=tool_calls,
         stop_reason=stop_reason_map.get(response.stop_reason or "end_turn", "end_turn"),
+        reasoning=reasoning,
     )

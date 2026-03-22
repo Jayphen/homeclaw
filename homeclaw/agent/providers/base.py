@@ -17,17 +17,26 @@ class ToolCall(BaseModel):
     arguments: dict[str, Any]
 
 
+class ReasoningBlock(BaseModel):
+    """A single reasoning/thinking block from the LLM."""
+    type: str = "thinking"  # "thinking" for Anthropic, "reasoning" for OpenAI/OpenRouter
+    content: str = ""
+    signature: str | None = None  # Anthropic requires this for round-tripping thinking blocks
+
+
 class Message(BaseModel):
     role: Literal["user", "assistant", "tool"]
     content: str | list[Any]
     tool_call_id: str | None = None
     tool_calls: list["ToolCall"] = []
+    reasoning: list[ReasoningBlock] = []
 
 
 class LLMResponse(BaseModel):
     content: str
     tool_calls: list[ToolCall] = []
     stop_reason: Literal["end_turn", "tool_use", "max_tokens"]
+    reasoning: list[ReasoningBlock] = []
 
 
 class LLMProvider(Protocol):

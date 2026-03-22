@@ -18,6 +18,7 @@ from tenacity import (
 from homeclaw.agent.providers.base import (
     LLMResponse,
     Message,
+    ReasoningBlock,
     ToolCall,
     ToolDefinition,
 )
@@ -120,6 +121,11 @@ def _to_api_message(message: Message) -> dict[str, Any]:
                 }
                 for tc in message.tool_calls
             ]
+        if message.reasoning:
+            msg["reasoning_details"] = [
+                {"type": r.type, "content": r.content}
+                for r in message.reasoning
+            ]
         return msg
     if isinstance(message.content, str):
         return {"role": "user", "content": message.content}
@@ -184,6 +190,22 @@ def _parse_response(response: ChatCompletion) -> LLMResponse:
                 )
             )
 
+    # Capture reasoning/thinking blocks (OpenRouter, MiniMax, DeepSeek, etc.)
+    reasoning: list[ReasoningBlock] = []
+    raw_reasoning = getattr(message, "reasoning_details", None)
+    if raw_reasoning:
+        for block in raw_reasoning:
+            if isinstance(block, dict):
+                reasoning.append(ReasoningBlock(
+                    type=block.get("type", "reasoning"),
+                    content=block.get("content", ""),
+                ))
+            elif hasattr(block, "content"):
+                reasoning.append(ReasoningBlock(
+                    type=getattr(block, "type", "reasoning"),
+                    content=block.content or "",
+                ))
+
     finish_reason_map: dict[str, Literal["end_turn", "tool_use", "max_tokens"]] = {
         "stop": "end_turn",
         "tool_calls": "tool_use",
@@ -194,4 +216,5 @@ def _parse_response(response: ChatCompletion) -> LLMResponse:
         content=content,
         tool_calls=tool_calls,
         stop_reason=finish_reason_map.get(choice.finish_reason or "stop", "end_turn"),
+        reasoning=reasoning,
     )
