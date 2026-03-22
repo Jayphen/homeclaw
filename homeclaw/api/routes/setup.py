@@ -236,6 +236,12 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
     if body.web_password and get_setup_token() is not None:
         clear_setup_token()
 
+    # Hot-update note_detail_level on the agent loop if changed.
+    if body.note_detail_level is not None:
+        loop = get_agent_loop()
+        if loop is not None:
+            loop._note_detail_level = body.note_detail_level
+
     # Hot-reload LLM providers if any provider-related field changed.
     _provider_fields = {
         "provider", "anthropic_api_key", "anthropic_base_url",
@@ -258,6 +264,7 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
                     provider=create_provider(config),
                     fast_provider=create_fast_provider(config),
                     vision_provider=create_vision_provider(config),
+                    note_detail_level=config.note_detail_level,
                 )
                 logger.info("Hot-reloaded LLM providers")
             except Exception:
