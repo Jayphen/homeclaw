@@ -846,7 +846,8 @@
     margin-bottom: 0.3rem;
   }
 
-  .field input {
+  .field input,
+  .field select {
     width: 100%;
     padding: 0.55rem 0.75rem;
     border: 1px solid var(--border);
@@ -858,7 +859,8 @@
     transition: border-color 0.15s;
   }
 
-  .field input:focus {
+  .field input:focus,
+  .field select:focus {
     outline: none;
     border-color: var(--primary);
   }
@@ -900,6 +902,30 @@
   }
 
   .preset.active {
+    color: #fff;
+    background: var(--primary);
+  }
+
+  .toggle-group {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .toggle-group button {
+    flex: 1;
+    padding: 0.5rem;
+    border: none;
+    border-radius: var(--radius-md);
+    background: var(--surface-low);
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .toggle-group button.active {
     color: #fff;
     background: var(--primary);
   }
@@ -1114,13 +1140,17 @@
     margin-left: auto;
     padding: 0.3rem 0.6rem;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-pill);
     background: var(--surface-low);
     color: var(--secondary);
     font-size: 0.78rem;
     font-weight: 500;
+    font-family: var(--font-sans);
     cursor: pointer;
+    transition: filter 0.15s;
   }
+
+  .dismiss:hover { filter: brightness(0.95); }
 
   /* ---- Data section ---- */
   .data-desc {
@@ -1148,7 +1178,7 @@
     transition: all 0.15s;
   }
 
-  .btn.secondary:hover { background: var(--surface-low); }
+  .btn.secondary:hover { filter: brightness(0.95); }
   .btn.secondary:disabled { opacity: 0.5; cursor: default; }
 
   .import-label {
@@ -1269,6 +1299,12 @@
     font-family: var(--font-sans);
     background: var(--surface-low);
     color: var(--text);
+    transition: border-color 0.15s;
+  }
+
+  .log-controls select:focus {
+    outline: none;
+    border-color: var(--primary);
   }
 
   .log-loggers {
