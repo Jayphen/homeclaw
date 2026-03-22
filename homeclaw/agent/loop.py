@@ -257,9 +257,11 @@ class AgentLoop:
         admin_check: Callable[[str], bool] | None = None,
         note_detail_level: str = "normal",
         fast_provider: LLMProvider | None = None,
+        vision_provider: LLMProvider | None = None,
     ) -> None:
         self._provider = provider
         self._fast_provider = fast_provider
+        self._vision_provider = vision_provider
         self._registry = registry
         self._workspaces = workspaces
         self._semantic_memory = semantic_memory
@@ -275,8 +277,14 @@ class AgentLoop:
         self._consolidation_task: asyncio.Task[None] | None = None
         self._current_model: str = getattr(provider, "model", "unknown")
 
-    def _pick_provider(self, call_type: CallType) -> LLMProvider:
-        """Return the fast provider for cheap call types, main provider otherwise."""
+    def _pick_provider(self, call_type: CallType, *, has_images: bool = False) -> LLMProvider:
+        """Return the appropriate provider for the call type.
+
+        When *has_images* is True and a vision provider is configured, it takes
+        precedence — the main/fast providers may not support image input.
+        """
+        if has_images and self._vision_provider:
+            return self._vision_provider
         if self._fast_provider and call_type in (CallType.TOOL_ONLY, CallType.MEMORY_WRITE):
             return self._fast_provider
         return self._provider
@@ -473,16 +481,25 @@ class AgentLoop:
         tools = self._registry.get_definitions()
         response: LLMResponse | None = None
 
+        # Detect if this request includes images — used to route to the
+        # vision provider when the main provider lacks image support.
+        has_images = isinstance(user_message, list) and any(
+            isinstance(b, dict) and b.get("type") == "image" for b in user_message
+        )
+
         # Apply model routing if configured
         current_call_type = call_type
         active_provider = self._provider
         model = getattr(active_provider, "model", "unknown")
         if self._routing:
             model = route_model(call_type, self._routing)
-            active_provider = self._pick_provider(current_call_type)
+            active_provider = self._pick_provider(current_call_type, has_images=has_images)
+            if has_images and self._vision_provider and self._routing.vision_model:
+                model = self._routing.vision_model
             if hasattr(active_provider, "model"):
                 active_provider.model = model  # type: ignore[attr-defined]
-            logger.debug("Routed %s → %s", call_type.value, model)
+            suffix = " (vision)" if has_images and self._vision_provider else ""
+            logger.debug("Routed %s → %s%s", call_type.value, model, suffix)
         self._current_model = model
 
         for _ in range(MAX_TOOL_ROUNDS):
@@ -542,12 +559,16 @@ class AgentLoop:
                     )
                 )
 
-            # Re-route: use cheaper model/provider for follow-up if tools were simple
+            # Re-route: use cheaper model/provider for follow-up if tools were simple.
+            # When images are present, keep using the vision provider since the
+            # image content blocks are still in the conversation history.
             if self._routing:
                 tool_names = [tc.name for tc in response.tool_calls]
                 current_call_type = classify_tool_round(tool_names)
                 model = route_model(current_call_type, self._routing)
-                active_provider = self._pick_provider(current_call_type)
+                active_provider = self._pick_provider(current_call_type, has_images=has_images)
+                if has_images and self._vision_provider and self._routing.vision_model:
+                    model = self._routing.vision_model
                 if hasattr(active_provider, "model"):
                     active_provider.model = model  # type: ignore[attr-defined]
                     logger.debug("Re-routed after tools %s → %s (%s)", tool_names, model, current_call_type.value)

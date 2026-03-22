@@ -132,3 +132,46 @@ def create_fast_provider(config: HomeclawConfig) -> LLMProvider | None:
         )
 
     raise ValueError(f"Unknown fast provider: {fast_type!r}")
+
+
+def create_vision_provider(config: HomeclawConfig) -> LLMProvider | None:
+    """Create a separate provider for vision (image) input, or None to reuse the main one.
+
+    Returns a provider when vision_base_url, vision_api_key, or vision_provider
+    is set, meaning image messages need a different connection (e.g. Anthropic
+    for vision while MiniMax handles text).
+    """
+    if not config.vision_base_url and not config.vision_api_key and not config.vision_provider:
+        return None
+
+    main_provider = _resolve_provider_type(config)
+    vision_type = config.vision_provider or main_provider
+    model = config.routing.vision_model or config.routing.conversation_model
+
+    if vision_type == "anthropic":
+        api_key = config.vision_api_key or config.anthropic_api_key
+        if not api_key:
+            raise ValueError("Vision model uses Anthropic but no API key is set.")
+        base_url = config.vision_base_url or config.anthropic_base_url
+        caching = config.routing.enable_prompt_caching and not config.vision_base_url
+        return _create_anthropic(
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+            enable_prompt_caching=caching,
+            context_window=config.routing.context_window,
+        )
+
+    if vision_type == "openai":
+        api_key = config.vision_api_key or config.openai_api_key
+        base_url = config.vision_base_url or config.openai_base_url
+        if not api_key and not base_url:
+            raise ValueError("Vision model uses OpenAI but no API key or base URL is set.")
+        return _create_openai(
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+            context_window=config.routing.context_window,
+        )
+
+    raise ValueError(f"Unknown vision provider: {vision_type!r}")

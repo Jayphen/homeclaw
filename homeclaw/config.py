@@ -33,6 +33,9 @@ _SAVEABLE_FIELDS = {
     "fast_provider",
     "fast_api_key",
     "fast_base_url",
+    "vision_provider",
+    "vision_api_key",
+    "vision_base_url",
     "model",
     "telegram_token",
     "telegram_allowed_users",
@@ -52,7 +55,7 @@ _SAVEABLE_FIELDS = {
 }
 
 # Routing model fields are saved/loaded via the nested RoutingConfig object.
-_ROUTING_FIELDS = {"conversation_model", "fast_model"}
+_ROUTING_FIELDS = {"conversation_model", "fast_model", "vision_model"}
 
 
 class _JsonFileSource(PydanticBaseSettingsSource):
@@ -91,6 +94,13 @@ class HomeclawConfig(BaseSettings):
     fast_provider: str | None = None  # "anthropic" or "openai"; defaults to main provider
     fast_api_key: str | None = None
     fast_base_url: str | None = None
+
+    # Vision provider overrides — when set, image-bearing messages are routed
+    # to this provider instead of the main one (e.g. use Anthropic for vision
+    # while MiniMax handles text).  Falls back to the main provider when unset.
+    vision_provider: str | None = None  # "anthropic" or "openai"; defaults to main provider
+    vision_api_key: str | None = None
+    vision_base_url: str | None = None
 
     # Model name — set to match your provider
     model: str = "claude-sonnet-4-6"

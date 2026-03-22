@@ -90,7 +90,11 @@ class HomeclawApp:
         config: Any | None = None,
     ) -> None:
         from homeclaw.agent.loop import AgentLoop
-        from homeclaw.agent.providers.factory import create_fast_provider, create_provider
+        from homeclaw.agent.providers.factory import (
+            create_fast_provider,
+            create_provider,
+            create_vision_provider,
+        )
         from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
         from homeclaw.config import HomeclawConfig
 
@@ -100,6 +104,7 @@ class HomeclawApp:
 
         provider = create_provider(self.config)
         fast_provider = create_fast_provider(self.config)
+        vision_provider = create_vision_provider(self.config)
 
         self._scheduler: Scheduler | None = None
 
@@ -165,6 +170,7 @@ class HomeclawApp:
             admin_check=_admin_check,
             note_detail_level=self.config.note_detail_level,
             fast_provider=fast_provider,
+            vision_provider=vision_provider,
         )
 
     async def initialize(self) -> None:

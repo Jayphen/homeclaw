@@ -22,6 +22,9 @@ class RoutingConfig(BaseSettings):
     # Cheap: used for simple tool calls and follow-ups
     fast_model: str = "claude-haiku-4-5"
 
+    # Vision: used for image-bearing messages (defaults to conversation_model)
+    vision_model: str = ""
+
     # Whether to use OpenRouter (dev) or direct providers (hosted)
     use_openrouter: bool = False
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
