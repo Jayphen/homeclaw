@@ -1,5 +1,6 @@
 """Tool registry, built-in tool definitions, and handlers."""
 
+import json
 import logging
 from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime, timedelta
@@ -762,8 +763,25 @@ def register_builtin_tools(
         except httpx.RequestError as e:
             return {"error": str(e), "query": query}
 
+        try:
+            data = json.loads(resp.text)
+        except json.JSONDecodeError:
+            data = None
+
+        if isinstance(data, dict) and "data" in data:
+            results = [
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "description": item.get("description", ""),
+                }
+                for item in data["data"]
+            ]
+            return {"query": query, "results": results}
+
+        # Fallback: non-JSON or unexpected shape
         content = resp.text
-        max_chars = 8_000
+        max_chars = 12_000
         if len(content) > max_chars:
             content = content[:max_chars] + "\n\n[… truncated]"
         return {"query": query, "results": content}
