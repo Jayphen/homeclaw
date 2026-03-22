@@ -115,12 +115,16 @@ async def chat(request: Request) -> StreamingResponse:
     async def generate():
         interim_q: asyncio.Queue[str] = asyncio.Queue()
         has_interim = False
+        meta: dict[str, Any] = {}
 
         async def _on_interim(text: str) -> None:
             await interim_q.put(text)
 
         result_task = asyncio.create_task(
-            loop.run(content, person, interim_callback=_on_interim),
+            loop.run(
+                content, person,
+                interim_callback=_on_interim, metadata=meta,
+            ),
         )
 
         try:
@@ -148,6 +152,10 @@ async def chat(request: Request) -> StreamingResponse:
                 yield "\n"
 
             yield response
+
+            # Append debug metadata as a hidden HTML comment
+            if meta:
+                yield f"\n<!--debug:{json.dumps(meta)}-->"
 
         except Exception as exc:
             logger.exception("Chat error for %s", person)

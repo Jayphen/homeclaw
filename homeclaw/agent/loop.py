@@ -485,6 +485,7 @@ class AgentLoop:
         channel: str | None = None,
         call_type: CallType = CallType.CONVERSATION,
         interim_callback: InterimCallback | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """Run the agent loop for a message.
 
@@ -499,6 +500,8 @@ class AgentLoop:
                 precedence over the instance-level callback set via
                 :meth:`set_interim_callback`. Avoids race conditions when
                 multiple callers share the same AgentLoop.
+            metadata: If provided, populated with debug info (model, tools,
+                rounds, duration_ms) after execution completes.
         """
         person = person.lower()
         history_key = channel or person
@@ -506,6 +509,7 @@ class AgentLoop:
             result = await self._run_inner(
                 user_message, person, channel, call_type, history_key,
                 interim_callback=interim_callback,
+                metadata=metadata,
             )
             # Record activity for idle-based consolidation
             self._last_activity[history_key] = time.monotonic()
@@ -519,7 +523,12 @@ class AgentLoop:
         call_type: CallType,
         history_key: str,
         interim_callback: InterimCallback | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
+        t0 = time.monotonic()
+        tool_names_used: list[str] = []
+        tool_rounds = 0
+
         # Reset per-run state
         self._household_confirmed.clear()
 
@@ -644,6 +653,8 @@ class AgentLoop:
                         await result
 
             # Dispatch tool calls
+            tool_rounds += 1
+            tool_names_used.extend(tc.name for tc in response.tool_calls)
             tool_results = await self._dispatch_tools(
                 response.tool_calls, person=person, channel=channel,
             )
@@ -678,6 +689,12 @@ class AgentLoop:
             )
             # Surface the exhaustion to the user instead of returning partial content.
             _save_history(self._workspaces, history_key, history)
+            if metadata is not None:
+                metadata.update(
+                    model=self._current_model, tools=tool_names_used,
+                    tool_rounds=tool_rounds,
+                    duration_ms=int((time.monotonic() - t0) * 1000),
+                )
             return (
                 response.content + "\n\n"
                 "(I ran out of tool rounds before finishing — "
@@ -694,6 +711,13 @@ class AgentLoop:
         if channel and channel.startswith("group-") and response and response.content:
             _append_chat_log(
                 self._workspaces, channel, text_for_context, response.content,
+            )
+
+        if metadata is not None:
+            metadata.update(
+                model=self._current_model, tools=tool_names_used,
+                tool_rounds=tool_rounds,
+                duration_ms=int((time.monotonic() - t0) * 1000),
             )
 
         return response.content if response else ""

@@ -7,6 +7,40 @@
 
   let inputText = $state("");
   let messagesEl: HTMLElement | undefined = $state();
+  let showDebug = $state(false);
+  let expandedDebug: Set<string> = $state(new Set());
+
+  interface DebugMeta {
+    model?: string;
+    tools?: string[];
+    tool_rounds?: number;
+    duration_ms?: number;
+  }
+
+  const DEBUG_RE = /\n?<!--debug:(.*?)-->$/;
+
+  function parseMessage(message: (typeof chat.messages)[0]): {
+    text: string;
+    debug: DebugMeta | null;
+  } {
+    const raw = message.parts
+      .filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join("");
+    const m = raw.match(DEBUG_RE);
+    if (!m) return { text: raw, debug: null };
+    try {
+      return { text: raw.replace(DEBUG_RE, ""), debug: JSON.parse(m[1]) };
+    } catch {
+      return { text: raw, debug: null };
+    }
+  }
+
+  function toggleDebug(id: string) {
+    const next = new Set(expandedDebug);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    expandedDebug = next;
+  }
 
   function scrollToBottom() {
     tick().then(() => {
@@ -16,9 +50,7 @@
     });
   }
 
-  // Auto-scroll when messages change
   $effect(() => {
-    // Access messages to create dependency
     chat.messages.length;
     chat.status;
     scrollToBottom();
@@ -37,18 +69,17 @@
       send();
     }
   }
-
-  function getMessageText(message: (typeof chat.messages)[0]): string {
-    return message.parts
-      .filter((p): p is { type: "text"; text: string } => p.type === "text")
-      .map((p) => p.text)
-      .join("");
-  }
 </script>
 
 <div class="chat">
   <div class="chat-header">
     <h1>Chat</h1>
+    <button
+      class="debug-toggle"
+      class:active={showDebug}
+      onclick={() => { showDebug = !showDebug; }}
+      title="Show debug info"
+    >debug</button>
   </div>
 
   <div class="messages" bind:this={messagesEl}>
@@ -63,14 +94,39 @@
     {/if}
 
     {#each chat.messages as message (message.id)}
+      {@const parsed = parseMessage(message)}
       <div class="message message-{message.role}">
         <div class="bubble bubble-{message.role}">
           {#if message.role === "user"}
-            <p>{getMessageText(message)}</p>
+            <p>{parsed.text}</p>
           {:else}
-            {@html renderMarkdown(getMessageText(message))}
+            {@html renderMarkdown(parsed.text)}
           {/if}
         </div>
+        {#if showDebug && message.role === "assistant" && parsed.debug}
+          <button
+            class="debug-badge"
+            onclick={() => toggleDebug(message.id)}
+          >
+            {parsed.debug.model?.split('/').pop() ?? '?'}
+            {#if parsed.debug.tools?.length}
+              &middot; {parsed.debug.tools.length} tool{parsed.debug.tools.length === 1 ? '' : 's'}
+            {/if}
+            &middot; {((parsed.debug.duration_ms ?? 0) / 1000).toFixed(1)}s
+          </button>
+          {#if expandedDebug.has(message.id)}
+            <div class="debug-panel">
+              <div><strong>Model</strong> {parsed.debug.model ?? 'unknown'}</div>
+              {#if parsed.debug.tool_rounds}
+                <div><strong>Tool rounds</strong> {parsed.debug.tool_rounds}</div>
+              {/if}
+              {#if parsed.debug.tools?.length}
+                <div><strong>Tools</strong> {parsed.debug.tools.join(', ')}</div>
+              {/if}
+              <div><strong>Duration</strong> {((parsed.debug.duration_ms ?? 0) / 1000).toFixed(1)}s</div>
+            </div>
+          {/if}
+        {/if}
       </div>
     {/each}
 
@@ -127,6 +183,9 @@
   .chat-header {
     flex-shrink: 0;
     padding-bottom: 0.5rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
   }
 
   .chat-header h1 {
@@ -136,6 +195,24 @@
     color: var(--text);
     margin: 0;
   }
+
+  .debug-toggle {
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .debug-toggle:hover { color: var(--text); border-color: var(--text-muted); }
+  .debug-toggle.active { color: var(--primary); border-color: var(--primary); }
 
   .messages {
     flex: 1;
@@ -265,6 +342,41 @@
     background: #fef2f0;
     color: var(--secondary);
     font-size: 0.85rem;
+  }
+
+  .debug-badge {
+    display: inline-block;
+    font-family: var(--font-sans);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    background: var(--surface-low);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0.15rem 0.5rem;
+    margin-top: 0.25rem;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+
+  .debug-badge:hover { color: var(--text); }
+
+  .debug-panel {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    background: var(--surface-low);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.75rem;
+    margin-top: 0.25rem;
+    max-width: 80%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .debug-panel strong {
+    color: var(--text);
+    margin-right: 0.4rem;
   }
 
   .thinking {
