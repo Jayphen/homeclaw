@@ -132,6 +132,21 @@
   let simpleApiKey: string = $state("");
   let simpleModel: string = $state("");
 
+  const BASE_URL_PRESETS: Record<"anthropic" | "openai", [string, string][]> = {
+    anthropic: [
+      ["Anthropic", "https://api.anthropic.com"],
+      ["OpenRouter", "https://openrouter.ai/api"],
+      ["MiniMax", "https://api.minimax.io/anthropic"],
+    ],
+    openai: [
+      ["OpenRouter", "https://openrouter.ai/api/v1"],
+      ["Ollama", "http://localhost:11434/v1"],
+      ["Groq", "https://api.groq.com/openai/v1"],
+      ["Together", "https://api.together.xyz/v1"],
+      ["OpenAI", "https://api.openai.com/v1"],
+    ],
+  };
+
   const SIMPLE_PROVIDERS: Record<SimpleProvider, {
     label: string;
     protocol: "anthropic" | "openai";
@@ -646,11 +661,7 @@
               <label for="anthropic-base-url">Base URL</label>
               <input id="anthropic-base-url" type="url" bind:value={anthropicBaseUrl} placeholder="https://api.anthropic.com (default)" />
               <div class="presets">
-                {#each [
-                  ["Anthropic", "https://api.anthropic.com"],
-                  ["OpenRouter", "https://openrouter.ai/api"],
-                  ["MiniMax", "https://api.minimax.io/anthropic"],
-                ] as [name, url]}
+                {#each BASE_URL_PRESETS.anthropic as [name, url]}
                   <button class="preset" class:active={anthropicBaseUrl === url} onclick={() => { anthropicBaseUrl = url; }}>
                     {name}
                   </button>
@@ -667,13 +678,7 @@
               <label for="openai-base-url">Base URL</label>
               <input id="openai-base-url" type="url" bind:value={openaiBaseUrl} placeholder="https://openrouter.ai/api/v1" />
               <div class="presets">
-                {#each [
-                  ["OpenRouter", "https://openrouter.ai/api/v1"],
-                  ["Ollama", "http://localhost:11434/v1"],
-                  ["Groq", "https://api.groq.com/openai/v1"],
-                  ["Together", "https://api.together.xyz/v1"],
-                  ["OpenAI", "https://api.openai.com/v1"],
-                ] as [name, url]}
+                {#each BASE_URL_PRESETS.openai as [name, url]}
                   <button class="preset" class:active={openaiBaseUrl === url} onclick={() => { openaiBaseUrl = url; }}>
                     {name}
                   </button>
@@ -717,10 +722,7 @@
             <label for="fast-base-url">Base URL</label>
             <input id="fast-base-url" type="url" bind:value={fastBaseUrl} placeholder="Falls back to main URL" />
             <div class="presets">
-              {#each effectiveFastProvider === "anthropic"
-                ? [["Anthropic", "https://api.anthropic.com"], ["OpenRouter", "https://openrouter.ai/api"], ["MiniMax", "https://api.minimax.io/anthropic"]]
-                : [["OpenRouter", "https://openrouter.ai/api/v1"], ["Ollama", "http://localhost:11434/v1"], ["Groq", "https://api.groq.com/openai/v1"], ["Together", "https://api.together.xyz/v1"], ["OpenAI", "https://api.openai.com/v1"]]
-              as [name, url]}
+              {#each BASE_URL_PRESETS[effectiveFastProvider] as [name, url]}
                 <button class="preset" class:active={fastBaseUrl === url} onclick={() => { fastBaseUrl = url; }}>
                   {name}
                 </button>
@@ -764,10 +766,7 @@
             <label for="vision-base-url">Base URL</label>
             <input id="vision-base-url" type="url" bind:value={visionBaseUrl} placeholder="Falls back to main URL" />
             <div class="presets">
-              {#each effectiveVisionProvider === "anthropic"
-                ? [["Anthropic", "https://api.anthropic.com"], ["OpenRouter", "https://openrouter.ai/api"], ["MiniMax", "https://api.minimax.io/anthropic"]]
-                : [["OpenRouter", "https://openrouter.ai/api/v1"], ["Ollama", "http://localhost:11434/v1"], ["Groq", "https://api.groq.com/openai/v1"], ["Together", "https://api.together.xyz/v1"], ["OpenAI", "https://api.openai.com/v1"]]
-              as [name, url]}
+              {#each BASE_URL_PRESETS[effectiveVisionProvider] as [name, url]}
                 <button class="preset" class:active={visionBaseUrl === url} onclick={() => { visionBaseUrl = url; }}>
                   {name}
                 </button>
