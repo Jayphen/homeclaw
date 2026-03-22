@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.13.0](https://github.com/Jayphen/homeclaw/compare/v0.12.0...v0.13.0) (2026-03-22)
+
+
+### Features
+
+* add LLM-summarised tool use events to activity feed ([15fcfff](https://github.com/Jayphen/homeclaw/commit/15fcfff9dac95f5a5205ceb31d393dfcc0570bd4))
+* add vision provider for image input routing ([f93cff0](https://github.com/Jayphen/homeclaw/commit/f93cff095e5feddbbbfc8c7fb81387691df3c345))
+* add vision provider settings to web UI ([ca986d9](https://github.com/Jayphen/homeclaw/commit/ca986d9e901d5aee72ed69999da739019afb09f8))
+* persist provider_mode (simple/advanced) in config ([5f38f8f](https://github.com/Jayphen/homeclaw/commit/5f38f8fe8a93b427aa5fcc0c528826409f77478c))
+* redesign settings with tab navigation and simple/advanced LLM provider ([3a80f17](https://github.com/Jayphen/homeclaw/commit/3a80f17017bd8f995fff3c5f1cfe133b6f1bc1f1))
+* support multi-skill GitHub repos for skill install ([b627d8b](https://github.com/Jayphen/homeclaw/commit/b627d8bc05afdc572dc73b9005a55986fc474539))
+
+
+### Bug Fixes
+
+* add 'Same as main' placeholder to fast model input ([6c299af](https://github.com/Jayphen/homeclaw/commit/6c299af65ab3f3d9bd52b6469e3067bad4eed111))
+* add Anthropic preset to base URL options in advanced mode ([e421501](https://github.com/Jayphen/homeclaw/commit/e421501d0cc70a786190ee953190cc4b95621a76))
+* use consistent 'Same as main' placeholder for vision model ([8d2396d](https://github.com/Jayphen/homeclaw/commit/8d2396dc3e161e01eb790cdc8c875d431ac9624e))
+* use consistent base URL presets across main, fast, and vision sections ([708ff07](https://github.com/Jayphen/homeclaw/commit/708ff07301707d55be025f7b89723e1b001d26e9))
+* use explicit Anthropic base URL in preset ([fb06601](https://github.com/Jayphen/homeclaw/commit/fb0660159c60656bc3c6b0b24151050a0019b464))
+
+
+### Documentation
+
+* overhaul README with openclaw comparison, web-UI-first setup, and real status ([f8ae706](https://github.com/Jayphen/homeclaw/commit/f8ae7061723f9f58f72635a26d0107d1a337f566))
+
 ## [0.12.0](https://github.com/Jayphen/homeclaw/compare/v0.11.1...v0.12.0) (2026-03-22)
 
 
