@@ -6,16 +6,25 @@
   let pageState: "loading" | "ready" | "error" = $state("loading");
   let error: string | null = $state(null);
 
-  // Save state machine: idle → saving → success (auto-clears) or error
-  let saveState: "idle" | "saving" | "success" | "error" = $state("idle");
-  let saveTimeout: ReturnType<typeof setTimeout> | null = $state(null);
+  // ---- Tab navigation ----
+  type SettingsTab = "provider" | "channels" | "general" | "members" | "data";
+  let activeTab: SettingsTab = $state("provider");
 
-  // Data operation state machine: idle → exporting/importing → result/error
+  // ---- Per-section save state ----
+  type SaveState = "idle" | "saving" | "success" | "error";
+  let providerSaveState: SaveState = $state("idle");
+  let channelsSaveState: SaveState = $state("idle");
+  let generalSaveState: SaveState = $state("idle");
+  let providerSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+  let channelsSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+  let generalSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // ---- Data operation state ----
   let dataState: "idle" | "exporting" | "importing" = $state("idle");
   let dataResult: string | null = $state(null);
   let dataError: string | null = $state(null);
 
-  // Log viewer state
+  // ---- Log viewer state ----
   interface LogEntry {
     ts: string;
     level: string;
@@ -31,7 +40,6 @@
   let logPollTimer: ReturnType<typeof setInterval> | null = $state(null);
   let logUseFile: boolean = $state(false);
 
-  // Date range defaults to past 24h
   function defaultAfter(): string {
     const d = new Date(Date.now() - 24 * 60 * 60 * 1000);
     return d.toISOString().slice(0, 16);
@@ -117,7 +125,80 @@
     if (logPollTimer) { clearInterval(logPollTimer); logPollTimer = null; }
   }
 
-  // Editable config fields
+  // ---- Provider: simple / advanced ----
+  type SimpleProvider = "anthropic" | "openai" | "openrouter" | "minimax";
+  let providerMode: "simple" | "advanced" = $state("simple");
+  let simpleProvider: SimpleProvider = $state("anthropic");
+  let simpleApiKey: string = $state("");
+  let simpleModel: string = $state("");
+
+  const SIMPLE_PROVIDERS: Record<SimpleProvider, {
+    label: string;
+    protocol: "anthropic" | "openai";
+    baseUrl: string | null;
+    keyHint: string;
+    modelHint: string;
+  }> = {
+    anthropic: { label: "Anthropic", protocol: "anthropic", baseUrl: null, keyHint: "sk-ant-...", modelHint: "e.g. claude-sonnet-4-6" },
+    openai: { label: "OpenAI", protocol: "openai", baseUrl: null, keyHint: "sk-...", modelHint: "e.g. gpt-4o" },
+    openrouter: { label: "OpenRouter", protocol: "openai", baseUrl: "https://openrouter.ai/api/v1", keyHint: "sk-or-...", modelHint: "e.g. anthropic/claude-sonnet-4-6" },
+    minimax: { label: "MiniMax", protocol: "openai", baseUrl: "https://api.minimax.io/v1", keyHint: "eyJ...", modelHint: "e.g. MiniMax-M1-80k" },
+  };
+
+  let simpleCurrentKey = $derived(
+    simpleProvider === "anthropic" ? setup?.anthropic_api_key : setup?.openai_api_key
+  );
+
+  function detectSimpleProvider(s: SetupStatus): SimpleProvider {
+    const aUrl = s.anthropic_base_url || "";
+    const oUrl = s.openai_base_url || "";
+    if (aUrl.includes("openrouter") || oUrl.includes("openrouter")) return "openrouter";
+    if (aUrl.includes("minimax") || oUrl.includes("minimax")) return "minimax";
+    if (s.provider === "anthropic") return "anthropic";
+    if (s.provider === "openai") return "openai";
+    return s.anthropic_api_key ? "anthropic" : "openai";
+  }
+
+  function detectSimpleFromAdvanced(): SimpleProvider {
+    if (selectedProvider === "anthropic") {
+      if (anthropicBaseUrl.includes("openrouter")) return "openrouter";
+      if (anthropicBaseUrl.includes("minimax")) return "minimax";
+      return "anthropic";
+    }
+    if (openaiBaseUrl.includes("openrouter")) return "openrouter";
+    if (openaiBaseUrl.includes("minimax")) return "minimax";
+    if (!openaiBaseUrl || openaiBaseUrl.includes("openai.com")) return "openai";
+    return "openai";
+  }
+
+  function switchToSimple() {
+    simpleProvider = detectSimpleFromAdvanced();
+    simpleModel = conversationModel;
+    simpleApiKey = "";
+    providerMode = "simple";
+  }
+
+  function switchToAdvanced() {
+    const cfg = SIMPLE_PROVIDERS[simpleProvider];
+    selectedProvider = cfg.protocol;
+    conversationModel = simpleModel;
+    if (cfg.protocol === "anthropic") {
+      anthropicBaseUrl = cfg.baseUrl || "";
+    } else {
+      openaiBaseUrl = cfg.baseUrl || "";
+    }
+    if (simpleApiKey) {
+      if (cfg.protocol === "anthropic") {
+        anthropicKey = simpleApiKey;
+      } else {
+        openaiKey = simpleApiKey;
+      }
+      simpleApiKey = "";
+    }
+    providerMode = "advanced";
+  }
+
+  // ---- Advanced mode state ----
   let selectedProvider: "anthropic" | "openai" = $state("anthropic");
   let conversationModel: string = $state("");
   let fastModel: string = $state("");
@@ -132,6 +213,10 @@
   let visionApiKey: string = $state("");
   let visionBaseUrl: string = $state("");
   let visionModel: string = $state("");
+  let effectiveFastProvider = $derived(fastProvider || selectedProvider);
+  let effectiveVisionProvider = $derived(visionProvider || selectedProvider);
+
+  // ---- Other config state ----
   let jinaKey: string = $state("");
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
@@ -144,13 +229,61 @@
   let timezoneValue: string = $state("");
   let noteDetailLevel: string = $state("normal");
 
-  // Effective fast provider protocol — used to filter presets
-  let effectiveFastProvider = $derived(fastProvider || selectedProvider);
-  let effectiveVisionProvider = $derived(visionProvider || selectedProvider);
-
-  // Member account management
+  // ---- Member accounts ----
   let memberPasswords: Record<string, string> = $state({});
   let memberSaveStatus: Record<string, "idle" | "saving" | "saved" | "error"> = $state({});
+
+  // ---- Helpers ----
+
+  function syncFromSetup(s: SetupStatus) {
+    setup = s;
+    // Advanced mode
+    selectedProvider = (s.provider === "openai" ? "openai" : s.provider === "anthropic" ? "anthropic" : s.anthropic_api_key ? "anthropic" : "openai") as "anthropic" | "openai";
+    conversationModel = s.conversation_model ?? "";
+    fastModel = s.fast_model ?? "";
+    anthropicBaseUrl = s.anthropic_base_url || "";
+    openaiBaseUrl = s.openai_base_url || "";
+    fastProvider = s.fast_provider || "";
+    fastBaseUrl = s.fast_base_url || "";
+    visionProvider = s.vision_provider || "";
+    visionBaseUrl = s.vision_base_url || "";
+    visionModel = s.vision_model || "";
+    // Simple mode
+    simpleProvider = detectSimpleProvider(s);
+    simpleModel = s.conversation_model ?? "";
+    // Channels
+    telegramAllowedUsers = s.telegram_allowed_users || "";
+    whatsappEnabled = s.whatsapp_configured ?? false;
+    whatsappConnected = s.whatsapp_connected ?? false;
+    whatsappPhoneNumber = s.whatsapp_phone_number || "";
+    whatsappAllowedUsers = s.whatsapp_allowed_users || "";
+    // General
+    timezoneValue = s.timezone || "";
+    noteDetailLevel = s.note_detail_level || "normal";
+    // Clear secrets
+    anthropicKey = "";
+    openaiKey = "";
+    fastApiKey = "";
+    visionApiKey = "";
+    jinaKey = "";
+    telegramToken = "";
+    simpleApiKey = "";
+  }
+
+  async function postSetup(body: Record<string, string | boolean | null>): Promise<SetupStatus> {
+    const r = await api("/api/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const data = await r.json().catch(() => null);
+      throw new Error(data?.detail || `Error ${r.status}`);
+    }
+    return await r.json();
+  }
+
+  // ---- Data operations ----
 
   async function exportData() {
     if (dataState !== "idle") return;
@@ -202,30 +335,20 @@
     input.value = "";
   }
 
+  // ---- Fetch ----
+
   async function fetchAll() {
     pageState = "loading";
     error = null;
     try {
       const setupRes = await api("/api/setup/status");
       if (!setupRes.ok) throw new Error(`${setupRes.status}`);
-      setup = await setupRes.json();
-      selectedProvider = (setup!.provider === "openai" ? "openai" : setup!.provider === "anthropic" ? "anthropic" : setup!.anthropic_api_key ? "anthropic" : "openai") as "anthropic" | "openai";
-      conversationModel = setup!.conversation_model;
-      fastModel = setup!.fast_model;
-      anthropicBaseUrl = setup!.anthropic_base_url || "";
-      openaiBaseUrl = setup!.openai_base_url || "";
-      fastProvider = setup!.fast_provider || "";
-      fastBaseUrl = setup!.fast_base_url || "";
-      visionProvider = setup!.vision_provider || "";
-      visionBaseUrl = setup!.vision_base_url || "";
-      visionModel = setup!.vision_model || "";
-      telegramAllowedUsers = setup!.telegram_allowed_users || "";
-      whatsappEnabled = setup!.whatsapp_configured;
-      whatsappConnected = setup!.whatsapp_connected;
-      whatsappPhoneNumber = setup!.whatsapp_phone_number || "";
-      whatsappAllowedUsers = setup!.whatsapp_allowed_users || "";
-      timezoneValue = setup!.timezone || "";
-      noteDetailLevel = setup!.note_detail_level || "normal";
+      const s: SetupStatus = await setupRes.json();
+      syncFromSetup(s);
+      // Auto-detect advanced mode
+      if (s.fast_provider || s.vision_provider) {
+        providerMode = "advanced";
+      }
       if (whatsappEnabled && !whatsappConnected) fetchWhatsAppQr();
       pageState = "ready";
     } catch (e: any) {
@@ -234,57 +357,124 @@
     }
   }
 
-  async function toggleAdmin(member: string) {
-    if (!setup) return;
-    const isAdmin = setup.admin_members?.includes(member) ?? false;
-    const newAdmins = isAdmin
-      ? (setup.admin_members ?? []).filter((m) => m !== member)
-      : [...(setup.admin_members ?? []), member];
+  // ---- Save: Provider ----
 
-    // Optimistic update — avoids full re-render and scroll jump
-    setup = { ...setup, admin_members: newAdmins };
+  async function saveProvider() {
+    if (providerSaveState === "saving") return;
+    error = null;
+    if (providerSaveTimeout) { clearTimeout(providerSaveTimeout); providerSaveTimeout = null; }
 
-    try {
-      const r = await api("/api/setup/members/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ member, is_admin: !isAdmin }),
-      });
-      if (!r.ok) {
-        // Revert on failure
-        setup = { ...setup, admin_members: isAdmin
-          ? [...newAdmins, member]
-          : newAdmins.filter((m) => m !== member) };
+    const body: Record<string, string | boolean | null> = {};
+
+    if (providerMode === "simple") {
+      const cfg = SIMPLE_PROVIDERS[simpleProvider];
+      if (cfg.protocol !== setup?.provider) body.provider = cfg.protocol;
+      if (simpleModel !== (setup?.conversation_model ?? "")) body.conversation_model = simpleModel;
+      if (simpleApiKey) {
+        if (cfg.protocol === "anthropic") body.anthropic_api_key = simpleApiKey;
+        else body.openai_api_key = simpleApiKey;
       }
-    } catch {
-      // Revert on error
-      setup = { ...setup, admin_members: isAdmin
-        ? [...(setup.admin_members ?? []), member]
-        : (setup.admin_members ?? []).filter((m) => m !== member) };
+      const curUrl = cfg.protocol === "anthropic"
+        ? (setup?.anthropic_base_url || "")
+        : (setup?.openai_base_url || "");
+      const targetUrl = cfg.baseUrl || "";
+      if (targetUrl !== curUrl) {
+        if (cfg.protocol === "anthropic") body.anthropic_base_url = cfg.baseUrl;
+        else body.openai_base_url = cfg.baseUrl;
+      }
+    } else {
+      if (selectedProvider !== setup?.provider) body.provider = selectedProvider;
+      if (conversationModel !== (setup?.conversation_model ?? "")) body.conversation_model = conversationModel;
+      if (fastModel !== (setup?.fast_model ?? "")) body.fast_model = fastModel;
+      if (anthropicKey) body.anthropic_api_key = anthropicKey;
+      if (anthropicBaseUrl !== (setup?.anthropic_base_url || "")) body.anthropic_base_url = anthropicBaseUrl || null;
+      if (openaiKey) body.openai_api_key = openaiKey;
+      if (openaiBaseUrl !== (setup?.openai_base_url || "")) body.openai_base_url = openaiBaseUrl || null;
+      if (fastProvider !== (setup?.fast_provider || "")) body.fast_provider = fastProvider || null;
+      if (fastApiKey) body.fast_api_key = fastApiKey;
+      if (fastBaseUrl !== (setup?.fast_base_url || "")) body.fast_base_url = fastBaseUrl || null;
+      if (visionProvider !== (setup?.vision_provider || "")) body.vision_provider = visionProvider || null;
+      if (visionApiKey) body.vision_api_key = visionApiKey;
+      if (visionBaseUrl !== (setup?.vision_base_url || "")) body.vision_base_url = visionBaseUrl || null;
+      if (visionModel !== (setup?.vision_model || "")) body.vision_model = visionModel || null;
+    }
+
+    if (Object.keys(body).length === 0) { providerSaveState = "idle"; return; }
+
+    providerSaveState = "saving";
+    try {
+      const result = await postSetup(body);
+      syncFromSetup(result);
+      providerSaveState = "success";
+      providerSaveTimeout = setTimeout(() => { providerSaveState = "idle"; }, 3000);
+    } catch (e: any) {
+      error = e.message;
+      providerSaveState = "idle";
     }
   }
 
-  async function saveMemberPassword(member: string) {
-    const pw = memberPasswords[member] ?? "";
-    memberSaveStatus = { ...memberSaveStatus, [member]: "saving" };
+  // ---- Save: Channels ----
+
+  async function saveChannels() {
+    if (channelsSaveState === "saving") return;
+    error = null;
+    if (channelsSaveTimeout) { clearTimeout(channelsSaveTimeout); channelsSaveTimeout = null; }
+
+    const body: Record<string, string | boolean | null> = {};
+    if (jinaKey) body.jina_api_key = jinaKey;
+    if (telegramToken) body.telegram_token = telegramToken;
+    if (telegramAllowedUsers !== (setup?.telegram_allowed_users || "")) {
+      body.telegram_allowed_users = telegramAllowedUsers || null;
+    }
+    if (whatsappEnabled !== setup?.whatsapp_configured) body.whatsapp_enabled = whatsappEnabled;
+    if (whatsappPhoneNumber !== (setup?.whatsapp_phone_number || "")) {
+      body.whatsapp_phone_number = whatsappPhoneNumber || null;
+    }
+    if (whatsappAllowedUsers !== (setup?.whatsapp_allowed_users || "")) {
+      body.whatsapp_allowed_users = whatsappAllowedUsers || null;
+    }
+
+    if (Object.keys(body).length === 0) { channelsSaveState = "idle"; return; }
+
+    channelsSaveState = "saving";
     try {
-      const r = await api("/api/setup/members/password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ member, password: pw }),
-      });
-      if (!r.ok) throw new Error(`${r.status}`);
-      memberSaveStatus = { ...memberSaveStatus, [member]: "saved" };
-      memberPasswords = { ...memberPasswords, [member]: "" };
-      // Refresh to update members_with_passwords
-      await fetchAll();
-      setTimeout(() => {
-        memberSaveStatus = { ...memberSaveStatus, [member]: "idle" };
-      }, 2000);
-    } catch {
-      memberSaveStatus = { ...memberSaveStatus, [member]: "error" };
+      const result = await postSetup(body);
+      syncFromSetup(result);
+      if (whatsappEnabled && !whatsappConnected) fetchWhatsAppQr();
+      channelsSaveState = "success";
+      channelsSaveTimeout = setTimeout(() => { channelsSaveState = "idle"; }, 3000);
+    } catch (e: any) {
+      error = e.message;
+      channelsSaveState = "idle";
     }
   }
+
+  // ---- Save: General ----
+
+  async function saveGeneral() {
+    if (generalSaveState === "saving") return;
+    error = null;
+    if (generalSaveTimeout) { clearTimeout(generalSaveTimeout); generalSaveTimeout = null; }
+
+    const body: Record<string, string | boolean | null> = {};
+    if (timezoneValue !== (setup?.timezone || "")) body.timezone = timezoneValue || null;
+    if (noteDetailLevel !== (setup?.note_detail_level || "normal")) body.note_detail_level = noteDetailLevel;
+
+    if (Object.keys(body).length === 0) { generalSaveState = "idle"; return; }
+
+    generalSaveState = "saving";
+    try {
+      const result = await postSetup(body);
+      syncFromSetup(result);
+      generalSaveState = "success";
+      generalSaveTimeout = setTimeout(() => { generalSaveState = "idle"; }, 3000);
+    } catch (e: any) {
+      error = e.message;
+      generalSaveState = "idle";
+    }
+  }
+
+  // ---- WhatsApp ----
 
   async function fetchWhatsAppQr() {
     whatsappQrLoading = true;
@@ -303,92 +493,57 @@
     whatsappQrLoading = false;
   }
 
-  async function saveConfig() {
-    if (saveState === "saving") return;
-    error = null;
-    if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+  // ---- Members ----
 
-    saveState = "saving";
-    const body: Record<string, string | boolean | null> = {};
+  async function toggleAdmin(member: string) {
+    if (!setup) return;
+    const isAdmin = setup.admin_members?.includes(member) ?? false;
+    const newAdmins = isAdmin
+      ? (setup.admin_members ?? []).filter((m) => m !== member)
+      : [...(setup.admin_members ?? []), member];
 
-    if (selectedProvider !== setup?.provider) body.provider = selectedProvider;
-    if (conversationModel !== setup?.conversation_model) body.conversation_model = conversationModel;
-    if (fastModel !== setup?.fast_model) body.fast_model = fastModel;
-    if (anthropicKey) body.anthropic_api_key = anthropicKey;
-    if (anthropicBaseUrl !== (setup?.anthropic_base_url || "")) body.anthropic_base_url = anthropicBaseUrl || null;
-    if (openaiKey) body.openai_api_key = openaiKey;
-    if (jinaKey) body.jina_api_key = jinaKey;
-    if (openaiBaseUrl !== (setup?.openai_base_url || "")) body.openai_base_url = openaiBaseUrl || null;
-    if (fastProvider !== (setup?.fast_provider || "")) body.fast_provider = fastProvider || null;
-    if (fastApiKey) body.fast_api_key = fastApiKey;
-    if (fastBaseUrl !== (setup?.fast_base_url || "")) body.fast_base_url = fastBaseUrl || null;
-    if (visionProvider !== (setup?.vision_provider || "")) body.vision_provider = visionProvider || null;
-    if (visionApiKey) body.vision_api_key = visionApiKey;
-    if (visionBaseUrl !== (setup?.vision_base_url || "")) body.vision_base_url = visionBaseUrl || null;
-    if (visionModel !== (setup?.vision_model || "")) body.vision_model = visionModel || null;
-    if (telegramToken) body.telegram_token = telegramToken;
-    if (telegramAllowedUsers !== (setup?.telegram_allowed_users || "")) {
-      body.telegram_allowed_users = telegramAllowedUsers || null;
-    }
-    if (whatsappEnabled !== setup?.whatsapp_configured) body.whatsapp_enabled = whatsappEnabled;
-    if (whatsappPhoneNumber !== (setup?.whatsapp_phone_number || "")) {
-      body.whatsapp_phone_number = whatsappPhoneNumber || null;
-    }
-    if (whatsappAllowedUsers !== (setup?.whatsapp_allowed_users || "")) {
-      body.whatsapp_allowed_users = whatsappAllowedUsers || null;
-    }
-    if (timezoneValue !== (setup?.timezone || "")) body.timezone = timezoneValue || null;
-    if (noteDetailLevel !== (setup?.note_detail_level || "normal")) body.note_detail_level = noteDetailLevel;
-
-    if (Object.keys(body).length === 0) {
-      saveState = "idle";
-      return;
-    }
+    setup = { ...setup, admin_members: newAdmins };
 
     try {
-      const r = await api("/api/setup", {
+      const r = await api("/api/setup/members/admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ member, is_admin: !isAdmin }),
       });
       if (!r.ok) {
-        const data = await r.json().catch(() => null);
-        throw new Error(data?.detail || `Error ${r.status}`);
+        setup = { ...setup, admin_members: isAdmin
+          ? [...newAdmins, member]
+          : newAdmins.filter((m) => m !== member) };
       }
-      setup = await r.json();
-      selectedProvider = (setup!.provider === "openai" ? "openai" : setup!.provider === "anthropic" ? "anthropic" : setup!.anthropic_api_key ? "anthropic" : "openai") as "anthropic" | "openai";
-      conversationModel = setup!.conversation_model;
-      fastModel = setup!.fast_model;
-      anthropicBaseUrl = setup!.anthropic_base_url || "";
-      openaiBaseUrl = setup!.openai_base_url || "";
-      fastProvider = setup!.fast_provider || "";
-      fastBaseUrl = setup!.fast_base_url || "";
-      visionProvider = setup!.vision_provider || "";
-      visionBaseUrl = setup!.vision_base_url || "";
-      visionModel = setup!.vision_model || "";
-      telegramAllowedUsers = setup!.telegram_allowed_users || "";
-      whatsappEnabled = setup!.whatsapp_configured;
-      whatsappConnected = setup!.whatsapp_connected;
-      whatsappPhoneNumber = setup!.whatsapp_phone_number || "";
-      whatsappAllowedUsers = setup!.whatsapp_allowed_users || "";
-      timezoneValue = setup!.timezone || "";
-      noteDetailLevel = setup!.note_detail_level || "normal";
-
-      // Clear secret inputs after save
-      anthropicKey = "";
-      openaiKey = "";
-      fastApiKey = "";
-      visionApiKey = "";
-      jinaKey = "";
-      telegramToken = "";
-
-      saveState = "success";
-      saveTimeout = setTimeout(() => { saveState = "idle"; saveTimeout = null; }, 3000);
-    } catch (e: any) {
-      error = e.message;
-      saveState = "idle";
+    } catch {
+      setup = { ...setup, admin_members: isAdmin
+        ? [...(setup.admin_members ?? []), member]
+        : (setup.admin_members ?? []).filter((m) => m !== member) };
     }
   }
+
+  async function saveMemberPassword(member: string) {
+    const pw = memberPasswords[member] ?? "";
+    memberSaveStatus = { ...memberSaveStatus, [member]: "saving" };
+    try {
+      const r = await api("/api/setup/members/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ member, password: pw }),
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+      memberSaveStatus = { ...memberSaveStatus, [member]: "saved" };
+      memberPasswords = { ...memberPasswords, [member]: "" };
+      await fetchAll();
+      setTimeout(() => {
+        memberSaveStatus = { ...memberSaveStatus, [member]: "idle" };
+      }, 2000);
+    } catch {
+      memberSaveStatus = { ...memberSaveStatus, [member]: "error" };
+    }
+  }
+
+  // ---- Init ----
 
   $effect(() => {
     fetchAll();
@@ -415,416 +570,494 @@
   {/if}
 
   {#if pageState === "ready" && setup}
-    <!-- Configuration -->
-    <section class="card">
-      <h2>LLM provider</h2>
-
-      <div class="field">
-        <span class="field-label">Active provider</span>
-        <div class="provider-toggle">
-          <button class:selected={selectedProvider === "anthropic"} onclick={() => { selectedProvider = "anthropic"; }}>
-            Anthropic
-          </button>
-          <button class:selected={selectedProvider === "openai"} onclick={() => { selectedProvider = "openai"; }}>
-            OpenAI / OpenRouter
-          </button>
-        </div>
-        <small class="field-hint">Determines which API key and model format to use.</small>
-      </div>
-
-      <div class="field">
-        <label for="conversation-model">Conversation model</label>
-        <input id="conversation-model" type="text" bind:value={conversationModel} />
-        <small class="field-hint">Used for chat messages that require reasoning.</small>
-      </div>
-
-      <div class="field">
-        <label for="fast-model">Fast model</label>
-        <input id="fast-model" type="text" bind:value={fastModel} />
-        <small class="field-hint">Used for simple tool follow-ups (cheaper/faster). Leave provider fields below empty to reuse the main provider.</small>
-      </div>
-
-      <div class="field">
-        <label for="fast-provider">Fast model provider</label>
-        <div class="toggle-group">
-          <button class:active={!fastProvider} onclick={() => { fastProvider = ""; }}>
-            Same as main
-          </button>
-          <button class:active={fastProvider === "anthropic"} onclick={() => { fastProvider = "anthropic"; }}>
-            Anthropic
-          </button>
-          <button class:active={fastProvider === "openai"} onclick={() => { fastProvider = "openai"; }}>
-            OpenAI
-          </button>
-        </div>
-      </div>
-
-      {#if fastProvider}
-      <div class="field">
-        <label for="fast-api-key">Fast model API key</label>
-        <input id="fast-api-key" type="password" bind:value={fastApiKey}
-          placeholder={setup.fast_api_key ? `Current: ${setup.fast_api_key}` : "Falls back to main key"} />
-      </div>
-
-      <div class="field">
-        <label for="fast-base-url">Fast model base URL</label>
-        <input id="fast-base-url" type="url" bind:value={fastBaseUrl} placeholder="Falls back to main URL" />
-        <div class="presets">
-          {#each effectiveFastProvider === "anthropic"
-            ? [["OpenRouter", "https://openrouter.ai/api"], ["MiniMax", "https://api.minimax.io/anthropic"]]
-            : [["OpenRouter", "https://openrouter.ai/api/v1"], ["MiniMax", "https://api.minimax.io/v1"], ["Groq", "https://api.groq.com/openai/v1"]]
-          as [name, url]}
-            <button class="preset" class:active={fastBaseUrl === url} onclick={() => { fastBaseUrl = url; }}>
-              {name}
-            </button>
-          {/each}
-        </div>
-      </div>
+    <nav class="settings-nav">
+      <button class:active={activeTab === "provider"} onclick={() => { activeTab = "provider"; }}>Provider</button>
+      <button class:active={activeTab === "channels"} onclick={() => { activeTab = "channels"; }}>Channels</button>
+      <button class:active={activeTab === "general"} onclick={() => { activeTab = "general"; }}>General</button>
+      {#if setup.members && setup.members.length > 0}
+        <button class:active={activeTab === "members"} onclick={() => { activeTab = "members"; }}>Members</button>
       {/if}
+      <button class:active={activeTab === "data"} onclick={() => { activeTab = "data"; }}>Data</button>
+    </nav>
 
-      <div class="field">
-        <label for="vision-model">Vision model</label>
-        <input id="vision-model" type="text" bind:value={visionModel} placeholder="Same as conversation model" />
-        <small class="field-hint">Only needed if your main provider doesn't support image input (e.g. MiniMax). Handles photo messages from Telegram/WhatsApp.</small>
-      </div>
-
-      <div class="field">
-        <label for="vision-provider">Vision model provider</label>
-        <div class="toggle-group">
-          <button class:active={!visionProvider} onclick={() => { visionProvider = ""; }}>
-            Same as main
-          </button>
-          <button class:active={visionProvider === "anthropic"} onclick={() => { visionProvider = "anthropic"; }}>
-            Anthropic
-          </button>
-          <button class:active={visionProvider === "openai"} onclick={() => { visionProvider = "openai"; }}>
-            OpenAI
-          </button>
-        </div>
-      </div>
-
-      {#if visionProvider}
-      <div class="field">
-        <label for="vision-api-key">Vision model API key</label>
-        <input id="vision-api-key" type="password" bind:value={visionApiKey}
-          placeholder={setup.vision_api_key ? `Current: ${setup.vision_api_key}` : "Falls back to main key"} />
-      </div>
-
-      <div class="field">
-        <label for="vision-base-url">Vision model base URL</label>
-        <input id="vision-base-url" type="url" bind:value={visionBaseUrl} placeholder="Falls back to main URL" />
-        <div class="presets">
-          {#each effectiveVisionProvider === "anthropic"
-            ? [["OpenRouter", "https://openrouter.ai/api"]]
-            : [["OpenRouter", "https://openrouter.ai/api/v1"], ["OpenAI", "https://api.openai.com/v1"]]
-          as [name, url]}
-            <button class="preset" class:active={visionBaseUrl === url} onclick={() => { visionBaseUrl = url; }}>
-              {name}
-            </button>
-          {/each}
-        </div>
-      </div>
-      {/if}
-
-      {#if selectedProvider === "anthropic"}
-      <div class="field">
-        <label for="anthropic-key">Anthropic API key</label>
-        <input id="anthropic-key" type="password" bind:value={anthropicKey}
-          placeholder={setup.anthropic_api_key ? `Current: ${setup.anthropic_api_key}` : "Not set"} />
-      </div>
-
-      <div class="field">
-        <label for="anthropic-base-url">Anthropic base URL</label>
-        <input id="anthropic-base-url" type="url" bind:value={anthropicBaseUrl} placeholder="https://api.anthropic.com (default)" />
-        <div class="presets">
-          {#each [
-            ["OpenRouter", "https://openrouter.ai/api"],
-            ["MiniMax", "https://api.minimax.io/anthropic"],
-          ] as [name, url]}
-            <button class="preset" class:active={anthropicBaseUrl === url} onclick={() => { anthropicBaseUrl = url; }}>
-              {name}
-            </button>
-          {/each}
-        </div>
-      </div>
-      {/if}
-
-      {#if selectedProvider === "openai"}
-      <div class="field">
-        <label for="openai-key">OpenAI / OpenRouter API key</label>
-        <input id="openai-key" type="password" bind:value={openaiKey}
-          placeholder={setup.openai_api_key ? `Current: ${setup.openai_api_key}` : "Not set"} />
-      </div>
-
-      <div class="field">
-        <label for="base-url">Base URL</label>
-        <input id="base-url" type="url" bind:value={openaiBaseUrl} placeholder="https://openrouter.ai/api/v1" />
-        <div class="presets">
-          {#each [
-            ["OpenRouter", "https://openrouter.ai/api/v1"],
-            ["Ollama", "http://localhost:11434/v1"],
-            ["Groq", "https://api.groq.com/openai/v1"],
-            ["Together", "https://api.together.xyz/v1"],
-            ["OpenAI", "https://api.openai.com/v1"],
-          ] as [name, url]}
-            <button class="preset" class:active={openaiBaseUrl === url} onclick={() => { openaiBaseUrl = url; }}>
-              {name}
-            </button>
-          {/each}
-        </div>
-      </div>
-      {/if}
-    </section>
-
-    <section class="card">
-      <h2>Web search</h2>
-      <div class="field">
-        <label for="jina-key">Jina API key</label>
-        <input id="jina-key" type="password" bind:value={jinaKey}
-          placeholder={setup.jina_api_key ? `Current: ${setup.jina_api_key}` : "Not set"} />
-        <small class="field-hint">Powers web_read and web_search tools. Get a key at <a href="https://jina.ai" target="_blank" rel="noopener">jina.ai</a>.</small>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Telegram</h2>
-      <div class="field">
-        <label for="tg-token">Bot token</label>
-        <input id="tg-token" type="password" bind:value={telegramToken}
-          placeholder={setup.telegram_configured ? "Configured (enter new to change)" : "Not set"} />
-      </div>
-      <div class="field">
-        <label for="tg-users">Allowed user IDs</label>
-        <input id="tg-users" type="text" bind:value={telegramAllowedUsers} placeholder="12345678, 87654321" />
-        <small class="field-hint">Comma-separated. Leave blank for unrestricted.</small>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>WhatsApp</h2>
-      <div class="field">
-        <label class="toggle-row">
-          <input type="checkbox" bind:checked={whatsappEnabled} />
-          <span>Enable WhatsApp channel</span>
-        </label>
-        <small class="field-hint">
-          Connects as a linked device via QR code. Requires <code>homeclaw[whatsapp]</code>.
-        </small>
-      </div>
-      {#if whatsappEnabled}
-        <div class="wa-status" class:connected={whatsappConnected}>
-          <span class="wa-status-dot"></span>
-          {whatsappConnected ? "Connected" : "Not connected"}
-        </div>
-        {#if !whatsappConnected}
-          <div class="wa-qr">
-            {#if whatsappQrLoading}
-              <p class="wa-qr-hint">Loading QR code...</p>
-            {:else if whatsappQrUrl}
-              <p class="wa-qr-hint">Scan this QR code with WhatsApp to link this device:</p>
-              <img src={whatsappQrUrl} alt="WhatsApp QR code" class="wa-qr-img" />
-              <button class="btn secondary" onclick={fetchWhatsAppQr}>Refresh QR</button>
-            {:else}
-              <p class="wa-qr-hint">No QR code available. Save settings and restart the container to generate one.</p>
-            {/if}
-          </div>
-        {/if}
-        <div class="field">
-          <label for="wa-phone">Your phone number</label>
-          <input id="wa-phone" type="text" bind:value={whatsappPhoneNumber} placeholder="14155551234" />
-          <small class="field-hint">
-            For pair-code auth (no QR scan needed). Leave blank to use QR code instead.
-          </small>
-        </div>
-        <div class="field">
-          <label for="wa-users">Allowed WhatsApp IDs</label>
-          <input id="wa-users" type="text" bind:value={whatsappAllowedUsers} placeholder="61412345678, 262899863912491" />
-          <small class="field-hint">Comma-separated phone numbers or WhatsApp LIDs. Check logs for the exact ID. Leave blank for unrestricted.</small>
-        </div>
-      {/if}
-    </section>
-
-    <section class="card">
-      <h2>Timezone</h2>
-      <div class="field">
-        <label for="timezone">Timezone</label>
-        <input id="timezone" type="text" bind:value={timezoneValue}
-          placeholder={Intl.DateTimeFormat().resolvedOptions().timeZone} />
-        <small class="field-hint">IANA timezone for schedules and logs (e.g. America/New_York, Europe/London). Leave blank for system default.</small>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Note-taking</h2>
-      <div class="field">
-        <label for="note-detail-level">Detail level</label>
-        <select id="note-detail-level" bind:value={noteDetailLevel}>
-          <option value="minimal">Minimal — only major events</option>
-          <option value="normal">Normal — notable things</option>
-          <option value="detailed">Detailed — comprehensive daily journal</option>
-        </select>
-        <small class="field-hint">Controls how aggressively homeclaw saves daily notes. Requires restart.</small>
-      </div>
-    </section>
-
-    {#if setup.members && setup.members.length > 0}
+    <!-- ============ PROVIDER TAB ============ -->
+    {#if activeTab === "provider"}
       <section class="card">
-        <h2>Member accounts</h2>
-        <small class="field-hint" style="margin-bottom: 0.75rem; display: block;">
-          Set passwords to allow members to log in. Admin members can access settings.
-        </small>
-        {#each setup.members as member}
-          <div class="member-row">
-            <span class="member-name">
-              {member}
-              {#if setup.members_with_passwords?.includes(member)}
-                <span class="member-badge">has login</span>
-              {/if}
-              {#if setup.admin_members?.includes(member)}
-                <span class="member-badge admin-badge">admin</span>
-              {/if}
-            </span>
-            <div class="member-controls">
-              <label class="admin-toggle">
-                <input
-                  type="checkbox"
-                  checked={setup.admin_members?.includes(member) ?? false}
-                  onchange={() => toggleAdmin(member)}
-                /> Admin
-              </label>
-              <div class="member-pw-row">
-                <input
-                  type="password"
-                  bind:value={memberPasswords[member]}
-                  placeholder={setup.members_with_passwords?.includes(member) ? "New password (or blank to remove)" : "Set password"}
-                />
-                <button
-                  class="btn secondary"
-                  onclick={() => saveMemberPassword(member)}
-                  disabled={memberSaveStatus[member] === "saving"}
-                >
-                  {#if memberSaveStatus[member] === "saving"}
-                    Saving...
-                  {:else if memberSaveStatus[member] === "saved"}
-                    Saved
-                  {:else}
-                    Set
-                  {/if}
+        <div class="card-header">
+          <h2>LLM provider</h2>
+          <div class="mode-toggle">
+            <button class:active={providerMode === "simple"} onclick={switchToSimple}>Simple</button>
+            <button class:active={providerMode === "advanced"} onclick={switchToAdvanced}>Advanced</button>
+          </div>
+        </div>
+
+        {#if providerMode === "simple"}
+          <div class="field">
+            <span class="field-label">Provider</span>
+            <div class="provider-grid">
+              {#each (["anthropic", "openai", "openrouter", "minimax"] as SimpleProvider[]) as p}
+                <button class:selected={simpleProvider === p} onclick={() => { simpleProvider = p; }}>
+                  {SIMPLE_PROVIDERS[p].label}
                 </button>
+              {/each}
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="simple-key">API key</label>
+            <input id="simple-key" type="password" bind:value={simpleApiKey}
+              placeholder={simpleCurrentKey ? `Current: ${simpleCurrentKey}` : SIMPLE_PROVIDERS[simpleProvider].keyHint} />
+          </div>
+
+          <div class="field">
+            <label for="simple-model">Model</label>
+            <input id="simple-model" type="text" bind:value={simpleModel}
+              placeholder={SIMPLE_PROVIDERS[simpleProvider].modelHint} />
+          </div>
+
+        {:else}
+          <!-- ---- Main model ---- -->
+          <h3 class="subsection">Main model</h3>
+
+          <div class="field">
+            <span class="field-label">Protocol</span>
+            <div class="provider-toggle">
+              <button class:selected={selectedProvider === "anthropic"} onclick={() => { selectedProvider = "anthropic"; }}>
+                Anthropic
+              </button>
+              <button class:selected={selectedProvider === "openai"} onclick={() => { selectedProvider = "openai"; }}>
+                OpenAI
+              </button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="conversation-model">Model</label>
+            <input id="conversation-model" type="text" bind:value={conversationModel} />
+          </div>
+
+          {#if selectedProvider === "anthropic"}
+            <div class="field">
+              <label for="anthropic-key">API key</label>
+              <input id="anthropic-key" type="password" bind:value={anthropicKey}
+                placeholder={setup.anthropic_api_key ? `Current: ${setup.anthropic_api_key}` : "Not set"} />
+            </div>
+            <div class="field">
+              <label for="anthropic-base-url">Base URL</label>
+              <input id="anthropic-base-url" type="url" bind:value={anthropicBaseUrl} placeholder="https://api.anthropic.com (default)" />
+              <div class="presets">
+                {#each [
+                  ["OpenRouter", "https://openrouter.ai/api"],
+                  ["MiniMax", "https://api.minimax.io/anthropic"],
+                ] as [name, url]}
+                  <button class="preset" class:active={anthropicBaseUrl === url} onclick={() => { anthropicBaseUrl = url; }}>
+                    {name}
+                  </button>
+                {/each}
               </div>
             </div>
-            {#if memberSaveStatus[member] === "error"}
-              <small class="field-hint" style="color: var(--secondary);">Failed to update.</small>
-            {/if}
-          </div>
-        {/each}
-      </section>
-    {/if}
-
-    <div class="save-row">
-      <button class="btn primary" onclick={saveConfig} disabled={saveState === "saving"}>
-        {saveState === "saving" ? "Saving..." : "Save changes"}
-      </button>
-      {#if saveState === "success"}
-        <span class="save-ok">Saved</span>
-      {/if}
-    </div>
-
-    <section class="card">
-      <h2>Data</h2>
-      <p class="data-desc">Export or import all household data (memory, contacts, notes, calendar) as a ZIP archive.</p>
-      <div class="data-actions">
-        <button class="btn secondary" onclick={exportData} disabled={dataState !== "idle"}>
-          {dataState === "exporting" ? "Exporting..." : "Export data"}
-        </button>
-        <label class="btn secondary import-label" class:disabled={dataState !== "idle"}>
-          {dataState === "importing" ? "Importing..." : "Import data"}
-          <input type="file" accept=".zip" onchange={importData} disabled={dataState !== "idle"} hidden />
-        </label>
-      </div>
-      {#if dataResult}
-        <p class="import-ok">{dataResult}</p>
-      {/if}
-      {#if dataError}
-        <p class="import-err">{dataError}</p>
-      {/if}
-    </section>
-
-    <section class="card">
-      <h2
-        class="collapsible"
-        onclick={() => { logExpanded = !logExpanded; if (logExpanded) startLogPolling(); else stopLogPolling(); }}
-        onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { logExpanded = !logExpanded; if (logExpanded) startLogPolling(); else stopLogPolling(); } }}
-        role="button"
-        tabindex="0"
-      >
-        <span class="collapse-arrow" class:open={logExpanded}>&#9654;</span>
-        Application logs
-      </h2>
-      {#if logExpanded}
-        <div class="log-controls">
-          <input type="text" class="log-search" bind:value={logSearch} placeholder="Filter logs..." />
-          <select bind:value={logLevel} onchange={fetchLogs}>
-            <option value="all">All levels</option>
-            <option value="DEBUG">DEBUG</option>
-            <option value="INFO">INFO</option>
-            <option value="WARNING">WARNING</option>
-            <option value="ERROR">ERROR</option>
-          </select>
-          <label class="log-toggle">
-            <input type="checkbox" bind:checked={logUseFile} onchange={() => { fetchLogs(); if (logPollTimer) startLogPolling(); }} />
-            <span>File</span>
-          </label>
-          <button class="btn secondary" onclick={fetchLogs} disabled={logLoading}>
-            {logLoading ? "Loading..." : "Refresh"}
-          </button>
-          <button class="btn secondary" onclick={downloadLogs} title="Download filtered logs">
-            Download
-          </button>
-        </div>
-        {#if logUseFile}
-          <div class="log-date-range">
-            <label>
-              After
-              <input type="datetime-local" bind:value={logAfter} onchange={fetchLogs} />
-            </label>
-            <label>
-              Before
-              <input type="datetime-local" bind:value={logBefore} onchange={fetchLogs} />
-            </label>
-          </div>
-        {/if}
-        {#if loggerCounts.size > 0}
-          <div class="log-loggers">
-            {#each [...loggerCounts.entries()].sort((a, b) => b[1] - a[1]) as [name, count]}
-              <button
-                class="logger-pill"
-                class:hidden-logger={hiddenLoggers.has(name)}
-                onclick={() => toggleLogger(name)}
-                title={hiddenLoggers.has(name) ? `Show ${name}` : `Hide ${name}`}
-              >
-                {name} <span class="logger-count">{count}</span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-        <div class="log-viewer">
-          {#if filteredLogEntries.length === 0}
-            <p class="log-empty">{logEntries.length === 0 ? "No log entries." : "No matching entries."}</p>
           {:else}
-            {#each filteredLogEntries as entry}
-              <div class="log-line">
-                <span class="log-ts">{entry.ts.slice(11, 19)}</span>
-                <span class="log-level" class:log-error={entry.level === "ERROR"} class:log-warn={entry.level === "WARNING"} class:log-debug={entry.level === "DEBUG"}>{entry.level.slice(0, 4)}</span>
-                <span class="log-name">{entry.logger}</span>
-                {#if entry.model}<span class="log-model">{entry.model}</span>{/if}
-                <span class="log-msg">{entry.message}</span>
+            <div class="field">
+              <label for="openai-key">API key</label>
+              <input id="openai-key" type="password" bind:value={openaiKey}
+                placeholder={setup.openai_api_key ? `Current: ${setup.openai_api_key}` : "Not set"} />
+            </div>
+            <div class="field">
+              <label for="openai-base-url">Base URL</label>
+              <input id="openai-base-url" type="url" bind:value={openaiBaseUrl} placeholder="https://openrouter.ai/api/v1" />
+              <div class="presets">
+                {#each [
+                  ["OpenRouter", "https://openrouter.ai/api/v1"],
+                  ["Ollama", "http://localhost:11434/v1"],
+                  ["Groq", "https://api.groq.com/openai/v1"],
+                  ["Together", "https://api.together.xyz/v1"],
+                  ["OpenAI", "https://api.openai.com/v1"],
+                ] as [name, url]}
+                  <button class="preset" class:active={openaiBaseUrl === url} onclick={() => { openaiBaseUrl = url; }}>
+                    {name}
+                  </button>
+                {/each}
               </div>
-            {/each}
+            </div>
+          {/if}
+
+          <!-- ---- Fast model ---- -->
+          <h3 class="subsection">Fast model</h3>
+
+          <div class="field">
+            <label for="fast-model">Model</label>
+            <input id="fast-model" type="text" bind:value={fastModel} />
+            <small class="field-hint">Used for simple tool follow-ups (cheaper/faster).</small>
+          </div>
+
+          <div class="field">
+            <span class="field-label">Provider</span>
+            <div class="toggle-group">
+              <button class:active={!fastProvider} onclick={() => { fastProvider = ""; }}>
+                Same as main
+              </button>
+              <button class:active={fastProvider === "anthropic"} onclick={() => { fastProvider = "anthropic"; }}>
+                Anthropic
+              </button>
+              <button class:active={fastProvider === "openai"} onclick={() => { fastProvider = "openai"; }}>
+                OpenAI
+              </button>
+            </div>
+          </div>
+
+          {#if fastProvider}
+          <div class="field">
+            <label for="fast-api-key">API key</label>
+            <input id="fast-api-key" type="password" bind:value={fastApiKey}
+              placeholder={setup.fast_api_key ? `Current: ${setup.fast_api_key}` : "Falls back to main key"} />
+          </div>
+
+          <div class="field">
+            <label for="fast-base-url">Base URL</label>
+            <input id="fast-base-url" type="url" bind:value={fastBaseUrl} placeholder="Falls back to main URL" />
+            <div class="presets">
+              {#each effectiveFastProvider === "anthropic"
+                ? [["OpenRouter", "https://openrouter.ai/api"], ["MiniMax", "https://api.minimax.io/anthropic"]]
+                : [["OpenRouter", "https://openrouter.ai/api/v1"], ["MiniMax", "https://api.minimax.io/v1"], ["Groq", "https://api.groq.com/openai/v1"]]
+              as [name, url]}
+                <button class="preset" class:active={fastBaseUrl === url} onclick={() => { fastBaseUrl = url; }}>
+                  {name}
+                </button>
+              {/each}
+            </div>
+          </div>
+          {/if}
+
+          <!-- ---- Vision model ---- -->
+          <h3 class="subsection">Vision model</h3>
+
+          <div class="field">
+            <label for="vision-model">Model</label>
+            <input id="vision-model" type="text" bind:value={visionModel} placeholder="Same as conversation model" />
+            <small class="field-hint">Only needed if your main provider doesn't support image input.</small>
+          </div>
+
+          <div class="field">
+            <span class="field-label">Provider</span>
+            <div class="toggle-group">
+              <button class:active={!visionProvider} onclick={() => { visionProvider = ""; }}>
+                Same as main
+              </button>
+              <button class:active={visionProvider === "anthropic"} onclick={() => { visionProvider = "anthropic"; }}>
+                Anthropic
+              </button>
+              <button class:active={visionProvider === "openai"} onclick={() => { visionProvider = "openai"; }}>
+                OpenAI
+              </button>
+            </div>
+          </div>
+
+          {#if visionProvider}
+          <div class="field">
+            <label for="vision-api-key">API key</label>
+            <input id="vision-api-key" type="password" bind:value={visionApiKey}
+              placeholder={setup.vision_api_key ? `Current: ${setup.vision_api_key}` : "Falls back to main key"} />
+          </div>
+
+          <div class="field">
+            <label for="vision-base-url">Base URL</label>
+            <input id="vision-base-url" type="url" bind:value={visionBaseUrl} placeholder="Falls back to main URL" />
+            <div class="presets">
+              {#each effectiveVisionProvider === "anthropic"
+                ? [["OpenRouter", "https://openrouter.ai/api"]]
+                : [["OpenRouter", "https://openrouter.ai/api/v1"], ["OpenAI", "https://api.openai.com/v1"]]
+              as [name, url]}
+                <button class="preset" class:active={visionBaseUrl === url} onclick={() => { visionBaseUrl = url; }}>
+                  {name}
+                </button>
+              {/each}
+            </div>
+          </div>
+          {/if}
+        {/if}
+
+        <div class="section-save">
+          <button class="btn primary" onclick={saveProvider} disabled={providerSaveState === "saving"}>
+            {providerSaveState === "saving" ? "Saving..." : "Save"}
+          </button>
+          {#if providerSaveState === "success"}
+            <span class="save-ok">Saved</span>
           {/if}
         </div>
+      </section>
+
+    <!-- ============ CHANNELS TAB ============ -->
+    {:else if activeTab === "channels"}
+      <section class="card">
+        <h2>Web search</h2>
+        <div class="field">
+          <label for="jina-key">Jina API key</label>
+          <input id="jina-key" type="password" bind:value={jinaKey}
+            placeholder={setup.jina_api_key ? `Current: ${setup.jina_api_key}` : "Not set"} />
+          <small class="field-hint">Powers web_read and web_search tools. Get a key at <a href="https://jina.ai" target="_blank" rel="noopener">jina.ai</a>.</small>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Telegram</h2>
+        <div class="field">
+          <label for="tg-token">Bot token</label>
+          <input id="tg-token" type="password" bind:value={telegramToken}
+            placeholder={setup.telegram_configured ? "Configured (enter new to change)" : "Not set"} />
+        </div>
+        <div class="field">
+          <label for="tg-users">Allowed user IDs</label>
+          <input id="tg-users" type="text" bind:value={telegramAllowedUsers} placeholder="12345678, 87654321" />
+          <small class="field-hint">Comma-separated. Leave blank for unrestricted.</small>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>WhatsApp</h2>
+        <div class="field">
+          <label class="toggle-row">
+            <input type="checkbox" bind:checked={whatsappEnabled} />
+            <span>Enable WhatsApp channel</span>
+          </label>
+          <small class="field-hint">
+            Connects as a linked device via QR code. Requires <code>homeclaw[whatsapp]</code>.
+          </small>
+        </div>
+        {#if whatsappEnabled}
+          <div class="wa-status" class:connected={whatsappConnected}>
+            <span class="wa-status-dot"></span>
+            {whatsappConnected ? "Connected" : "Not connected"}
+          </div>
+          {#if !whatsappConnected}
+            <div class="wa-qr">
+              {#if whatsappQrLoading}
+                <p class="wa-qr-hint">Loading QR code...</p>
+              {:else if whatsappQrUrl}
+                <p class="wa-qr-hint">Scan this QR code with WhatsApp to link this device:</p>
+                <img src={whatsappQrUrl} alt="WhatsApp QR code" class="wa-qr-img" />
+                <button class="btn secondary" onclick={fetchWhatsAppQr}>Refresh QR</button>
+              {:else}
+                <p class="wa-qr-hint">No QR code available. Save settings and restart the container to generate one.</p>
+              {/if}
+            </div>
+          {/if}
+          <div class="field">
+            <label for="wa-phone">Your phone number</label>
+            <input id="wa-phone" type="text" bind:value={whatsappPhoneNumber} placeholder="14155551234" />
+            <small class="field-hint">
+              For pair-code auth (no QR scan needed). Leave blank to use QR code instead.
+            </small>
+          </div>
+          <div class="field">
+            <label for="wa-users">Allowed WhatsApp IDs</label>
+            <input id="wa-users" type="text" bind:value={whatsappAllowedUsers} placeholder="61412345678, 262899863912491" />
+            <small class="field-hint">Comma-separated phone numbers or WhatsApp LIDs. Check logs for the exact ID. Leave blank for unrestricted.</small>
+          </div>
+        {/if}
+      </section>
+
+      <div class="section-save">
+        <button class="btn primary" onclick={saveChannels} disabled={channelsSaveState === "saving"}>
+          {channelsSaveState === "saving" ? "Saving..." : "Save"}
+        </button>
+        {#if channelsSaveState === "success"}
+          <span class="save-ok">Saved</span>
+        {/if}
+      </div>
+
+    <!-- ============ GENERAL TAB ============ -->
+    {:else if activeTab === "general"}
+      <section class="card">
+        <h2>Timezone</h2>
+        <div class="field">
+          <label for="timezone">Timezone</label>
+          <input id="timezone" type="text" bind:value={timezoneValue}
+            placeholder={Intl.DateTimeFormat().resolvedOptions().timeZone} />
+          <small class="field-hint">IANA timezone for schedules and logs (e.g. America/New_York, Europe/London). Leave blank for system default.</small>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Note-taking</h2>
+        <div class="field">
+          <label for="note-detail-level">Detail level</label>
+          <select id="note-detail-level" bind:value={noteDetailLevel}>
+            <option value="minimal">Minimal — only major events</option>
+            <option value="normal">Normal — notable things</option>
+            <option value="detailed">Detailed — comprehensive daily journal</option>
+          </select>
+          <small class="field-hint">Controls how aggressively homeclaw saves daily notes. Requires restart.</small>
+        </div>
+      </section>
+
+      <div class="section-save">
+        <button class="btn primary" onclick={saveGeneral} disabled={generalSaveState === "saving"}>
+          {generalSaveState === "saving" ? "Saving..." : "Save"}
+        </button>
+        {#if generalSaveState === "success"}
+          <span class="save-ok">Saved</span>
+        {/if}
+      </div>
+
+    <!-- ============ MEMBERS TAB ============ -->
+    {:else if activeTab === "members"}
+      {#if setup.members && setup.members.length > 0}
+        <section class="card">
+          <h2>Member accounts</h2>
+          <small class="field-hint" style="margin-bottom: 0.75rem; display: block;">
+            Set passwords to allow members to log in. Admin members can access settings.
+          </small>
+          {#each setup.members as member}
+            <div class="member-row">
+              <span class="member-name">
+                {member}
+                {#if setup.members_with_passwords?.includes(member)}
+                  <span class="member-badge">has login</span>
+                {/if}
+                {#if setup.admin_members?.includes(member)}
+                  <span class="member-badge admin-badge">admin</span>
+                {/if}
+              </span>
+              <div class="member-controls">
+                <label class="admin-toggle">
+                  <input
+                    type="checkbox"
+                    checked={setup.admin_members?.includes(member) ?? false}
+                    onchange={() => toggleAdmin(member)}
+                  /> Admin
+                </label>
+                <div class="member-pw-row">
+                  <input
+                    type="password"
+                    bind:value={memberPasswords[member]}
+                    placeholder={setup.members_with_passwords?.includes(member) ? "New password (or blank to remove)" : "Set password"}
+                  />
+                  <button
+                    class="btn secondary"
+                    onclick={() => saveMemberPassword(member)}
+                    disabled={memberSaveStatus[member] === "saving"}
+                  >
+                    {#if memberSaveStatus[member] === "saving"}
+                      Saving...
+                    {:else if memberSaveStatus[member] === "saved"}
+                      Saved
+                    {:else}
+                      Set
+                    {/if}
+                  </button>
+                </div>
+              </div>
+              {#if memberSaveStatus[member] === "error"}
+                <small class="field-hint" style="color: var(--secondary);">Failed to update.</small>
+              {/if}
+            </div>
+          {/each}
+        </section>
+      {:else}
+        <section class="card">
+          <h2>Member accounts</h2>
+          <p class="field-hint">No household members registered yet. Members are created when they register via Telegram or WhatsApp.</p>
+        </section>
       {/if}
-    </section>
+
+    <!-- ============ DATA TAB ============ -->
+    {:else if activeTab === "data"}
+      <section class="card">
+        <h2>Data</h2>
+        <p class="data-desc">Export or import all household data (memory, contacts, notes, calendar) as a ZIP archive.</p>
+        <div class="data-actions">
+          <button class="btn secondary" onclick={exportData} disabled={dataState !== "idle"}>
+            {dataState === "exporting" ? "Exporting..." : "Export data"}
+          </button>
+          <label class="btn secondary import-label" class:disabled={dataState !== "idle"}>
+            {dataState === "importing" ? "Importing..." : "Import data"}
+            <input type="file" accept=".zip" onchange={importData} disabled={dataState !== "idle"} hidden />
+          </label>
+        </div>
+        {#if dataResult}
+          <p class="import-ok">{dataResult}</p>
+        {/if}
+        {#if dataError}
+          <p class="import-err">{dataError}</p>
+        {/if}
+      </section>
+
+      <section class="card">
+        <h2
+          class="collapsible"
+          onclick={() => { logExpanded = !logExpanded; if (logExpanded) startLogPolling(); else stopLogPolling(); }}
+          onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { logExpanded = !logExpanded; if (logExpanded) startLogPolling(); else stopLogPolling(); } }}
+          role="button"
+          tabindex="0"
+        >
+          <span class="collapse-arrow" class:open={logExpanded}>&#9654;</span>
+          Application logs
+        </h2>
+        {#if logExpanded}
+          <div class="log-controls">
+            <input type="text" class="log-search" bind:value={logSearch} placeholder="Filter logs..." />
+            <select bind:value={logLevel} onchange={fetchLogs}>
+              <option value="all">All levels</option>
+              <option value="DEBUG">DEBUG</option>
+              <option value="INFO">INFO</option>
+              <option value="WARNING">WARNING</option>
+              <option value="ERROR">ERROR</option>
+            </select>
+            <label class="log-toggle">
+              <input type="checkbox" bind:checked={logUseFile} onchange={() => { fetchLogs(); if (logPollTimer) startLogPolling(); }} />
+              <span>File</span>
+            </label>
+            <button class="btn secondary" onclick={fetchLogs} disabled={logLoading}>
+              {logLoading ? "Loading..." : "Refresh"}
+            </button>
+            <button class="btn secondary" onclick={downloadLogs} title="Download filtered logs">
+              Download
+            </button>
+          </div>
+          {#if logUseFile}
+            <div class="log-date-range">
+              <label>
+                After
+                <input type="datetime-local" bind:value={logAfter} onchange={fetchLogs} />
+              </label>
+              <label>
+                Before
+                <input type="datetime-local" bind:value={logBefore} onchange={fetchLogs} />
+              </label>
+            </div>
+          {/if}
+          {#if loggerCounts.size > 0}
+            <div class="log-loggers">
+              {#each [...loggerCounts.entries()].sort((a, b) => b[1] - a[1]) as [name, count]}
+                <button
+                  class="logger-pill"
+                  class:hidden-logger={hiddenLoggers.has(name)}
+                  onclick={() => toggleLogger(name)}
+                  title={hiddenLoggers.has(name) ? `Show ${name}` : `Hide ${name}`}
+                >
+                  {name} <span class="logger-count">{count}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+          <div class="log-viewer">
+            {#if filteredLogEntries.length === 0}
+              <p class="log-empty">{logEntries.length === 0 ? "No log entries." : "No matching entries."}</p>
+            {:else}
+              {#each filteredLogEntries as entry}
+                <div class="log-line">
+                  <span class="log-ts">{entry.ts.slice(11, 19)}</span>
+                  <span class="log-level" class:log-error={entry.level === "ERROR"} class:log-warn={entry.level === "WARNING"} class:log-debug={entry.level === "DEBUG"}>{entry.level.slice(0, 4)}</span>
+                  <span class="log-name">{entry.logger}</span>
+                  {#if entry.model}<span class="log-model">{entry.model}</span>{/if}
+                  <span class="log-msg">{entry.message}</span>
+                </div>
+              {/each}
+            {/if}
+          </div>
+        {/if}
+      </section>
+    {/if}
   {/if}
 
   {#if setup}
@@ -833,6 +1066,159 @@
 </div>
 
 <style>
+  /* ---- Layout ---- */
+  .settings-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .settings-header h1 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: 1.6rem;
+    margin: 0;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  /* ---- Tab navigation ---- */
+  .settings-nav {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 0.25rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    overflow-x: auto;
+  }
+
+  .settings-nav button {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .settings-nav button:hover {
+    color: var(--text);
+  }
+
+  .settings-nav button.active {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  /* ---- Cards ---- */
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.5rem;
+  }
+
+  .card h2 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--text);
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.01em;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+
+  .card-header h2 {
+    margin: 0;
+  }
+
+  /* ---- Mode toggle (Simple / Advanced) ---- */
+  .mode-toggle {
+    display: flex;
+    gap: 0.2rem;
+    background: var(--surface-low);
+    border-radius: var(--radius-md);
+    padding: 0.2rem;
+  }
+
+  .mode-toggle button {
+    padding: 0.3rem 0.65rem;
+    border: none;
+    border-radius: calc(var(--radius-md) - 2px);
+    background: transparent;
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .mode-toggle button.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  }
+
+  /* ---- Simple provider grid ---- */
+  .provider-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+  }
+
+  .provider-grid button {
+    padding: 0.55rem 0.5rem;
+    border: none;
+    border-radius: var(--radius-md);
+    background: var(--surface-low);
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .provider-grid button.selected {
+    color: #fff;
+    background: var(--primary);
+  }
+
+  /* ---- Advanced subsection headers ---- */
+  .subsection {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 1.25rem 0 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .subsection:first-of-type {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+
+  /* ---- Provider toggle (Anthropic / OpenAI) ---- */
   .provider-toggle {
     display: flex;
     gap: 0.5rem;
@@ -857,48 +1243,20 @@
     background: var(--primary);
   }
 
-  .field-label {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .settings-page {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-  }
-
-  .settings-header h1 {
-    font-family: var(--font-serif);
-    font-weight: 600;
-    font-size: 1.6rem;
-    margin: 0;
-    letter-spacing: -0.02em;
-    color: var(--text);
-  }
-
-  .card {
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 1.25rem 1.5rem;
-  }
-
-  .card h2 {
-    font-family: var(--font-serif);
-    font-weight: 600;
-    font-size: 1.05rem;
-    color: var(--text);
-    margin: 0 0 0.75rem;
-    letter-spacing: -0.01em;
-  }
-
   /* ---- Fields ---- */
   .field {
     margin-bottom: 0.75rem;
   }
 
   .field label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+  }
+
+  .field-label {
     display: block;
     font-size: 0.82rem;
     font-weight: 600;
@@ -1019,6 +1377,20 @@
     border-radius: var(--radius-sm);
   }
 
+  /* ---- Section save row ---- */
+  .section-save {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+
+  .card .section-save {
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+  }
+
   /* ---- WhatsApp status & QR ---- */
   .wa-status {
     display: flex;
@@ -1062,8 +1434,6 @@
   .member-row {
     padding: 0.6rem 0;
   }
-
-  .member-row:last-child { }
 
   .member-name {
     display: flex;
@@ -1129,13 +1499,7 @@
     border-color: var(--primary);
   }
 
-  /* ---- Save row ---- */
-  .save-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
+  /* ---- Buttons ---- */
   .btn.primary {
     padding: 0.55rem 1.25rem;
     border-radius: var(--radius-pill);
@@ -1151,6 +1515,22 @@
 
   .btn.primary:hover { filter: brightness(1.08); }
   .btn.primary:disabled { opacity: 0.5; cursor: default; }
+
+  .btn.secondary {
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    border: none;
+    background: var(--surface-low);
+    color: var(--text);
+    transition: all 0.15s;
+  }
+
+  .btn.secondary:hover { filter: brightness(0.95); }
+  .btn.secondary:disabled { opacity: 0.5; cursor: default; }
 
   .save-ok {
     font-size: 0.82rem;
@@ -1224,22 +1604,6 @@
     display: flex;
     gap: 0.5rem;
   }
-
-  .btn.secondary {
-    padding: 0.5rem 1rem;
-    border-radius: var(--radius-pill);
-    font-size: 0.82rem;
-    font-weight: 500;
-    font-family: var(--font-sans);
-    cursor: pointer;
-    border: none;
-    background: var(--surface-low);
-    color: var(--text);
-    transition: all 0.15s;
-  }
-
-  .btn.secondary:hover { filter: brightness(0.95); }
-  .btn.secondary:disabled { opacity: 0.5; cursor: default; }
 
   .import-label {
     display: inline-flex;
@@ -1387,9 +1751,6 @@
     color: var(--text);
     cursor: pointer;
     transition: all 0.15s;
-  }
-
-  .logger-pill:hover {
   }
 
   .logger-pill.hidden-logger {
