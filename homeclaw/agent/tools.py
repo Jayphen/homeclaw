@@ -798,11 +798,14 @@ def register_builtin_tools(
     @_reg(
         name="web_search",
         description=(
-            "Search the web and return results. You MUST use this for any "
-            "question requiring current information — news, weather, events, "
-            "prices, scores, headlines, recent developments. Never guess or "
-            "hedge about current events; search first, then summarize the "
-            "real results."
+            "Search the web and return result snippets (title, URL, "
+            "description). You MUST use this for any question requiring "
+            "current information — news, weather, events, prices, scores, "
+            "headlines, recent developments. Never guess or hedge about "
+            "current events; search first. Results are SHORT SNIPPETS "
+            "only — if you need actual page content (live scores, full "
+            "articles, detailed data), follow up with web_read on the "
+            "most relevant result URL."
         ),
     )
     async def web_search(
