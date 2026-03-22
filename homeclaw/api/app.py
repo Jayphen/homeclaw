@@ -24,6 +24,7 @@ from homeclaw.api.routes.knowledge import router as knowledge_router
 from homeclaw.api.routes.memory import router as memory_router
 from homeclaw.api.routes.notes import router as notes_router
 from homeclaw.api.routes.plugins import router as plugins_router
+from homeclaw.api.routes.routines import router as routines_router
 from homeclaw.api.routes.settings import router as settings_router
 from homeclaw.api.routes.setup import router as setup_router
 from homeclaw.api.routes.skills import router as skills_router
@@ -47,6 +48,7 @@ app.include_router(knowledge_router)
 app.include_router(dashboard_router)
 app.include_router(memory_router)
 app.include_router(notes_router)
+app.include_router(routines_router)
 app.include_router(settings_router)
 app.include_router(setup_router)
 

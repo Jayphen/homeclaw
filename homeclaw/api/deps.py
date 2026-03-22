@@ -179,6 +179,18 @@ def get_plugin_registry() -> Any:
     return _plugin_registry
 
 
+_scheduler: Any = None  # Scheduler instance — set by main entry point
+
+
+def set_scheduler(scheduler: Any) -> None:
+    global _scheduler
+    _scheduler = scheduler
+
+
+def get_scheduler() -> Any:
+    return _scheduler
+
+
 _whatsapp_qr_fn: Callable[[], bytes | None] | None = None
 
 

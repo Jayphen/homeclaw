@@ -182,6 +182,7 @@ class HomeclawApp:
 
     def load_scheduler(self) -> None:
         """Parse ROUTINES.md and register routines (does not start the event loop)."""
+        from homeclaw.api.deps import set_scheduler
         from homeclaw.scheduler.scheduler import Scheduler
 
         self._scheduler = Scheduler(
@@ -190,6 +191,7 @@ class HomeclawApp:
             timezone=self.config.timezone,
         )
         self._scheduler.load_routines_md()
+        set_scheduler(self._scheduler)
 
     def start_scheduler(self) -> None:
         """Start the scheduler. Must be called inside a running event loop."""

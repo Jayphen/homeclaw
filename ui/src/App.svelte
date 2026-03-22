@@ -8,6 +8,7 @@
   import Contacts from "./views/Contacts.svelte";
   import Plugins from "./views/Plugins.svelte";
   import Skills from "./views/Skills.svelte";
+  import Routines from "./views/Routines.svelte";
   import Settings from "./views/Settings.svelte";
   import Setup from "./views/Setup.svelte";
   import { api, getToken, setToken, clearToken } from "$lib/api";
@@ -21,6 +22,7 @@
     "/notes/:person": Notes,
     "/notes/:person/:date": Notes,
     "/contacts": Contacts,
+    "/routines": Routines,
     "/skills": Skills,
     "/skills/:owner/:name": Skills,
     "/skills/:owner/:name/*file": Skills,
@@ -159,6 +161,7 @@
         <a href="#/calendar">Calendar</a>
         <a href="#/bookmarks">Bookmarks</a>
         <a href="#/contacts">Contacts</a>
+        <a href="#/routines">Routines</a>
       </nav>
 
       <nav class="nav-group">
