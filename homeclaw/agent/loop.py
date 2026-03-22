@@ -131,6 +131,7 @@ _PERSONAL_WRITE_TOOLS = frozenset({
     "skill_remove",
     "skill_migrate",
     "skill_install",
+    "skill_edit_file",
     "decision_log",
 })
 

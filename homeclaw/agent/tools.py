@@ -1041,6 +1041,24 @@ def register_builtin_tools(
     def _pending_dir() -> Path:
         return workspaces / "household" / "skills" / ".pending"
 
+    def _resolve_skill_name(
+        raw_name: str,
+        locations: list[Any],
+    ) -> tuple[Any | None, str, list[str]]:
+        """Sanitize a skill name and find the matching skill.
+
+        LLMs sometimes hallucinate parameter formatting artifacts like
+        ``"name: my-skill"`` instead of ``"my-skill"``.  This strips
+        common prefixes and returns (location, clean_name, available).
+        """
+        clean = raw_name.strip()
+        # Strip "key: value" hallucination artifacts
+        if ": " in clean:
+            clean = clean.split(": ", 1)[-1].strip()
+        loc = next((sk for sk in locations if sk.name == clean), None)
+        available = [sk.name for sk in locations]
+        return loc, clean, available
+
     @_reg(
         name="skill_create",
         description=(
@@ -1704,9 +1722,9 @@ def register_builtin_tools(
         from homeclaw.plugins.skills.loader import discover_skills
 
         locations = discover_skills(workspaces, person)
-        loc = next((sk for sk in locations if sk.name == name), None)
+        loc, clean_name, available = _resolve_skill_name(name, locations)
         if loc is None:
-            return {"error": f"Skill '{name}' not found"}
+            return {"error": f"Skill '{clean_name}' not found", "available_skills": available}
 
         # Resolve and validate path
         path = (loc.skill_dir / file).resolve()
@@ -1783,18 +1801,18 @@ def register_builtin_tools(
         )
 
         locations = discover_skills(workspaces, person)
-        loc = next((sk for sk in locations if sk.name == name), None)
+        loc, clean_name, available = _resolve_skill_name(name, locations)
         if loc is None:
-            return {"error": f"Skill '{name}' not found"}
+            return {"error": f"Skill '{clean_name}' not found", "available_skills": available}
 
         skill_path = loc.skill_dir / "SKILL.md"
         if not skill_path.is_file():
-            return {"error": f"No SKILL.md in '{name}'"}
+            return {"error": f"No SKILL.md in '{clean_name}'"}
 
         defn = skill_md_to_definition(skill_path.read_text())
 
         if _is_admin_only(defn) and not _is_admin(person):
-            return {"error": f"Skill '{name}' is admin-only"}
+            return {"error": f"Skill '{clean_name}' is admin-only"}
 
         # List available resource directories
         resources: dict[str, list[str]] = {}
@@ -1805,12 +1823,12 @@ def register_builtin_tools(
                 if files:
                     resources[subdir] = files
 
-        _activated_skills.add(name)
+        _activated_skills.add(clean_name)
 
         # List registered plugin tools for this skill (e.g. weather__http_call)
         available_tools: list[str] = []
         if plugin_registry is not None:
-            entry = plugin_registry.get_entry(name)
+            entry = plugin_registry.get_entry(clean_name)
             if entry is not None:
                 available_tools = list(entry.tool_names)
 
@@ -1822,7 +1840,7 @@ def register_builtin_tools(
             "scope": loc.scope,
             "resources": resources,
             "tools": available_tools,
-            "already_loaded": name in _activated_skills,
+            "already_loaded": clean_name in _activated_skills,
         }
 
     @_reg(
@@ -1846,13 +1864,13 @@ def register_builtin_tools(
         from homeclaw.plugins.skills.loader import discover_skills
 
         locations = discover_skills(workspaces, person)
-        loc = next((sk for sk in locations if sk.name == name), None)
+        loc, clean_name, available = _resolve_skill_name(name, locations)
         if loc is None:
-            return {"error": f"Skill '{name}' not found"}
+            return {"error": f"Skill '{clean_name}' not found", "available_skills": available}
 
         scripts_dir = loc.skill_dir / "scripts"
         if not scripts_dir.is_dir():
-            return {"error": f"Skill '{name}' has no scripts/ directory"}
+            return {"error": f"Skill '{clean_name}' has no scripts/ directory"}
 
         # Resolve and validate path (prevent traversal)
         script_path = (scripts_dir / script).resolve()
