@@ -667,16 +667,26 @@ class AgentLoop:
                     )
                 )
 
-            # Re-route: use cheaper model/provider for follow-up if tools were simple.
-            # When images are present, keep using the vision provider since the
-            # image content blocks are still in the conversation history.
+            # After the vision model's first response, strip image blocks
+            # from history so subsequent rounds can use the fast model.
+            # The vision model's text response already captures what it saw.
+            if has_images:
+                for i, msg in enumerate(history):
+                    if isinstance(msg.content, list) and any(
+                        isinstance(b, dict) and b.get("type") == "image"
+                        for b in msg.content
+                    ):
+                        history[i] = msg.model_copy(
+                            update={"content": _strip_images(msg.content)},
+                        )
+                has_images = False
+
+            # Re-route: use cheaper model/provider for follow-up tool rounds.
             if self._routing:
                 tool_names = [tc.name for tc in response.tool_calls]
                 current_call_type = classify_tool_round(tool_names)
                 model = route_model(current_call_type, self._routing)
                 active_provider = self._pick_provider(current_call_type, has_images=has_images)
-                if has_images and self._vision_provider and self._routing.vision_model:
-                    model = self._routing.vision_model
                 if hasattr(active_provider, "model"):
                     active_provider.model = model  # type: ignore[attr-defined]
                     logger.debug("Re-routed after tools %s → %s (%s)", tool_names, model, current_call_type.value)

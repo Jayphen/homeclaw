@@ -465,11 +465,15 @@ def register_builtin_tools(
         title: Annotated[str, Desc("Name of the place or recipe")],
         category: Annotated[str, Desc("Category (e.g. 'place', 'recipe', 'book', 'article')")] = "other",
         url: Annotated[str | None, Desc("URL if one was shared")] = None,
-        tags: Annotated[list[str] | None, Desc("Tags (e.g. 'italian', 'rooftop', 'brunch', 'vegan')")] = None,
+        tags: Annotated[list[str] | str | None, Desc("Tags (e.g. 'italian', 'rooftop', 'brunch', 'vegan')")] = None,
         person: Annotated[str, Desc("Who saved this")] = "",
         **_: Any,
     ) -> dict[str, Any]:
         from uuid import uuid4
+
+        # Coerce comma-separated string to list (Gemini sends strings)
+        if isinstance(tags, str):
+            tags = [t.strip() for t in tags.split(",") if t.strip()]
 
         bookmark = Bookmark(
             id=uuid4().hex[:8],
