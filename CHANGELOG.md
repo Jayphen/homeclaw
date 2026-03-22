@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.0](https://github.com/Jayphen/homeclaw/compare/v0.14.0...v0.15.0) (2026-03-22)
+
+
+### Features
+
+* add Tavily Extract as web_read fallback provider ([e953741](https://github.com/Jayphen/homeclaw/commit/e953741128fe0da56bbf1bbca985a3143222d97a))
+
+
+### Bug Fixes
+
+* coerce string tags in bookmark_save and hand off vision→fast ([279d839](https://github.com/Jayphen/homeclaw/commit/279d83958079d93f81d8336f408b6bd4a529445f))
+* web_search description tells LLM to follow up with web_read ([0d43fab](https://github.com/Jayphen/homeclaw/commit/0d43fab6e913f8da904abb1888fe369946e58876))
+
 ## [0.14.0](https://github.com/Jayphen/homeclaw/compare/v0.13.0...v0.14.0) (2026-03-22)
 
 
