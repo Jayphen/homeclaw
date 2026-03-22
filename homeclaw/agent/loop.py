@@ -273,6 +273,7 @@ class AgentLoop:
         # Track last activity per session for idle-based consolidation
         self._last_activity: dict[str, float] = {}
         self._consolidation_task: asyncio.Task[None] | None = None
+        self._current_model: str = getattr(provider, "model", "unknown")
 
     def _pick_provider(self, call_type: CallType) -> LLMProvider:
         """Return the fast provider for cheap call types, main provider otherwise."""
@@ -482,6 +483,7 @@ class AgentLoop:
             if hasattr(active_provider, "model"):
                 active_provider.model = model  # type: ignore[attr-defined]
             logger.debug("Routed %s → %s", call_type.value, model)
+        self._current_model = model
 
         for _ in range(MAX_TOOL_ROUNDS):
             token_limit = max_tokens_for(current_call_type, self._routing) if self._routing else None
@@ -549,6 +551,7 @@ class AgentLoop:
                 if hasattr(active_provider, "model"):
                     active_provider.model = model  # type: ignore[attr-defined]
                     logger.debug("Re-routed after tools %s → %s (%s)", tool_names, model, current_call_type.value)
+                self._current_model = model
                 extra = {"model": model}
 
         if response and response.stop_reason == "tool_use":
@@ -644,6 +647,7 @@ class AgentLoop:
                 logger.info(
                     "Tool result: %s → %s",
                     tc.name, result_str[:2000],
+                    extra={"model": self._current_model},
                 )
                 results.append(result)
             except Exception as e:
