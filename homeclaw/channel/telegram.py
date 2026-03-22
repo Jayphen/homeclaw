@@ -47,6 +47,7 @@ class TelegramChannel:
         self._user_map = load_user_map(workspaces, _USER_MAP_FILE)
         self._user_map_lock = asyncio.Lock()
         self._dispatcher = dispatcher
+        self._bot_username: str | None = None
 
     def _is_allowed(self, update: Update) -> bool:
         """Check if the Telegram user is in the allowlist (if configured)."""
@@ -146,6 +147,36 @@ class TelegramChannel:
         chat = update.effective_chat
         return chat is not None and chat.type in (ChatType.GROUP, ChatType.SUPERGROUP)
 
+    def _mentions_others_not_bot(self, update: Update) -> bool:
+        """Return True if the message @mentions someone but not the bot."""
+        from telegram import MessageEntity
+
+        msg = update.message
+        if not msg or not msg.entities:
+            return False
+        mentions = [
+            e for e in msg.entities
+            if e.type in (MessageEntity.MENTION, MessageEntity.TEXT_MENTION)
+        ]
+        if not mentions:
+            return False
+        bot_username = self._bot_username
+        if not bot_username:
+            return False
+        text = msg.text or ""
+        for e in mentions:
+            if e.type == MessageEntity.MENTION:
+                mention = text[e.offset : e.offset + e.length].lstrip("@").lower()
+                if mention == bot_username.lower():
+                    return False
+            elif e.type == MessageEntity.TEXT_MENTION and e.user and e.user.is_bot:
+                if (
+                    e.user.username
+                    and e.user.username.lower() == bot_username.lower()
+                ):
+                    return False
+        return True
+
     async def _handle_message(self, update: Update, _context: Any) -> None:
         """Handle incoming text messages — route through the agent loop."""
         if update.message is None or not update.message.text:
@@ -162,6 +193,11 @@ class TelegramChannel:
 
         user_text = update.message.text
         is_group = self._is_group_chat(update)
+
+        # In group chats, skip messages that @mention someone other than the bot
+        if is_group and self._mentions_others_not_bot(update):
+            logger.debug("Skipping group message — @mentions others, not the bot")
+            return
 
         # In group chats, prefix with speaker name and use shared channel history
         if is_group:
@@ -357,8 +393,9 @@ class TelegramChannel:
                 send_image=self._send_image_to_person,
             )
 
-    async def _post_init(self, _app: Application) -> None:  # type: ignore[type-arg]
+    async def _post_init(self, app: Application) -> None:  # type: ignore[type-arg]
         """Called by python-telegram-bot after the event loop is running."""
+        self._bot_username = app.bot.username
         if self._on_scheduler_start:
             self._on_scheduler_start()
 

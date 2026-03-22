@@ -247,6 +247,17 @@ class WhatsAppChannel:
     def _resolve_person(self, phone: str) -> str | None:
         return self._user_map.get(phone)
 
+    @staticmethod
+    def _has_at_mentions(ev: Any) -> bool:
+        """Return True if the WhatsApp message contains @mentions."""
+        try:
+            mentioned = ev.Message.extendedTextMessage.contextInfo.mentionedJid
+            if mentioned:
+                return True
+        except (AttributeError, TypeError):
+            pass
+        return False
+
     async def _handle_message(self, ev: Any) -> None:
         """Route an incoming WhatsApp message through the agent loop."""
         logger.debug(
@@ -302,6 +313,12 @@ class WhatsAppChannel:
         chat: Any = ev.Info.MessageSource.Chat
         if is_group:
             self._known_groups.add(chat.User)
+            if self._has_at_mentions(ev):
+                logger.debug(
+                    "Skipping group message from %s — contains @mentions",
+                    person,
+                )
+                return
             user_text = f"[{person}] {text}"
             channel: str | None = f"group-{chat.User}"
         else:

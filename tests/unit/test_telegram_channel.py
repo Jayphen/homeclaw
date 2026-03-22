@@ -16,6 +16,7 @@ from homeclaw.channel.telegram import TelegramChannel, _split_message, _clean_ma
 
 def _make_update(
     user_id: int = 123, text: str = "hello", chat_type: str = "private",
+    entities: list[MagicMock] | None = None,
 ) -> MagicMock:
     update = MagicMock()
     update.effective_user.id = user_id
@@ -23,6 +24,7 @@ def _make_update(
     update.effective_chat.id = -100999
     update.effective_chat.type = chat_type
     update.message.text = text
+    update.message.entities = entities or []
     update.message.reply_text = AsyncMock()
     return update
 
@@ -247,3 +249,61 @@ class TestMessageHandling:
         channel._loop.run.assert_awaited_once_with(  # type: ignore[union-attr]
             "private thing", "alice", channel=None,
         )
+
+    @pytest.mark.asyncio
+    async def test_group_message_with_mention_of_other_is_skipped(
+        self, tmp_path: Path,
+    ) -> None:
+        from telegram import MessageEntity
+
+        channel = _make_channel(tmp_path, user_map={"123": "alice"})
+        channel._bot_username = "homeclaw_bot"
+        entity = MagicMock()
+        entity.type = MessageEntity.MENTION
+        entity.offset = 0
+        entity.length = 5
+        update = _make_update(
+            user_id=123, text="@john what do you think?",
+            chat_type="supergroup", entities=[entity],
+        )
+        entity.offset = 0
+        entity.length = 5  # "@john"
+
+        await channel._handle_message(update, None)
+
+        channel._loop.run.assert_not_awaited()  # type: ignore[union-attr]
+
+    @pytest.mark.asyncio
+    async def test_group_message_mentioning_bot_is_processed(
+        self, tmp_path: Path,
+    ) -> None:
+        from telegram import MessageEntity
+
+        channel = _make_channel(tmp_path, user_map={"123": "alice"})
+        channel._bot_username = "homeclaw_bot"
+        entity = MagicMock()
+        entity.type = MessageEntity.MENTION
+        entity.offset = 0
+        entity.length = 13  # "@homeclaw_bot"
+        update = _make_update(
+            user_id=123, text="@homeclaw_bot what's for dinner?",
+            chat_type="supergroup", entities=[entity],
+        )
+
+        await channel._handle_message(update, None)
+
+        channel._loop.run.assert_awaited_once()  # type: ignore[union-attr]
+
+    @pytest.mark.asyncio
+    async def test_group_message_no_mentions_is_processed(
+        self, tmp_path: Path,
+    ) -> None:
+        channel = _make_channel(tmp_path, user_map={"123": "alice"})
+        channel._bot_username = "homeclaw_bot"
+        update = _make_update(
+            user_id=123, text="what's for dinner?", chat_type="supergroup",
+        )
+
+        await channel._handle_message(update, None)
+
+        channel._loop.run.assert_awaited_once()  # type: ignore[union-attr]

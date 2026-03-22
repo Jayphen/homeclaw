@@ -29,6 +29,7 @@ def _make_ev(
     ev.Info.MessageSource.Chat.User = chat_user
     ev.Message.conversation = text
     ev.Message.extendedTextMessage.text = ""
+    ev.Message.extendedTextMessage.contextInfo.mentionedJid = []
     ev.Message.imageMessage = None
     return ev
 
@@ -224,6 +225,36 @@ class TestMessageHandling:
         channel._loop.run.assert_awaited_once_with(
             "[alice] dinner at 7", "alice", channel="group-120363001234567890",
         )
+
+    @pytest.mark.asyncio
+    async def test_group_message_with_mentions_is_skipped(self, tmp_path: Path) -> None:
+        channel = _make_channel(tmp_path, user_map={"14155551234": "alice"})
+        ev = _make_ev(
+            phone="14155551234",
+            text="@bob what do you think?",
+            is_group=True,
+            chat_user="120363001234567890",
+        )
+        ev.Message.extendedTextMessage.contextInfo.mentionedJid = ["14155559999@s.whatsapp.net"]
+
+        await channel._handle_message(ev)
+
+        channel._loop.run.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_dm_with_mentions_still_processed(self, tmp_path: Path) -> None:
+        """@mentions in DMs should not suppress the agent response."""
+        channel = _make_channel(tmp_path, user_map={"14155551234": "alice"})
+        ev = _make_ev(
+            phone="14155551234",
+            text="tell @bob about dinner",
+            is_group=False,
+        )
+        ev.Message.extendedTextMessage.contextInfo.mentionedJid = ["14155559999@s.whatsapp.net"]
+
+        await channel._handle_message(ev)
+
+        channel._loop.run.assert_awaited_once()
 
 
 class TestPhotoHandling:
