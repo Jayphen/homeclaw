@@ -471,14 +471,26 @@ def _run_serve_with_deferred_telegram(
     set_on_telegram_configured(_start_telegram)
 
     async def _serve() -> None:
-        nonlocal hc_app_ready
-        if wa_channel and hc_app:
+        nonlocal hc_app, hc_app_ready
+        # Always create the agent loop when a provider is configured,
+        # so web UI chat works even without Telegram/WhatsApp.
+        if hc_app is None and config.is_provider_configured:
+            try:
+                hc_app = HomeclawApp(workspaces=workspaces, config=config)
+                from homeclaw.api.deps import set_agent_loop as _set_al
+                from homeclaw.api.deps import set_plugin_registry as _set_pr
+                _set_pr(hc_app.plugin_registry)
+                _set_al(hc_app.loop)
+            except ValueError:
+                logger.warning("LLM provider not configured — chat unavailable")
+        if hc_app and not hc_app_ready:
             # Acquire the lock so _start_telegram (which can fire during any
             # await) sees a consistent hc_app_ready flag.
             async with _telegram_lock:
                 await hc_app.initialize()
                 hc_app.load_scheduler()
                 hc_app_ready = True
+        if wa_channel and hc_app:
             await wa_channel.start()
             from homeclaw.api.deps import set_whatsapp_connected_fn, set_whatsapp_qr_fn
             _wa = wa_channel  # capture for lambda
