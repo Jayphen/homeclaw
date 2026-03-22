@@ -76,6 +76,17 @@
     };
   }
 
+  // ---- Bookmark types ----
+  interface BookmarkItem {
+    id: string;
+    url: string | null;
+    title: string;
+    category: string;
+    tags: string[];
+    saved_by: string;
+    saved_at: string | null;
+  }
+
   // ---- Feed types ----
   interface FeedEvent {
     ts: string;
@@ -95,6 +106,7 @@
   let data: DashboardData | null = $state(null);
   let knowledge: KnowledgeData | null = $state(null);
   let feed: FeedData | null = $state(null);
+  let recentBookmarks: BookmarkItem[] = $state([]);
   let error: string | null = $state(null);
   let loading: boolean = $state(true);
 
@@ -166,11 +178,21 @@
         if (!r.ok) return null; // non-critical
         return r.json();
       }),
+      api("/api/bookmarks").then((r) => {
+        if (!r.ok) return null; // non-critical
+        return r.json();
+      }),
     ])
-      .then(([d, k, f]: [DashboardData, KnowledgeData | null, FeedData | null]) => {
+      .then(([d, k, f, b]: [DashboardData, KnowledgeData | null, FeedData | null, { bookmarks: BookmarkItem[] } | null]) => {
         data = d;
         knowledge = k;
         feed = f;
+        if (b?.bookmarks) {
+          recentBookmarks = b.bookmarks
+            .filter((bm: BookmarkItem) => bm.saved_at)
+            .sort((a: BookmarkItem, b: BookmarkItem) => new Date(b.saved_at!).getTime() - new Date(a.saved_at!).getTime())
+            .slice(0, 6);
+        }
         loading = false;
       })
       .catch((e) => {
@@ -370,6 +392,31 @@
         </ul>
       </section>
     {/if}
+
+    <!-- Recent bookmarks -->
+    {#if recentBookmarks.length > 0}
+      <section class="card bookmarks">
+        <h2>Recent bookmarks</h2>
+        <ul>
+          {#each recentBookmarks as bm}
+            <li>
+              <div class="bm-row">
+                {#if bm.url}
+                  <a class="bm-title" href={bm.url} target="_blank" rel="noopener">{bm.title}</a>
+                {:else}
+                  <strong>{bm.title}</strong>
+                {/if}
+                <span class="badge type-badge">{bm.category}</span>
+              </div>
+              {#if bm.saved_at}
+                <span class="detail">{formatTime(bm.saved_at)}{bm.saved_by ? ` · ${bm.saved_by}` : ""}</span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+        <a class="card-link" href="#/bookmarks">All bookmarks</a>
+      </section>
+    {/if}
   </div>
 
   <!-- ============ Activity Feed ============ -->
@@ -407,7 +454,7 @@
   {/if}
 
   <!-- Empty state -->
-  {#if data.today_notes.length === 0 && data.upcoming_reminders.length === 0 && data.upcoming_birthdays.length === 0 && data.recent_interactions.length === 0 && data.overdue_checkins.length === 0 && (!feed || feed.events.length === 0) && (!knowledge || knowledge.summary.total_entries === 0)}
+  {#if data.today_notes.length === 0 && data.upcoming_reminders.length === 0 && data.upcoming_birthdays.length === 0 && data.recent_interactions.length === 0 && data.overdue_checkins.length === 0 && recentBookmarks.length === 0 && (!feed || feed.events.length === 0) && (!knowledge || knowledge.summary.total_entries === 0)}
     <div class="empty">
       <p>Nothing on the board yet.</p>
       <small>Chat with homeclaw on Telegram to start building your household's story.</small>
@@ -823,6 +870,36 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  /* ---- Bookmarks ---- */
+  .bm-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .bm-title {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.88rem;
+  }
+
+  .bm-title:hover {
+    text-decoration: underline;
+  }
+
+  .card-link {
+    display: inline-block;
+    margin-top: 0.75rem;
+    font-size: 0.78rem;
+    color: var(--primary);
+    text-decoration: none;
+  }
+
+  .card-link:hover {
+    text-decoration: underline;
   }
 
   /* ---- Birthdays ---- */
