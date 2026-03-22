@@ -10,6 +10,11 @@ export const chat = new Chat({
       const token = getToken();
       return token ? { Authorization: `Bearer ${token}` } : {};
     },
+    // Only send the latest user message — the server manages history.
+    prepareSendMessagesRequest: ({ messages, ...rest }) => ({
+      ...rest,
+      messages: messages.slice(-1),
+    }),
   }),
 });
 

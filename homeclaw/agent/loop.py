@@ -202,6 +202,26 @@ def _estimate_message_tokens(msg: Message) -> int:
     return total
 
 
+def _sanitize_history(history: list[Message]) -> list[Message]:
+    """Ensure history has valid structure for the LLM API.
+
+    - Strip leading tool-result messages (orphaned by truncation)
+    - Strip trailing assistant messages with pending tool_calls but no results
+    """
+    # Drop orphaned tool results at the start
+    start = 0
+    while start < len(history) and history[start].role == "tool":
+        start += 1
+    if start:
+        history = history[start:]
+
+    # Drop trailing assistant with unanswered tool_calls (crashed session)
+    while history and history[-1].role == "assistant" and history[-1].tool_calls:
+        history = history[:-1]
+
+    return history
+
+
 def _truncate_history(
     history: list[Message], system_tokens: int, context_window: int,
 ) -> list[Message]:
@@ -228,7 +248,7 @@ def _truncate_history(
             "Truncated history from %d to %d messages (%d estimated tokens)",
             len(history), len(kept), used,
         )
-    return kept
+    return _sanitize_history(kept)
 
 
 InterimCallback = Callable[[str], Any]
@@ -282,12 +302,15 @@ class AgentLoop:
         provider: "LLMProvider",
         fast_provider: "LLMProvider | None" = None,
         vision_provider: "LLMProvider | None" = None,
+        note_detail_level: str | None = None,
     ) -> None:
         """Hot-swap providers without restarting the agent loop."""
         self._provider = provider
         self._fast_provider = fast_provider
         self._vision_provider = vision_provider
         self._current_model = getattr(provider, "model", "unknown")
+        if note_detail_level is not None:
+            self._note_detail_level = note_detail_level
 
     def _pick_provider(self, call_type: CallType, *, has_images: bool = False) -> LLMProvider:
         """Return the appropriate provider for the call type.
@@ -889,7 +912,7 @@ def _load_history(workspaces: Path, person: str, max_messages: int = 200) -> lis
     last_consolidated, all_messages = _read_history_file(path)
     # Return only messages after the consolidation pointer
     unconsolidated = all_messages[last_consolidated:]
-    return unconsolidated[-max_messages:]
+    return _sanitize_history(unconsolidated[-max_messages:])
 
 
 def _strip_images(content: str | list[Any]) -> str:
