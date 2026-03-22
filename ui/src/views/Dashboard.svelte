@@ -234,7 +234,7 @@
     </section>
 
     <!-- Per-member knowledge breakdown -->
-    {#if knowledge.members.length > 0 || knowledge.household.topic_count > 0}
+    {#if knowledge.household.topic_count > 0 || knowledge.members.some(m => m.topic_count > 0)}
       <section class="card knowledge-detail" style="animation-delay: 60ms">
         <h2>What homeclaw knows</h2>
         <div class="knowledge-grid">
