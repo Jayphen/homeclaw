@@ -17,14 +17,16 @@ def test_config_loads_from_env():
 
 
 def test_config_requires_provider():
-    """Config raises if no LLM provider is configured."""
+    """create_provider raises if no LLM provider is configured."""
+    from homeclaw.agent.providers.factory import create_provider
+
     with patch.dict(os.environ, {}, clear=True):
-        # Clear any existing env vars that might satisfy the validator
         env = {k: v for k, v in os.environ.items()
                if k not in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENAI_BASE_URL")}
         with patch.dict(os.environ, env, clear=True):
+            config = HomeclawConfig(workspaces_path="./test-workspaces")
             with pytest.raises(Exception):
-                HomeclawConfig(workspaces_path="./test-workspaces")
+                create_provider(config)
 
 
 def test_config_workspaces_path():

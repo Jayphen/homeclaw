@@ -58,8 +58,8 @@ def test_register_and_list() -> None:
     assert entry.plugin_type == PluginType.PYTHON
     assert entry.status == PluginStatus.ACTIVE
     assert len(entry.tool_names) == 2
-    assert "plants.tool_0" in entry.tool_names
-    assert "plants.tool_1" in entry.tool_names
+    assert "plants__tool_0" in entry.tool_names
+    assert "plants__tool_1" in entry.tool_names
     assert reg.plugin_count == 1
     assert reg.active_count == 1
 
@@ -71,10 +71,10 @@ def test_tools_exposed_to_agent() -> None:
     plugin = FakePlugin("weather", tool_count=1)
     reg.register(plugin, PluginType.PYTHON)
 
-    assert tool_reg.has_tool("weather.tool_0")
+    assert tool_reg.has_tool("weather__tool_0")
     defs = tool_reg.get_definitions()
     names = [d.name for d in defs]
-    assert "weather.tool_0" in names
+    assert "weather__tool_0" in names
 
 
 @pytest.mark.asyncio
@@ -85,7 +85,7 @@ async def test_tool_handler_dispatches_to_plugin() -> None:
     plugin = FakePlugin("test")
     reg.register(plugin, PluginType.PYTHON)
 
-    handler = tool_reg.get_handler("test.tool_0")
+    handler = tool_reg.get_handler("test__tool_0")
     assert handler is not None
     result = await handler()
     assert result == {"handled": "tool_0"}
@@ -98,12 +98,12 @@ def test_unregister() -> None:
 
     plugin = FakePlugin("temp", tool_count=2)
     reg.register(plugin, PluginType.PYTHON)
-    assert tool_reg.has_tool("temp.tool_0")
+    assert tool_reg.has_tool("temp__tool_0")
 
     assert reg.unregister("temp") is True
     assert reg.plugin_count == 0
-    assert not tool_reg.has_tool("temp.tool_0")
-    assert not tool_reg.has_tool("temp.tool_1")
+    assert not tool_reg.has_tool("temp__tool_0")
+    assert not tool_reg.has_tool("temp__tool_1")
 
 
 def test_unregister_nonexistent() -> None:
@@ -132,17 +132,17 @@ def test_disable_and_enable() -> None:
     plugin = FakePlugin("togglable", tool_count=1)
     reg.register(plugin, PluginType.SKILL)
 
-    assert tool_reg.has_tool("togglable.tool_0")
+    assert tool_reg.has_tool("togglable__tool_0")
 
     reg.disable("togglable")
     entry = reg.get_entry("togglable")
     assert entry is not None
     assert entry.status == PluginStatus.DISABLED
-    assert not tool_reg.has_tool("togglable.tool_0")
+    assert not tool_reg.has_tool("togglable__tool_0")
 
     reg.enable("togglable")
     assert entry.status == PluginStatus.ACTIVE
-    assert tool_reg.has_tool("togglable.tool_0")
+    assert tool_reg.has_tool("togglable__tool_0")
 
 
 def test_routines() -> None:
