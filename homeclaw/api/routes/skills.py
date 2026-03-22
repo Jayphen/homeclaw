@@ -67,13 +67,15 @@ def _scan_active_skills(workspaces: Path) -> list[dict[str, Any]]:
             if not skill_md.is_file():
                 continue
 
+            parse_error: str | None = None
             try:
                 defn = skill_md_to_definition(skill_md.read_text())
                 description = defn.description
                 allowed_domains = defn.allowed_domains
-            except Exception:
+            except Exception as exc:
                 description = ""
                 allowed_domains = []
+                parse_error = str(exc)
 
             # Collect all files in the skill directory
             files: list[dict[str, str]] = []
@@ -82,14 +84,17 @@ def _scan_active_skills(workspaces: Path) -> list[dict[str, Any]]:
                     rel = str(f.relative_to(child))
                     files.append({"path": rel, "size": str(f.stat().st_size)})
 
-            skills.append({
+            entry: dict[str, Any] = {
                 "name": child.name,
                 "owner": owner,
                 "description": description,
                 "allowed_domains": allowed_domains,
                 "file_count": len(files),
                 "files": files,
-            })
+            }
+            if parse_error:
+                entry["parse_error"] = parse_error
+            skills.append(entry)
 
     return skills
 
@@ -282,16 +287,42 @@ async def get_skill(owner: str, name: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="Skill not found")
 
     skill_md = skill_dir / "SKILL.md"
-    if not skill_md.is_file():
-        raise HTTPException(status_code=404, detail="Skill has no SKILL.md")
-
-    defn = skill_md_to_definition(skill_md.read_text())
 
     files: list[dict[str, str]] = []
     for f in sorted(skill_dir.rglob("*")):
         if f.is_file():
             rel = str(f.relative_to(skill_dir))
             files.append({"path": rel, "size": str(f.stat().st_size)})
+
+    if not skill_md.is_file():
+        return {
+            "name": name,
+            "owner": owner,
+            "description": "",
+            "allowed_domains": [],
+            "instructions": "",
+            "metadata": {},
+            "compatibility": None,
+            "files": files,
+            "deps": None,
+            "parse_error": "Skill has no SKILL.md",
+        }
+
+    try:
+        defn = skill_md_to_definition(skill_md.read_text())
+    except ValueError as exc:
+        return {
+            "name": name,
+            "owner": owner,
+            "description": "",
+            "allowed_domains": [],
+            "instructions": "",
+            "metadata": {},
+            "compatibility": None,
+            "files": files,
+            "deps": None,
+            "parse_error": str(exc),
+        }
 
     return {
         "name": name,
@@ -347,14 +378,28 @@ async def write_skill_file(
         raise HTTPException(status_code=404, detail="Skill not found")
 
     path = _safe_relative(skill_dir, file_path)
+
+    # Validate SKILL.md before saving
+    validation_error: str | None = None
+    if file_path == "SKILL.md":
+        from homeclaw.plugins.skills.loader import skill_md_to_definition
+
+        try:
+            skill_md_to_definition(body.content)
+        except ValueError as exc:
+            validation_error = str(exc)
+
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(body.content)
 
-    return {
+    result: dict[str, Any] = {
         "path": file_path,
         "size": len(body.content),
         "status": "written",
     }
+    if validation_error:
+        result["validation_error"] = validation_error
+    return result
 
 
 @router.delete("/{owner}/{name}/files/{file_path:path}", dependencies=[AuthDep])

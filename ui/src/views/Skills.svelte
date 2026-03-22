@@ -21,6 +21,7 @@
     allowed_domains: string[];
     file_count: number;
     files: SkillFile[];
+    parse_error?: string;
   }
 
   interface MissingBin {
@@ -45,6 +46,7 @@
     compatibility: string | null;
     files: SkillFile[];
     deps: SkillDeps | null;
+    parse_error?: string;
   }
 
   interface FileContent {
@@ -63,6 +65,7 @@
   let deleting: boolean = $state(false);
   let confirmDelete: boolean = $state(false);
   let saving: boolean = $state(false);
+  let saveWarning: string | null = $state(null);
 
   // Install
   let installUrl: string = $state("");
@@ -212,6 +215,7 @@
     if (fileContent) {
       editContent = fileContent.content;
       editing = true;
+      saveWarning = null;
     }
   }
 
@@ -222,6 +226,7 @@
   async function saveEdit() {
     if (!fileContent || !params.owner || !params.name || !filePath) return;
     saving = true;
+    saveWarning = null;
     try {
       const r = await api(`/api/skills/${params.owner}/${params.name}/files/${filePath}`, {
         method: "PUT",
@@ -229,8 +234,12 @@
         body: JSON.stringify({ content: editContent }),
       });
       if (!r.ok) throw new Error(`${r.status}`);
+      const data = await r.json();
       fileContent = { ...fileContent, content: editContent, size: editContent.length };
       editing = false;
+      if (data.validation_error) {
+        saveWarning = `Saved, but SKILL.md has errors: ${data.validation_error}`;
+      }
     } catch (e: any) {
       error = e.message;
     } finally {
@@ -333,6 +342,9 @@
         </div>
       {:else}
         <div class="file-body">
+          {#if saveWarning}
+            <div class="save-warning">{saveWarning}</div>
+          {/if}
           <button class="btn-edit" onclick={startEdit}>Edit</button>
           {#if fileContent.path === "SKILL.md"}
             <pre><code>{fileContent.content}</code></pre>
@@ -361,6 +373,12 @@
           <button class="btn-delete" onclick={() => (confirmDelete = true)}>Delete</button>
         {/if}
       </div>
+      {#if detail.parse_error}
+        <div class="parse-error">
+          <p><strong>SKILL.md has errors:</strong> {detail.parse_error}</p>
+          <a href="#/skills/{params.owner}/{params.name}/SKILL.md" class="btn btn-primary">Edit SKILL.md</a>
+        </div>
+      {/if}
       <p class="skill-desc">{detail.description}</p>
       {#if detail.allowed_domains.length > 0}
         <div class="skill-domains">
@@ -513,7 +531,11 @@
                   <span class="skill-card-name">{skill.name}</span>
                   <span class="skill-card-files">{skill.file_count} files</span>
                 </div>
-                <div class="skill-card-desc">{skill.description}</div>
+                {#if skill.parse_error}
+                  <div class="skill-card-error">{skill.parse_error}</div>
+                {:else}
+                  <div class="skill-card-desc">{skill.description}</div>
+                {/if}
                 {#if skill.allowed_domains.length > 0}
                   <div class="skill-card-domains">
                     {#each skill.allowed_domains as domain}
@@ -662,6 +684,7 @@
   .skill-card-name { font-weight: 600; font-size: 0.9rem; }
   .skill-card-files { font-size: 0.72rem; color: var(--text-muted); }
   .skill-card-desc { font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; }
+  .skill-card-error { font-size: 0.82rem; color: #8b3a3a; line-height: 1.4; }
   .skill-card-domains { margin-top: 0.4rem; display: flex; gap: 0.3rem; flex-wrap: wrap; }
   .domain-tag-sm {
     font-size: 0.68rem; background: var(--surface-low); color: var(--primary);
@@ -784,6 +807,17 @@
   }
   .error-card p { margin: 0 0 0.5rem; font-weight: 500; }
   .error-card small { color: var(--text-muted); }
+  .parse-error {
+    background: #fef0f0; border-radius: var(--radius); padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem; font-size: 0.85rem; color: #8b3a3a;
+    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  }
+  .parse-error p { margin: 0; }
+  .parse-error .btn { flex-shrink: 0; font-size: 0.78rem; padding: 0.3rem 0.75rem; text-decoration: none; }
+  .save-warning {
+    background: #fef8ee; border-radius: var(--radius); padding: 0.6rem 0.85rem;
+    margin-bottom: 0.75rem; font-size: 0.82rem; color: #8a6d3b;
+  }
 
   @media (max-width: 640px) {
     .file-article { padding: 1rem 1.25rem; }
