@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0](https://github.com/Jayphen/homeclaw/compare/v0.10.0...v0.11.0) (2026-03-22)
+
+
+### Features
+
+* allow full URLs in skill allowed-domains ([2adf32d](https://github.com/Jayphen/homeclaw/commit/2adf32d8552f2f49eeab917dc596dde0a1e13497))
+* resolve env vars in skill allowed-domains ([b9ad9fb](https://github.com/Jayphen/homeclaw/commit/b9ad9fbe2c65ba7c02f1534252dfe671952b4010))
+
+
+### Bug Fixes
+
+* plugins API tests loading real config.json (auth failures) ([801c43c](https://github.com/Jayphen/homeclaw/commit/801c43cb5334cdda55ea9ce95e986f7e72a1d944))
+
 ## [0.10.0](https://github.com/Jayphen/homeclaw/compare/v0.9.0...v0.10.0) (2026-03-22)
 
 
