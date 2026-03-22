@@ -1,6 +1,7 @@
 <script lang="ts">
   import Router from "svelte-spa-router";
   import Bookmarks from "./views/Bookmarks.svelte";
+  import Chat from "./views/Chat.svelte";
   import Dashboard from "./views/Dashboard.svelte";
   import Calendar from "./views/Calendar.svelte";
   import Knowledge from "./views/Knowledge.svelte";
@@ -13,6 +14,7 @@
 
   const routes = {
     "/": Dashboard,
+    "/chat": Chat,
     "/bookmarks": Bookmarks,
     "/calendar": Calendar,
     "/knowledge": Knowledge,
@@ -156,6 +158,7 @@
 
       <nav class="nav-group">
         <a href="#/">Home</a>
+        <a href="#/chat">Chat</a>
         <a href="#/knowledge">Knowledge</a>
         <a href="#/calendar">Calendar</a>
         <a href="#/bookmarks">Bookmarks</a>
@@ -186,8 +189,8 @@
   <!-- Mobile bottom bar -->
   <nav class="mobile-bar">
     <a href="#/">Home</a>
+    <a href="#/chat">Chat</a>
     <a href="#/knowledge">Knowledge</a>
-    <a href="#/contacts">Contacts</a>
     <a href="#/settings">Settings</a>
   </nav>
 {/if}

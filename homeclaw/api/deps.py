@@ -167,6 +167,18 @@ def get_whatsapp_connected() -> bool:
     return _whatsapp_connected_fn()
 
 
+_agent_loop: Any = None  # AgentLoop — set by serve entry points
+
+
+def set_agent_loop(loop: Any) -> None:
+    global _agent_loop
+    _agent_loop = loop
+
+
+def get_agent_loop() -> Any:
+    return _agent_loop
+
+
 _plugin_registry: Any = None  # PluginRegistry — avoided to prevent circular import
 
 

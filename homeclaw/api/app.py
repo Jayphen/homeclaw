@@ -15,6 +15,7 @@ from homeclaw.api.deps import set_config as set_config  # noqa: F401
 from homeclaw.api.routes.auth import router as auth_router
 from homeclaw.api.routes.bookmarks import router as bookmarks_router
 from homeclaw.api.routes.calendar import router as calendar_router
+from homeclaw.api.routes.chat import router as chat_router
 from homeclaw.api.routes.contacts import router as contacts_router
 from homeclaw.api.routes.cost import router as cost_router
 from homeclaw.api.routes.dashboard import router as dashboard_router
@@ -37,6 +38,7 @@ except Exception:
 app = FastAPI(title="homeclaw", version=_version)
 app.include_router(auth_router)
 app.include_router(bookmarks_router)
+app.include_router(chat_router)
 app.include_router(plugins_router)
 app.include_router(skills_router)
 app.include_router(calendar_router)

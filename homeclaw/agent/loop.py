@@ -397,6 +397,7 @@ class AgentLoop:
         person: str,
         channel: str | None = None,
         call_type: CallType = CallType.CONVERSATION,
+        interim_callback: InterimCallback | None = None,
     ) -> str:
         """Run the agent loop for a message.
 
@@ -407,11 +408,18 @@ class AgentLoop:
             channel: If set, use shared history keyed by this channel ID
                      and restrict context to household-level facts only.
             call_type: The type of call for model routing.
+            interim_callback: Per-call callback for interim responses. Takes
+                precedence over the instance-level callback set via
+                :meth:`set_interim_callback`. Avoids race conditions when
+                multiple callers share the same AgentLoop.
         """
         person = person.lower()
         history_key = channel or person
         async with self._lock_pool.lock_for(history_key):
-            result = await self._run_inner(user_message, person, channel, call_type, history_key)
+            result = await self._run_inner(
+                user_message, person, channel, call_type, history_key,
+                interim_callback=interim_callback,
+            )
             # Record activity for idle-based consolidation
             self._last_activity[history_key] = time.monotonic()
             return result
@@ -423,6 +431,7 @@ class AgentLoop:
         channel: str | None,
         call_type: CallType,
         history_key: str,
+        interim_callback: InterimCallback | None = None,
     ) -> str:
         # Reset per-run state
         self._household_confirmed.clear()
@@ -538,10 +547,11 @@ class AgentLoop:
 
             # Send interim text to user if the LLM said something substantive
             # alongside its tool calls (e.g. "Connecting to Home Assistant...")
-            if response.content and self._on_interim:
+            on_interim = interim_callback or self._on_interim
+            if response.content and on_interim:
                 text = response.content.strip()
                 if _is_substantive_interim(text):
-                    result = self._on_interim(text)
+                    result = on_interim(text)
                     # Support both sync and async callbacks
                     if hasattr(result, "__await__"):
                         await result
