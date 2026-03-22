@@ -21,6 +21,9 @@ export interface SetupStatus {
   fast_provider?: string | null;
   fast_api_key?: string | null;
   fast_base_url?: string | null;
+  vision_provider?: string | null;
+  vision_api_key?: string | null;
+  vision_base_url?: string | null;
   telegram_configured?: boolean;
   telegram_allowed_users?: string | null;
   whatsapp_configured?: boolean;
@@ -31,6 +34,7 @@ export interface SetupStatus {
   ha_configured?: boolean;
   conversation_model?: string;
   fast_model?: string;
+  vision_model?: string;
   timezone?: string | null;
   note_detail_level?: string;
   members?: string[];

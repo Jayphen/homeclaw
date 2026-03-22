@@ -128,6 +128,10 @@
   let fastProvider: string = $state("");
   let fastApiKey: string = $state("");
   let fastBaseUrl: string = $state("");
+  let visionProvider: string = $state("");
+  let visionApiKey: string = $state("");
+  let visionBaseUrl: string = $state("");
+  let visionModel: string = $state("");
   let jinaKey: string = $state("");
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
@@ -142,6 +146,7 @@
 
   // Effective fast provider protocol — used to filter presets
   let effectiveFastProvider = $derived(fastProvider || selectedProvider);
+  let effectiveVisionProvider = $derived(visionProvider || selectedProvider);
 
   // Member account management
   let memberPasswords: Record<string, string> = $state({});
@@ -211,6 +216,9 @@
       openaiBaseUrl = setup!.openai_base_url || "";
       fastProvider = setup!.fast_provider || "";
       fastBaseUrl = setup!.fast_base_url || "";
+      visionProvider = setup!.vision_provider || "";
+      visionBaseUrl = setup!.vision_base_url || "";
+      visionModel = setup!.vision_model || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
       whatsappEnabled = setup!.whatsapp_configured;
       whatsappConnected = setup!.whatsapp_connected;
@@ -314,6 +322,10 @@
     if (fastProvider !== (setup?.fast_provider || "")) body.fast_provider = fastProvider || null;
     if (fastApiKey) body.fast_api_key = fastApiKey;
     if (fastBaseUrl !== (setup?.fast_base_url || "")) body.fast_base_url = fastBaseUrl || null;
+    if (visionProvider !== (setup?.vision_provider || "")) body.vision_provider = visionProvider || null;
+    if (visionApiKey) body.vision_api_key = visionApiKey;
+    if (visionBaseUrl !== (setup?.vision_base_url || "")) body.vision_base_url = visionBaseUrl || null;
+    if (visionModel !== (setup?.vision_model || "")) body.vision_model = visionModel || null;
     if (telegramToken) body.telegram_token = telegramToken;
     if (telegramAllowedUsers !== (setup?.telegram_allowed_users || "")) {
       body.telegram_allowed_users = telegramAllowedUsers || null;
@@ -351,6 +363,9 @@
       openaiBaseUrl = setup!.openai_base_url || "";
       fastProvider = setup!.fast_provider || "";
       fastBaseUrl = setup!.fast_base_url || "";
+      visionProvider = setup!.vision_provider || "";
+      visionBaseUrl = setup!.vision_base_url || "";
+      visionModel = setup!.vision_model || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
       whatsappEnabled = setup!.whatsapp_configured;
       whatsappConnected = setup!.whatsapp_connected;
@@ -363,6 +378,7 @@
       anthropicKey = "";
       openaiKey = "";
       fastApiKey = "";
+      visionApiKey = "";
       jinaKey = "";
       telegramToken = "";
 
@@ -459,6 +475,50 @@
             : [["OpenRouter", "https://openrouter.ai/api/v1"], ["MiniMax", "https://api.minimax.io/v1"], ["Groq", "https://api.groq.com/openai/v1"]]
           as [name, url]}
             <button class="preset" class:active={fastBaseUrl === url} onclick={() => { fastBaseUrl = url; }}>
+              {name}
+            </button>
+          {/each}
+        </div>
+      </div>
+      {/if}
+
+      <div class="field">
+        <label for="vision-model">Vision model</label>
+        <input id="vision-model" type="text" bind:value={visionModel} placeholder="Same as conversation model" />
+        <small class="field-hint">Only needed if your main provider doesn't support image input (e.g. MiniMax). Handles photo messages from Telegram/WhatsApp.</small>
+      </div>
+
+      <div class="field">
+        <label for="vision-provider">Vision model provider</label>
+        <div class="toggle-group">
+          <button class:active={!visionProvider} onclick={() => { visionProvider = ""; }}>
+            Same as main
+          </button>
+          <button class:active={visionProvider === "anthropic"} onclick={() => { visionProvider = "anthropic"; }}>
+            Anthropic
+          </button>
+          <button class:active={visionProvider === "openai"} onclick={() => { visionProvider = "openai"; }}>
+            OpenAI
+          </button>
+        </div>
+      </div>
+
+      {#if visionProvider}
+      <div class="field">
+        <label for="vision-api-key">Vision model API key</label>
+        <input id="vision-api-key" type="password" bind:value={visionApiKey}
+          placeholder={setup.vision_api_key ? `Current: ${setup.vision_api_key}` : "Falls back to main key"} />
+      </div>
+
+      <div class="field">
+        <label for="vision-base-url">Vision model base URL</label>
+        <input id="vision-base-url" type="url" bind:value={visionBaseUrl} placeholder="Falls back to main URL" />
+        <div class="presets">
+          {#each effectiveVisionProvider === "anthropic"
+            ? [["OpenRouter", "https://openrouter.ai/api"]]
+            : [["OpenRouter", "https://openrouter.ai/api/v1"], ["OpenAI", "https://api.openai.com/v1"]]
+          as [name, url]}
+            <button class="preset" class:active={visionBaseUrl === url} onclick={() => { visionBaseUrl = url; }}>
               {name}
             </button>
           {/each}
