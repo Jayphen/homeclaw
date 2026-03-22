@@ -417,14 +417,13 @@
             <a
               class="file-card"
               href="#/skills/{params.owner}/{params.name}/{file.path}"
-              style="animation-delay: {i * 30}ms"
             >
               <span class="file-icon">{fileIcon(file.path)}</span>
               <span class="file-path">{file.path}</span>
               <span class="file-size">{file.size} B</span>
             </a>
           {:else}
-            <div class="file-card file-card-disabled" style="animation-delay: {i * 30}ms">
+            <div class="file-card file-card-disabled">
               <span class="file-icon">{fileIcon(file.path)}</span>
               <span class="file-path">{file.path}</span>
               <span class="file-size">{file.size} B</span>
@@ -518,14 +517,13 @@
       </div>
     {:else}
       {#each [...groupedByOwner.entries()] as [owner, ownerSkills], gi}
-        <section class="owner-section" style="animation-delay: {gi * 60}ms">
+        <section class="owner-section">
           <h2>{owner} <span class="skill-count">{ownerSkills.length}</span></h2>
           <div class="skill-list">
             {#each ownerSkills as skill, i}
               <a
                 class="skill-card"
                 href="#/skills/{skill.owner}/{skill.name}"
-                style="animation-delay: {(gi * 60) + (i * 40)}ms"
               >
                 <div class="skill-card-header">
                   <span class="skill-card-name">{skill.name}</span>
@@ -553,13 +551,6 @@
 </div>
 
 <style>
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .skills-page { animation: fadeUp 0.35s ease-out; }
-
   /* Settings panel */
   .settings-panel {
     background: var(--surface);
@@ -659,7 +650,7 @@
   }
 
   /* Owner sections */
-  .owner-section { margin-bottom: 2rem; opacity: 0; animation: fadeUp 0.3s ease-out forwards; }
+  .owner-section { margin-bottom: 2rem; }
   .owner-section h2 {
     font-family: var(--font-serif); font-weight: 600; font-size: 1.1rem;
     margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.5rem;
@@ -677,7 +668,6 @@
     border-radius: var(--radius);
     text-decoration: none; color: var(--text);
     transition: background 0.15s;
-    opacity: 0; animation: fadeUp 0.3s ease-out forwards;
   }
   .skill-card:hover { background: var(--surface-low); box-shadow: inset 0 0 0 1px rgba(198, 200, 184, 0.2); }
   .skill-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
@@ -715,7 +705,6 @@
     border-radius: var(--radius-md);
     text-decoration: none; color: var(--text); font-size: 0.85rem;
     transition: background 0.15s;
-    opacity: 0; animation: fadeUp 0.3s ease-out forwards;
   }
   .file-card:hover:not(.file-card-disabled) { background: var(--surface-low); }
   .file-card-disabled { opacity: 0.6; cursor: default; }

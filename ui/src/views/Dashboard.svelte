@@ -192,7 +192,7 @@
     <small>{error}</small>
   </div>
 {:else if data}
-  <header class="greeting" style="animation-delay: 0ms">
+  <header class="greeting">
     <h1>{greeting}</h1>
     <p class="date">{displayDate}</p>
     {#if data.members.length > 0}
@@ -204,7 +204,7 @@
 
   <!-- ============ Knowledge Stats Bar ============ -->
   {#if knowledge}
-    <section class="knowledge-bar" style="animation-delay: 40ms">
+    <section class="knowledge-bar">
       <div class="stat">
         <span class="stat-value">{knowledge.summary.total_entries}</span>
         <span class="stat-label">memories</span>
@@ -235,7 +235,7 @@
 
     <!-- Per-member knowledge breakdown -->
     {#if knowledge.household.topic_count > 0 || knowledge.members.some(m => m.topic_count > 0)}
-      <section class="card knowledge-detail" style="animation-delay: 60ms">
+      <section class="card knowledge-detail">
         <h2>What homeclaw knows</h2>
         <div class="knowledge-grid">
           {#if knowledge.household.topic_count > 0}
@@ -285,7 +285,7 @@
 
   <!-- Overdue check-ins — urgent, shown first -->
   {#if data.overdue_checkins.length > 0}
-    <section class="card overdue" style="animation-delay: 80ms">
+    <section class="card overdue">
       <h2>Overdue check-ins</h2>
       <ul>
         {#each data.overdue_checkins as checkin}
@@ -304,7 +304,7 @@
   <div class="grid">
     <!-- Today's notes -->
     {#if data.today_notes.length > 0}
-      <section class="card notes" style="animation-delay: 120ms">
+      <section class="card notes">
         <h2>Today's notes</h2>
         {#each data.today_notes as note}
           <div class="note-block">
@@ -322,7 +322,7 @@
 
     <!-- Upcoming reminders -->
     {#if data.upcoming_reminders.length > 0}
-      <section class="card reminders" style="animation-delay: 180ms">
+      <section class="card reminders">
         <h2>Reminders</h2>
         <ul>
           {#each data.upcoming_reminders as reminder}
@@ -338,7 +338,7 @@
 
     <!-- Upcoming birthdays -->
     {#if data.upcoming_birthdays.length > 0}
-      <section class="card birthdays" style="animation-delay: 240ms">
+      <section class="card birthdays">
         <h2>Birthdays coming up</h2>
         <ul>
           {#each data.upcoming_birthdays as bday}
@@ -353,7 +353,7 @@
 
     <!-- Recent interactions -->
     {#if data.recent_interactions.length > 0}
-      <section class="card interactions" style="animation-delay: 300ms">
+      <section class="card interactions">
         <h2>Recent interactions</h2>
         <ul>
           {#each data.recent_interactions.slice(0, 8) as ix}
@@ -374,7 +374,7 @@
 
   <!-- ============ Activity Feed ============ -->
   {#if feed && feed.events.length > 0}
-    <section class="card feed" style="animation-delay: 360ms">
+    <section class="card feed">
       <div class="feed-header">
         <h2>Recent activity</h2>
         <span class="feed-total">{feed.total} events</span>
@@ -408,7 +408,7 @@
 
   <!-- Empty state -->
   {#if data.today_notes.length === 0 && data.upcoming_reminders.length === 0 && data.upcoming_birthdays.length === 0 && data.recent_interactions.length === 0 && data.overdue_checkins.length === 0 && (!feed || feed.events.length === 0) && (!knowledge || knowledge.summary.total_entries === 0)}
-    <div class="empty" style="animation-delay: 120ms">
+    <div class="empty">
       <p>Nothing on the board yet.</p>
       <small>Chat with homeclaw on Telegram to start building your household's story.</small>
     </div>
@@ -416,26 +416,6 @@
 {/if}
 
 <style>
-  /* ---- Entrance animation ---- */
-  @keyframes fadeUp {
-    from {
-      opacity: 0;
-      transform: translateY(12px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .greeting,
-  .card,
-  .knowledge-bar,
-  .empty {
-    opacity: 0;
-    animation: fadeUp 0.4s ease-out forwards;
-  }
-
   /* ---- Loading ---- */
   .loading {
     display: flex;

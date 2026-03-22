@@ -2,6 +2,9 @@
   import { api } from "$lib/api";
   import { renderMarkdown } from "$lib/markdown";
 
+  // Route params from svelte-spa-router
+  let { params = {} }: { params?: { id?: string } } = $props();
+
   interface ContactSummary {
     id: string;
     name: string;
@@ -91,7 +94,7 @@
     return d.toLocaleDateString("en-US", { month: "long", day: "numeric" });
   }
 
-  async function selectContact(id: string) {
+  async function loadContact(id: string) {
     detailLoading = true;
     try {
       const r = await api(`/api/contacts/${id}`);
@@ -101,10 +104,6 @@
       selected = null;
     }
     detailLoading = false;
-  }
-
-  function closeDetail() {
-    selected = null;
   }
 
   $effect(() => {
@@ -122,6 +121,14 @@
         loading = false;
       });
   });
+
+  $effect(() => {
+    if (params.id) {
+      loadContact(params.id);
+    } else {
+      selected = null;
+    }
+  });
 </script>
 
 {#if loading}
@@ -136,17 +143,17 @@
     <small>{error}</small>
   </div>
 {:else if contacts.length === 0}
-  <div class="empty" style="animation-delay: 120ms">
+  <div class="empty">
     <p>No contacts yet</p>
     <small>Chat with homeclaw to start building your address book.</small>
   </div>
 {:else}
-  <header class="page-header" style="animation-delay: 0ms">
+  <header class="page-header">
     <h1>Contacts</h1>
     <p class="subtitle">{contacts.length} {contacts.length === 1 ? "person" : "people"}</p>
   </header>
 
-  <div class="search-bar" style="animation-delay: 60ms">
+  <div class="search-bar">
     <input
       type="text"
       placeholder="Search by name, nickname, or relationship..."
@@ -156,8 +163,8 @@
 
   {#if selected}
     <!-- Detail panel -->
-    <div class="detail-panel" style="animation-delay: 0ms">
-      <button class="back-btn" onclick={closeDetail}>&larr; All contacts</button>
+    <div class="detail-panel">
+      <a class="back-btn" href="#/contacts">&larr; All contacts</a>
 
       {#if detailLoading}
         <div class="loading">
@@ -184,6 +191,8 @@
           </div>
         </div>
 
+        {@const hasData = selected.birthday || selected.last_contact || selected.member || selected.notes_md || selected.reminders.length > 0 || selected.interactions.length > 0}
+        {#if hasData}
         <div class="detail-grid">
           <!-- Info card -->
           {#if selected.birthday || selected.last_contact || selected.member}
@@ -256,21 +265,32 @@
             </section>
           {/if}
         </div>
+        {:else}
+        <div class="detail-hint">
+          <p>No details saved yet</p>
+          <small>Chat with homeclaw to add things like:</small>
+          <ul>
+            <li>Birthday and important dates</li>
+            <li>Notes and facts</li>
+            <li>Interaction history</li>
+            <li>Recurring reminders to stay in touch</li>
+          </ul>
+        </div>
+        {/if}
       {/if}
     </div>
   {:else}
     <!-- Contact list -->
     {#if filtered.length === 0}
-      <div class="empty" style="animation-delay: 120ms">
+      <div class="empty">
         <p>No contacts match "{search}"</p>
       </div>
     {:else}
       <div class="contact-list">
         {#each filtered as contact, i}
-          <button
+          <a
             class="contact-row"
-            style="animation-delay: {120 + i * 30}ms"
-            onclick={() => selectContact(contact.id)}
+            href="#/contacts/{contact.id}"
           >
             <div class="contact-avatar">
               {contact.name
@@ -300,7 +320,7 @@
               </div>
             </div>
             <div class="contact-arrow">&rsaquo;</div>
-          </button>
+          </a>
         {/each}
       </div>
     {/if}
@@ -308,27 +328,6 @@
 {/if}
 
 <style>
-  /* ---- Entrance animation ---- */
-  @keyframes fadeUp {
-    from {
-      opacity: 0;
-      transform: translateY(12px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .page-header,
-  .search-bar,
-  .contact-row,
-  .detail-panel,
-  .empty {
-    opacity: 0;
-    animation: fadeUp 0.4s ease-out forwards;
-  }
-
   /* ---- Loading ---- */
   .loading {
     display: flex;
@@ -451,6 +450,8 @@
     cursor: pointer;
     text-align: left;
     font-family: inherit;
+    text-decoration: none;
+    color: inherit;
     transition: background 0.1s;
     width: 100%;
   }
@@ -538,11 +539,11 @@
 
   /* ---- Detail panel ---- */
   .back-btn {
-    background: none;
-    border: none;
+    display: inline-block;
     color: var(--primary);
     font-family: inherit;
     font-size: 0.85rem;
+    text-decoration: none;
     cursor: pointer;
     padding: 0;
     margin-bottom: 1rem;
@@ -691,6 +692,41 @@
   .contact-notes :global(p) { margin: 0 0 0.4rem; }
   .contact-notes :global(p:last-child) { margin-bottom: 0; }
   .contact-notes :global(ul), .contact-notes :global(ol) { margin: 0.2rem 0; padding-left: 1.2rem; }
+
+  /* ---- Detail hint ---- */
+  .detail-hint {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-muted);
+  }
+
+  .detail-hint p {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: 1rem;
+    margin: 0 0 0.25rem;
+  }
+
+  .detail-hint small {
+    font-size: 0.82rem;
+  }
+
+  .detail-hint ul {
+    list-style: none;
+    padding: 0;
+    margin: 0.75rem 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+
+  .detail-hint li {
+    font-size: 0.78rem;
+    background: var(--surface);
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--radius-sm);
+  }
 
   /* ---- Empty state ---- */
   .empty {

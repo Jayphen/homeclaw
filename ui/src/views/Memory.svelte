@@ -125,7 +125,6 @@
           class="member-card"
           class:active={isActive}
           onclick={() => selectPerson(member.person)}
-          style="animation-delay: {i * 50}ms"
         >
           <div class="member-info">
             <span class="member-name">{member.person}</span>
@@ -213,15 +212,6 @@
 </div>
 
 <style>
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .memory-page {
-    animation: fadeUp 0.35s ease-out;
-  }
-
   .mem-header h1 {
     font-family: var(--font-serif);
     font-weight: 600;
@@ -250,8 +240,6 @@
     text-align: left;
     font-family: var(--font-sans);
     transition: background 0.15s, box-shadow 0.15s;
-    opacity: 0;
-    animation: fadeUp 0.3s ease-out forwards;
   }
 
   .member-card:hover {
@@ -295,7 +283,6 @@
     border: none;
     border-radius: var(--radius);
     padding: 1.25rem 1.5rem;
-    animation: fadeUp 0.25s ease-out;
   }
 
   .detail-header {

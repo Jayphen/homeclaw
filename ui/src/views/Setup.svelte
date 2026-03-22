@@ -306,12 +306,6 @@
     max-width: 480px;
     width: 100%;
     box-shadow: var(--shadow);
-    animation: fadeUp 0.35s ease-out;
-  }
-
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
   }
 
   h1 {

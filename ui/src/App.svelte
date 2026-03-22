@@ -3,8 +3,7 @@
   import Bookmarks from "./views/Bookmarks.svelte";
   import Dashboard from "./views/Dashboard.svelte";
   import Calendar from "./views/Calendar.svelte";
-  import Memory from "./views/Memory.svelte";
-  import Notes from "./views/Notes.svelte";
+  import Knowledge from "./views/Knowledge.svelte";
   import Contacts from "./views/Contacts.svelte";
   import Plugins from "./views/Plugins.svelte";
   import Skills from "./views/Skills.svelte";
@@ -17,11 +16,12 @@
     "/": Dashboard,
     "/bookmarks": Bookmarks,
     "/calendar": Calendar,
-    "/memory": Memory,
-    "/notes": Notes,
-    "/notes/:person": Notes,
-    "/notes/:person/:date": Notes,
+    "/knowledge": Knowledge,
+    "/knowledge/:person/:date": Knowledge,
+    "/notes": Knowledge,
+    "/notes/:person/:date": Knowledge,
     "/contacts": Contacts,
+    "/contacts/:id": Contacts,
     "/routines": Routines,
     "/skills": Skills,
     "/skills/:owner/:name": Skills,
@@ -156,8 +156,7 @@
 
       <nav class="nav-group">
         <a href="#/">Home</a>
-        <a href="#/notes">Notes</a>
-        <a href="#/memory">Memory</a>
+        <a href="#/knowledge">Knowledge</a>
         <a href="#/calendar">Calendar</a>
         <a href="#/bookmarks">Bookmarks</a>
         <a href="#/contacts">Contacts</a>
@@ -188,8 +187,7 @@
   <!-- Mobile bottom bar -->
   <nav class="mobile-bar">
     <a href="#/">Home</a>
-    <a href="#/notes">Notes</a>
-    <a href="#/memory">Memory</a>
+    <a href="#/knowledge">Knowledge</a>
     <a href="#/contacts">Contacts</a>
     <a href="#/settings">Settings</a>
   </nav>
@@ -394,12 +392,6 @@
     max-width: 360px;
     width: 100%;
     box-shadow: var(--shadow);
-    animation: fadeUp 0.35s ease-out;
-  }
-
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
   }
 
   .login-card h1 {

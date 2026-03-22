@@ -134,7 +134,7 @@
 {:else if error}
   <div class="error-card"><p>Couldn't load plugins data</p><small>{error}</small></div>
 {:else}
-  <header class="page-header" style="animation-delay: 0ms">
+  <header class="page-header">
     <h1>Plugins</h1>
     <p class="subtitle">Manage installed plugins, skills, and browse the marketplace</p>
   </header>
@@ -144,7 +144,7 @@
   {/if}
 
   <!-- Installed plugins -->
-  <section class="section" style="animation-delay: 60ms">
+  <section class="section">
     <div class="section-header">
       <h2>Installed</h2>
       <p class="section-desc">Plugins installed in your workspace. Enable a plugin to expose its tools to the assistant.</p>
@@ -158,7 +158,7 @@
     {:else}
       <div class="plugin-list">
         {#each plugins as plugin, i}
-          <div class="plugin-card" style="animation-delay: {90 + i * 25}ms">
+          <div class="plugin-card">
             <div class="plugin-title-row">
               <div class="plugin-identity">
                 <span class="plugin-name">{plugin.name}</span>
@@ -216,7 +216,7 @@
 
   <!-- Marketplace -->
   {#if marketplaceConfigured}
-    <section class="section" style="animation-delay: 120ms">
+    <section class="section">
       <div class="section-header">
         <h2>Marketplace</h2>
         <p class="section-desc">Browse and install plugins from the community.</p>
@@ -230,7 +230,7 @@
       {:else}
         <div class="plugin-list">
           {#each marketplace as mp, i}
-            <div class="plugin-card" style="animation-delay: {150 + i * 25}ms">
+            <div class="plugin-card">
               <div class="plugin-title-row">
                 <div class="plugin-identity">
                   <span class="plugin-name">{mp.name}</span>
@@ -256,7 +256,7 @@
   {/if}
 
   <!-- Skill archives -->
-  <section class="section" style="animation-delay: 180ms">
+  <section class="section">
     <div class="section-header">
       <h2>Skill archives</h2>
       <p class="section-desc">Skills removed via chat are archived here. Restore them to bring them back, or delete permanently to free up space.</p>
@@ -270,7 +270,7 @@
     {:else}
       <div class="archive-list">
         {#each archives as archive, i}
-          <div class="archive-card" style="animation-delay: {210 + i * 25}ms">
+          <div class="archive-card">
             <div class="archive-title-row">
               <div class="archive-identity">
                 <span class="archive-name">{archive.name}</span>
@@ -313,12 +313,6 @@
 {/if}
 
 <style>
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .page-header, .section, .empty { opacity: 0; animation: fadeUp 0.4s ease-out forwards; }
-
   .loading { display: flex; justify-content: center; gap: 0.5rem; padding: 4rem 0; }
   .loading-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); opacity: 0.3; animation: pulse 1s ease-in-out infinite; }
   .loading-dot:nth-child(2) { animation-delay: 0.15s; }
@@ -342,7 +336,7 @@
 
   /* Installed plugins */
   .plugin-list { display: flex; flex-direction: column; gap: 0.5rem; }
-  .plugin-card { background: var(--surface); border-radius: var(--radius); padding: 0.85rem 1.1rem; transition: background 0.15s; opacity: 0; animation: fadeUp 0.4s ease-out forwards; }
+  .plugin-card { background: var(--surface); border-radius: var(--radius); padding: 0.85rem 1.1rem; transition: background 0.15s; }
   .plugin-card:hover { background: var(--surface-low); box-shadow: inset 0 0 0 1px rgba(198, 200, 184, 0.2); }
 
   .plugin-title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
@@ -382,7 +376,7 @@
 
   /* Skill archives */
   .archive-list { display: flex; flex-direction: column; gap: 0.5rem; }
-  .archive-card { background: var(--surface); border-radius: var(--radius); padding: 0.85rem 1.1rem; transition: background 0.15s; opacity: 0; animation: fadeUp 0.4s ease-out forwards; }
+  .archive-card { background: var(--surface); border-radius: var(--radius); padding: 0.85rem 1.1rem; transition: background 0.15s; }
   .archive-card:hover { background: var(--surface-low); box-shadow: inset 0 0 0 1px rgba(198, 200, 184, 0.2); }
 
   .archive-title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }

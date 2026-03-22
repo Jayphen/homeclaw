@@ -206,7 +206,6 @@
           <a
             class="note-card"
             href="#/notes/{note.person}/{note.date}"
-            style="animation-delay: {i * 40}ms"
           >
             <div class="note-card-header">
               <span class="note-card-date">{formatDateShort(note.date)}</span>
@@ -227,7 +226,7 @@
       </div>
     {:else}
       {#each [...groupedByPerson.entries()] as [person, notes], gi}
-        <section class="person-section" style="animation-delay: {gi * 60}ms">
+        <section class="person-section">
           <h2>
             <a href="#/notes/{person}">{person}</a>
             <span class="note-count">{notes.length}</span>
@@ -237,7 +236,6 @@
               <a
                 class="note-card"
                 href="#/notes/{note.person}/{note.date}"
-                style="animation-delay: {(gi * 60) + (i * 40)}ms"
               >
                 <div class="note-card-header">
                   <span class="note-card-date">{formatDateShort(note.date)}</span>
@@ -259,15 +257,6 @@
 </div>
 
 <style>
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .notes-page {
-    animation: fadeUp 0.35s ease-out;
-  }
-
   /* ---- Breadcrumb ---- */
   .breadcrumb {
     display: flex;
@@ -309,8 +298,6 @@
   /* ---- Person sections ---- */
   .person-section {
     margin-bottom: 2rem;
-    opacity: 0;
-    animation: fadeUp 0.3s ease-out forwards;
   }
 
   .person-section h2 {
@@ -358,8 +345,6 @@
     text-decoration: none;
     color: var(--text);
     transition: background 0.15s;
-    opacity: 0;
-    animation: fadeUp 0.3s ease-out forwards;
   }
 
   .note-card:hover {

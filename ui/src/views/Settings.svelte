@@ -133,6 +133,7 @@
   let whatsappPhoneNumber: string = $state("");
   let whatsappAllowedUsers: string = $state("");
   let timezoneValue: string = $state("");
+  let noteDetailLevel: string = $state("normal");
 
   // Member account management
   let memberPasswords: Record<string, string> = $state({});
@@ -205,6 +206,7 @@
       whatsappPhoneNumber = setup!.whatsapp_phone_number || "";
       whatsappAllowedUsers = setup!.whatsapp_allowed_users || "";
       timezoneValue = setup!.timezone || "";
+      noteDetailLevel = setup!.note_detail_level || "normal";
       if (whatsappEnabled && !whatsappConnected) fetchWhatsAppQr();
       pageState = "ready";
     } catch (e: any) {
@@ -309,6 +311,7 @@
       body.whatsapp_allowed_users = whatsappAllowedUsers || null;
     }
     if (timezoneValue !== (setup?.timezone || "")) body.timezone = timezoneValue || null;
+    if (noteDetailLevel !== (setup?.note_detail_level || "normal")) body.note_detail_level = noteDetailLevel;
 
     if (Object.keys(body).length === 0) {
       saveState = "idle";
@@ -336,6 +339,7 @@
       whatsappPhoneNumber = setup!.whatsapp_phone_number || "";
       whatsappAllowedUsers = setup!.whatsapp_allowed_users || "";
       timezoneValue = setup!.timezone || "";
+      noteDetailLevel = setup!.note_detail_level || "normal";
 
       // Clear secret inputs after save
       anthropicKey = "";
@@ -511,6 +515,19 @@
         <input id="timezone" type="text" bind:value={timezoneValue}
           placeholder={Intl.DateTimeFormat().resolvedOptions().timeZone} />
         <small class="field-hint">IANA timezone for schedules and logs (e.g. America/New_York, Europe/London). Leave blank for system default.</small>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Note-taking</h2>
+      <div class="field">
+        <label for="note-detail-level">Detail level</label>
+        <select id="note-detail-level" bind:value={noteDetailLevel}>
+          <option value="minimal">Minimal — only major events</option>
+          <option value="normal">Normal — notable things</option>
+          <option value="detailed">Detailed — comprehensive daily journal</option>
+        </select>
+        <small class="field-hint">Controls how aggressively homeclaw saves daily notes. Requires restart.</small>
       </div>
     </section>
 
@@ -709,13 +726,7 @@
     color: var(--text);
   }
 
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
   .settings-page {
-    animation: fadeUp 0.35s ease-out;
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
@@ -982,7 +993,6 @@
     font-size: 0.82rem;
     font-weight: 600;
     color: var(--sage);
-    animation: fadeUp 0.2s ease-out;
   }
 
   /* ---- Loading ---- */

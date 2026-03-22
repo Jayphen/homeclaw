@@ -314,7 +314,7 @@
                   <span class="ev-type">{TYPE_LABELS[ev.type]}</span>
                   <span class="ev-person">{ev.person}</span>
                   {#if ev.type === "note"}
-                    <a class="ev-link" href="#/notes/{ev.person}/{ev.date}">View note</a>
+                    <a class="ev-link" href="#/knowledge/{ev.person}/{ev.date}">View note</a>
                   {/if}
                 </div>
                 <div class="ev-summary">{@html renderMarkdown(ev.summary)}</div>
@@ -353,7 +353,7 @@
                       <span class="ev-type">{TYPE_LABELS[ev.type]}</span>
                       <span class="ev-person">{ev.person}</span>
                       {#if ev.type === "note"}
-                        <a class="ev-link" href="#/notes/{ev.person}/{ev.date}">View note</a>
+                        <a class="ev-link" href="#/knowledge/{ev.person}/{ev.date}">View note</a>
                       {/if}
                     </div>
                     <div class="ev-summary">{@html renderMarkdown(ev.summary)}</div>
@@ -371,15 +371,6 @@
 </div>
 
 <style>
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .calendar-page {
-    animation: fadeUp 0.35s ease-out;
-  }
-
   /* ---- Header ---- */
   .cal-header {
     display: flex;
@@ -565,7 +556,6 @@
     background: var(--surface);
     border-radius: var(--radius);
     padding: 1.25rem 1.5rem;
-    animation: fadeUp 0.25s ease-out;
   }
 
   .detail-drawer h2 {

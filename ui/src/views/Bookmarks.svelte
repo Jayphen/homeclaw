@@ -92,14 +92,14 @@
     <small>{error}</small>
   </div>
 {:else}
-  <header class="page-header" style="animation-delay: 0ms">
+  <header class="page-header">
     <h1>Bookmarks</h1>
     <p class="subtitle">
       {bookmarks.length} saved {bookmarks.length === 1 ? "item" : "items"}
     </p>
   </header>
 
-  <div class="search-bar" style="animation-delay: 60ms">
+  <div class="search-bar">
     <input
       type="text"
       placeholder="Search bookmarks..."
@@ -108,7 +108,7 @@
   </div>
 
   {#if categories.length > 0}
-    <div class="category-bar" style="animation-delay: 90ms">
+    <div class="category-bar">
       {#each categories as cat}
         <button
           class="category-chip"
@@ -122,7 +122,7 @@
   {/if}
 
   {#if filtered.length === 0}
-    <div class="empty" style="animation-delay: 120ms">
+    <div class="empty">
       {#if search.trim() || activeCategory}
         <p>No bookmarks match your filter</p>
       {:else}
@@ -133,7 +133,7 @@
   {:else}
     <div class="bookmark-list">
       {#each filtered as bm, i}
-        <div class="bookmark-card" style="animation-delay: {120 + i * 30}ms">
+        <div class="bookmark-card">
           <div class="bm-main">
             <div class="bm-title-row">
               {#if bm.url}
@@ -174,16 +174,6 @@
 {/if}
 
 <style>
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .page-header, .search-bar, .category-bar, .bookmark-card, .empty {
-    opacity: 0;
-    animation: fadeUp 0.4s ease-out forwards;
-  }
-
   /* ---- Loading ---- */
   .loading {
     display: flex;

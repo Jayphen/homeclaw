@@ -133,7 +133,7 @@
     <small>{error}</small>
   </div>
 {:else}
-  <header class="page-header" style="animation-delay: 0ms">
+  <header class="page-header">
     <div class="header-row">
       <h1>Routines</h1>
       <button class="add-btn" onclick={() => { showAdd = !showAdd; }}>
@@ -144,7 +144,7 @@
   </header>
 
   {#if showAdd}
-    <section class="card add-form" style="animation-delay: 20ms">
+    <section class="card add-form">
       <h2>New routine</h2>
       {#if addError}
         <div class="form-error">{addError}</div>
@@ -169,14 +169,14 @@
   {/if}
 
   {#if routines.length === 0}
-    <div class="empty" style="animation-delay: 60ms">
+    <div class="empty">
       <p>No routines yet.</p>
       <small>Add a routine above, or ask homeclaw in chat to set one up.</small>
     </div>
   {:else}
     <div class="routine-list">
       {#each routines as routine, i}
-        <div class="routine-card" style="animation-delay: {40 + i * 30}ms">
+        <div class="routine-card">
           <div class="routine-header">
             <div class="routine-title-row">
               <span class="routine-name">{routine.description.split(":")[0]}</span>
@@ -215,19 +215,6 @@
 {/if}
 
 <style>
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .page-header,
-  .card,
-  .routine-card,
-  .empty {
-    opacity: 0;
-    animation: fadeUp 0.4s ease-out forwards;
-  }
-
   .loading {
     display: flex;
     justify-content: center;
