@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.10.0](https://github.com/Jayphen/homeclaw/compare/v0.9.0...v0.10.0) (2026-03-22)
+
+
+### Features
+
+* add recent bookmarks card to dashboard ([0f232a1](https://github.com/Jayphen/homeclaw/commit/0f232a18feb330d3c1a85abd2eed62c609a1fdc7))
+* add routines API and UI view ([2f904d8](https://github.com/Jayphen/homeclaw/commit/2f904d856b927c3b4ecb3356975ab90ddef7eb33))
+* align UI with Digital Conservatory design system ([bdf813f](https://github.com/Jayphen/homeclaw/commit/bdf813f66d65bb7fc97b8684a436d922ce7cae19))
+* configurable note-taking detail level and remove misleading search scores ([2368c97](https://github.com/Jayphen/homeclaw/commit/2368c97459c25c9c566abc1675e5e18590c54834))
+* merge Skills and Plugins into unified Extensions view ([f421019](https://github.com/Jayphen/homeclaw/commit/f421019f794fdfc95d439fae4e8cbf114d56391d))
+* per-model provider config for fast model ([bc59a73](https://github.com/Jayphen/homeclaw/commit/bc59a73b03973eb1b1f4ca3d42cc58c595039acc))
+* require confirmation before sharing notes in DMs ([a152fe8](https://github.com/Jayphen/homeclaw/commit/a152fe8768436346f40c78f953b50d78d22f85ec))
+* round-trip reasoning/thinking blocks between tool rounds ([dbffd67](https://github.com/Jayphen/homeclaw/commit/dbffd67ebf1c0c4a2bae9a3538a4531cf5b0945d))
+* show last routine execution result in routines view ([c75e559](https://github.com/Jayphen/homeclaw/commit/c75e55904987c598a8f64d61aa3dce247e6d7e64))
+* support custom base URL for Anthropic provider ([6866fa0](https://github.com/Jayphen/homeclaw/commit/6866fa0c8ff48c9cfaebaa8f8f8d86aff36b4d81))
+* support private per-person contact notes ([a21bd8d](https://github.com/Jayphen/homeclaw/commit/a21bd8d650b9d3b69a8837b331fd559c5178f6f8))
+
+
+### Bug Fixes
+
+* hide empty 'What homeclaw knows' section ([7ad54ba](https://github.com/Jayphen/homeclaw/commit/7ad54ba5524a96df386c66dea4803f87154a2e3b))
+* hide empty info card in contact detail view ([cc39cd2](https://github.com/Jayphen/homeclaw/commit/cc39cd24882839e0ee3b59c3852c9f653d97a62c))
+* remove fadeUp entrance animations and add contact URL routing ([39437fe](https://github.com/Jayphen/homeclaw/commit/39437fe20a3ed07cd782747d233799a5bcdc9deb))
+* repair broken tests (config provider, plugin registry naming) ([4465c4c](https://github.com/Jayphen/homeclaw/commit/4465c4ca293afae54cad62cb3d1f2c794836338a))
+* show clean empty state when no contacts exist ([472ab9e](https://github.com/Jayphen/homeclaw/commit/472ab9e7611a95df9559189573c13c26089b6653))
+* show skill validation errors instead of 500, with edit access ([ada8839](https://github.com/Jayphen/homeclaw/commit/ada88391f1b65be8f1326a60c45e1c45734f80d9))
+* suppress LLM self-talk chains in interim responses ([6cb3d27](https://github.com/Jayphen/homeclaw/commit/6cb3d27c4c330f799e16c2345d4802ba5a0afbc4))
+
 ## [0.9.0](https://github.com/Jayphen/homeclaw/compare/v0.8.0...v0.9.0) (2026-03-22)
 
 
