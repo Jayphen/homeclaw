@@ -301,7 +301,6 @@
 
   .setup-card {
     background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 2.5rem;
     max-width: 480px;
@@ -350,7 +349,7 @@
     align-items: center;
     gap: 0.35rem;
     padding: 0.3rem 0.6rem;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 0.75rem;
     font-weight: 500;
     color: var(--text-muted);
@@ -359,7 +358,7 @@
   }
 
   .step.active {
-    background: var(--terracotta);
+    background: var(--primary);
     color: #fff;
   }
 
@@ -390,17 +389,17 @@
   input {
     padding: 0.6rem 0.75rem;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     font-size: 0.88rem;
     font-family: var(--font-sans);
-    background: #fdfcfa;
+    background: var(--surface-low);
     color: var(--text);
     transition: border-color 0.15s;
   }
 
   input:focus {
     outline: none;
-    border-color: var(--terracotta);
+    border-color: var(--primary);
   }
 
   input::placeholder {
@@ -434,7 +433,7 @@
   .toggle-row input[type="checkbox"] {
     width: 1rem;
     height: 1rem;
-    accent-color: var(--terracotta);
+    accent-color: var(--primary);
     cursor: pointer;
   }
 
@@ -453,9 +452,9 @@
 
   .preset {
     padding: 0.25rem 0.55rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: #fdfcfa;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--surface-low);
     font-size: 0.75rem;
     font-weight: 500;
     font-family: var(--font-sans);
@@ -466,13 +465,11 @@
 
   .preset:hover {
     color: var(--text);
-    border-color: var(--text-muted);
   }
 
   .preset.active {
-    border-color: var(--terracotta);
-    color: var(--terracotta);
-    background: #fff;
+    color: #fff;
+    background: var(--primary);
   }
 
   /* Provider toggle */
@@ -485,9 +482,9 @@
   .provider-toggle button {
     flex: 1;
     padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: #fdfcfa;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--surface-low);
     font-size: 0.82rem;
     font-weight: 500;
     font-family: var(--font-sans);
@@ -497,19 +494,17 @@
   }
 
   .provider-toggle button.selected {
-    border-color: var(--terracotta);
-    color: var(--terracotta);
-    background: #fff;
+    color: #fff;
+    background: var(--primary);
   }
 
   /* Error */
   .error {
     background: #fef2f0;
-    border: 1px solid #f0c4bc;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     padding: 0.6rem 0.85rem;
     font-size: 0.82rem;
-    color: var(--terracotta);
+    color: var(--secondary);
     margin-bottom: 1rem;
   }
 
@@ -523,7 +518,7 @@
 
   .btn {
     padding: 0.55rem 1.25rem;
-    border-radius: 8px;
+    border-radius: var(--radius-pill);
     font-size: 0.85rem;
     font-weight: 600;
     font-family: var(--font-sans);
@@ -533,8 +528,8 @@
   }
 
   .btn.primary {
-    background: var(--terracotta);
-    color: #fff;
+    background: linear-gradient(135deg, var(--primary), var(--primary-container));
+    color: var(--on-primary);
   }
 
   .btn.primary:hover {
@@ -547,13 +542,11 @@
   }
 
   .btn.secondary {
-    background: transparent;
+    background: var(--surface-low);
     color: var(--text-muted);
-    border: 1px solid var(--border);
   }
 
   .btn.secondary:hover {
     color: var(--text);
-    background: rgba(45, 41, 38, 0.04);
   }
 </style>

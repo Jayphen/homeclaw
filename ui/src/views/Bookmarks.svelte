@@ -196,7 +196,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--terracotta);
+    background: var(--primary);
     opacity: 0.3;
     animation: pulse 1s ease-in-out infinite;
   }
@@ -212,11 +212,10 @@
   /* ---- Error ---- */
   .error-card {
     background: #fef2f0;
-    border: 1px solid #f0c4bc;
     border-radius: var(--radius);
     padding: 1.5rem;
     text-align: center;
-    color: var(--terracotta);
+    color: var(--secondary);
   }
 
   .error-card p { margin: 0 0 0.5rem; font-weight: 500; }
@@ -247,8 +246,8 @@
     width: 100%;
     padding: 0.6rem 0.9rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
+    border-radius: var(--radius-md);
+    background: var(--surface-low);
     font-family: var(--font-sans);
     font-size: 0.88rem;
     color: var(--text);
@@ -257,7 +256,7 @@
     box-sizing: border-box;
   }
 
-  .search-bar input:focus { border-color: var(--terracotta); }
+  .search-bar input:focus { border-color: var(--primary); }
   .search-bar input::placeholder { color: var(--text-muted); }
 
   /* ---- Category chips ---- */
@@ -271,7 +270,7 @@
   .category-chip {
     padding: 0.3rem 0.7rem;
     border: 1px solid var(--border);
-    border-radius: 20px;
+    border-radius: var(--radius-pill);
     background: var(--surface);
     color: var(--text-muted);
     font-family: var(--font-sans);
@@ -288,9 +287,9 @@
   }
 
   .category-chip.active {
-    border-color: var(--terracotta);
-    background: #fef9f4;
-    color: var(--terracotta);
+    border-color: var(--primary);
+    background: var(--surface-low);
+    color: var(--primary);
   }
 
   /* ---- Bookmark list ---- */
@@ -302,14 +301,14 @@
 
   .bookmark-card {
     background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 0.85rem 1.1rem;
-    transition: border-color 0.15s;
+    transition: box-shadow 0.15s, background 0.15s;
   }
 
   .bookmark-card:hover {
-    border-color: #d0c8be;
+    box-shadow: inset 0 0 0 1px var(--border);
+    background: var(--surface-low);
   }
 
   .bm-main {
@@ -333,7 +332,7 @@
   }
 
   a.bm-title:hover {
-    color: var(--terracotta);
+    color: var(--primary);
   }
 
   .bm-delete {
@@ -351,7 +350,7 @@
   }
 
   .bookmark-card:hover .bm-delete { opacity: 1; }
-  .bm-delete:hover { color: var(--terracotta); }
+  .bm-delete:hover { color: var(--primary); }
 
   .bm-notes {
     font-family: var(--font-sans);
@@ -360,9 +359,8 @@
     color: var(--text-muted);
     margin: 0.25rem 0 0;
     padding: 0.5rem 0.75rem;
-    background: #fdfcfa;
-    border-left: 3px solid var(--sage);
-    border-radius: 4px;
+    background: var(--surface-low);
+    border-radius: var(--radius-sm);
   }
 
   .bm-notes :global(p) { margin: 0 0 0.3rem; }
@@ -383,13 +381,13 @@
     font-size: 0.68rem;
     font-weight: 600;
     padding: 0.1rem 0.4rem;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     letter-spacing: 0.02em;
     text-transform: capitalize;
   }
 
   .cat-badge {
-    background: #f0ebe5;
+    background: var(--surface-low);
     color: var(--text-muted);
   }
 

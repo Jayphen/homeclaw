@@ -339,7 +339,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--terracotta);
+    background: var(--primary);
     opacity: 0.3;
     animation: pulse 1s ease-in-out infinite;
   }
@@ -367,11 +367,10 @@
   /* ---- Error ---- */
   .error-card {
     background: #fef2f0;
-    border: 1px solid #f0c4bc;
     border-radius: var(--radius);
     padding: 1.5rem;
     text-align: center;
-    color: var(--terracotta);
+    color: var(--primary);
   }
 
   .error-card p {
@@ -412,8 +411,8 @@
     width: 100%;
     padding: 0.6rem 0.9rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
+    border-radius: var(--radius-md);
+    background: var(--surface-low);
     font-family: var(--font-sans);
     font-size: 0.88rem;
     color: var(--text);
@@ -423,7 +422,7 @@
   }
 
   .search-bar input:focus {
-    border-color: var(--terracotta);
+    border-color: var(--primary);
   }
 
   .search-bar input::placeholder {
@@ -434,9 +433,8 @@
   .contact-list {
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
+    gap: 0.5rem;
+    background: transparent;
     border-radius: var(--radius);
     overflow: hidden;
   }
@@ -447,7 +445,7 @@
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     background: var(--surface);
-    border: none;
+    border-radius: var(--radius);
     cursor: pointer;
     text-align: left;
     font-family: inherit;
@@ -456,7 +454,7 @@
   }
 
   .contact-row:hover {
-    background: #fdfcfa;
+    background: var(--surface-low);
   }
 
   /* ---- Avatar ---- */
@@ -466,7 +464,7 @@
     width: 2.2rem;
     height: 2.2rem;
     border-radius: 50%;
-    background: var(--sage);
+    background: var(--primary);
     color: white;
     display: flex;
     align-items: center;
@@ -480,7 +478,7 @@
     width: 3rem;
     height: 3rem;
     font-size: 0.9rem;
-    background: var(--terracotta);
+    background: var(--secondary);
   }
 
   /* ---- Contact info ---- */
@@ -520,18 +518,18 @@
     font-size: 0.68rem;
     font-weight: 600;
     padding: 0.1rem 0.4rem;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     letter-spacing: 0.02em;
     text-transform: capitalize;
   }
 
   .member-badge {
-    background: #eef4ef;
+    background: var(--surface-low);
     color: var(--sage);
   }
 
   .type-badge {
-    background: #f0ebe5;
+    background: var(--surface-low);
     color: var(--text-muted);
   }
 
@@ -539,7 +537,7 @@
   .back-btn {
     background: none;
     border: none;
-    color: var(--terracotta);
+    color: var(--primary);
     font-family: inherit;
     font-size: 0.85rem;
     cursor: pointer;
@@ -595,7 +593,6 @@
   /* ---- Detail cards ---- */
   .card {
     background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 1rem 1.25rem;
   }
@@ -616,7 +613,6 @@
 
   .card li {
     padding: 0.5rem 0;
-    border-top: 1px solid var(--border);
     font-size: 0.85rem;
     color: var(--text);
   }
@@ -644,7 +640,7 @@
   }
 
   .info-row + .info-row {
-    border-top: 1px solid var(--border);
+    margin-top: 0.2rem;
   }
 
   .info-label {
