@@ -15,6 +15,7 @@ export interface SetupStatus {
   provider?: string | null;
   model?: string;
   anthropic_api_key?: string | null;
+  anthropic_base_url?: string | null;
   openai_api_key?: string | null;
   openai_base_url?: string | null;
   telegram_configured?: boolean;

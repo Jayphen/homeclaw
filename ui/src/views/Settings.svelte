@@ -121,6 +121,7 @@
   let conversationModel: string = $state("");
   let routineModel: string = $state("");
   let anthropicKey: string = $state("");
+  let anthropicBaseUrl: string = $state("");
   let openaiKey: string = $state("");
   let openaiBaseUrl: string = $state("");
   let jinaKey: string = $state("");
@@ -199,6 +200,7 @@
       selectedProvider = (setup!.provider === "openai" ? "openai" : setup!.provider === "anthropic" ? "anthropic" : setup!.anthropic_api_key ? "anthropic" : "openai") as "anthropic" | "openai";
       conversationModel = setup!.conversation_model;
       routineModel = setup!.routine_model;
+      anthropicBaseUrl = setup!.anthropic_base_url || "";
       openaiBaseUrl = setup!.openai_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
       whatsappEnabled = setup!.whatsapp_configured;
@@ -296,6 +298,7 @@
     if (conversationModel !== setup?.conversation_model) body.conversation_model = conversationModel;
     if (routineModel !== setup?.routine_model) body.routine_model = routineModel;
     if (anthropicKey) body.anthropic_api_key = anthropicKey;
+    if (anthropicBaseUrl !== (setup?.anthropic_base_url || "")) body.anthropic_base_url = anthropicBaseUrl || null;
     if (openaiKey) body.openai_api_key = openaiKey;
     if (jinaKey) body.jina_api_key = jinaKey;
     if (openaiBaseUrl !== (setup?.openai_base_url || "")) body.openai_base_url = openaiBaseUrl || null;
@@ -332,6 +335,7 @@
       selectedProvider = (setup!.provider === "openai" ? "openai" : setup!.provider === "anthropic" ? "anthropic" : setup!.anthropic_api_key ? "anthropic" : "openai") as "anthropic" | "openai";
       conversationModel = setup!.conversation_model;
       routineModel = setup!.routine_model;
+      anthropicBaseUrl = setup!.anthropic_base_url || "";
       openaiBaseUrl = setup!.openai_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
       whatsappEnabled = setup!.whatsapp_configured;
@@ -413,6 +417,20 @@
         <label for="anthropic-key">Anthropic API key</label>
         <input id="anthropic-key" type="password" bind:value={anthropicKey}
           placeholder={setup.anthropic_api_key ? `Current: ${setup.anthropic_api_key}` : "Not set"} />
+      </div>
+
+      <div class="field">
+        <label for="anthropic-base-url">Anthropic base URL</label>
+        <input id="anthropic-base-url" type="url" bind:value={anthropicBaseUrl} placeholder="https://api.anthropic.com (default)" />
+        <div class="presets">
+          {#each [
+            ["MiniMax", "https://api.minimax.io/anthropic"],
+          ] as [name, url]}
+            <button class="preset" class:active={anthropicBaseUrl === url} onclick={() => { anthropicBaseUrl = url; }}>
+              {name}
+            </button>
+          {/each}
+        </div>
       </div>
 
       <div class="field">

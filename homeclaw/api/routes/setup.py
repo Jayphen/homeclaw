@@ -82,6 +82,7 @@ async def setup_status(request: Request) -> dict[str, Any]:
         "provider": config.provider,
         "model": config.model,
         "anthropic_api_key": _mask(config.anthropic_api_key),
+        "anthropic_base_url": config.anthropic_base_url,
         "openai_api_key": _mask(config.openai_api_key),
         "openai_base_url": config.openai_base_url,
         "telegram_configured": config.telegram_token is not None,
@@ -106,6 +107,7 @@ class SetupBody(BaseModel):
     # LLM provider
     provider: str | None = None
     anthropic_api_key: str | None = None
+    anthropic_base_url: str | None = None
     openai_api_key: str | None = None
     openai_base_url: str | None = None
     model: str | None = None
@@ -157,6 +159,8 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         config.provider = body.provider or None
     if body.anthropic_api_key is not None:
         config.anthropic_api_key = body.anthropic_api_key or None
+    if body.anthropic_base_url is not None:
+        config.anthropic_base_url = body.anthropic_base_url or None
     if body.openai_api_key is not None:
         config.openai_api_key = body.openai_api_key or None
     if body.openai_base_url is not None:

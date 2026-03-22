@@ -25,6 +25,7 @@ def create_provider(config: HomeclawConfig) -> LLMProvider:
         return AnthropicProvider(
             api_key=config.anthropic_api_key,
             model=model,
+            base_url=config.anthropic_base_url,
             enable_prompt_caching=config.routing.enable_prompt_caching,
             context_window=config.routing.context_window,
         )

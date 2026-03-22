@@ -37,10 +37,14 @@ class AnthropicProvider:
         self,
         api_key: str,
         model: str,
+        base_url: str | None = None,
         enable_prompt_caching: bool = True,
         context_window: int = 200_000,
     ) -> None:
-        self._client = anthropic.AsyncAnthropic(api_key=api_key)
+        kwargs: dict[str, Any] = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self._client = anthropic.AsyncAnthropic(**kwargs)
         self.model = model
         self.context_window = context_window
         self._enable_caching = enable_prompt_caching
