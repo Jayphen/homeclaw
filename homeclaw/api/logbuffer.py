@@ -17,13 +17,18 @@ from zoneinfo import ZoneInfo
 
 
 def _log_entry(record: logging.LogRecord, tz: tzinfo) -> dict[str, Any]:
+    msg = record.getMessage()
+    if record.exc_info and record.exc_info[1] is not None:
+        # Append the traceback so exceptions show up in the UI and log file
+        fmt = logging.Formatter()
+        msg = msg + "\n" + fmt.formatException(record.exc_info)
     return {
         "ts": datetime.fromtimestamp(
             record.created, tz=tz,
         ).isoformat(),
         "level": record.levelname,
         "logger": record.name,
-        "message": record.getMessage(),
+        "message": msg,
     }
 
 

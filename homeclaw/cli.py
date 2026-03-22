@@ -301,6 +301,8 @@ def _run_serve(workspaces: Path, port: int) -> None:
     set_config(config)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    # Silence noisy HTTP client logs (Telegram polling, API calls)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     from homeclaw.api.logbuffer import install_log_buffer
     log_dir = config.workspaces.resolve() / "household" / "logs"
