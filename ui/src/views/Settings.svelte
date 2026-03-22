@@ -718,8 +718,8 @@
             <input id="fast-base-url" type="url" bind:value={fastBaseUrl} placeholder="Falls back to main URL" />
             <div class="presets">
               {#each effectiveFastProvider === "anthropic"
-                ? [["OpenRouter", "https://openrouter.ai/api"], ["MiniMax", "https://api.minimax.io/anthropic"]]
-                : [["OpenRouter", "https://openrouter.ai/api/v1"], ["MiniMax", "https://api.minimax.io/v1"], ["Groq", "https://api.groq.com/openai/v1"]]
+                ? [["Anthropic", "https://api.anthropic.com"], ["OpenRouter", "https://openrouter.ai/api"], ["MiniMax", "https://api.minimax.io/anthropic"]]
+                : [["OpenRouter", "https://openrouter.ai/api/v1"], ["Ollama", "http://localhost:11434/v1"], ["Groq", "https://api.groq.com/openai/v1"], ["Together", "https://api.together.xyz/v1"], ["OpenAI", "https://api.openai.com/v1"]]
               as [name, url]}
                 <button class="preset" class:active={fastBaseUrl === url} onclick={() => { fastBaseUrl = url; }}>
                   {name}
@@ -765,8 +765,8 @@
             <input id="vision-base-url" type="url" bind:value={visionBaseUrl} placeholder="Falls back to main URL" />
             <div class="presets">
               {#each effectiveVisionProvider === "anthropic"
-                ? [["OpenRouter", "https://openrouter.ai/api"]]
-                : [["OpenRouter", "https://openrouter.ai/api/v1"], ["OpenAI", "https://api.openai.com/v1"]]
+                ? [["Anthropic", "https://api.anthropic.com"], ["OpenRouter", "https://openrouter.ai/api"], ["MiniMax", "https://api.minimax.io/anthropic"]]
+                : [["OpenRouter", "https://openrouter.ai/api/v1"], ["Ollama", "http://localhost:11434/v1"], ["Groq", "https://api.groq.com/openai/v1"], ["Together", "https://api.together.xyz/v1"], ["OpenAI", "https://api.openai.com/v1"]]
               as [name, url]}
                 <button class="preset" class:active={visionBaseUrl === url} onclick={() => { visionBaseUrl = url; }}>
                   {name}
