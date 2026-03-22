@@ -43,6 +43,9 @@ _SAVEABLE_FIELDS = {
     "whatsapp_phone_number",
     "whatsapp_allowed_users",
     "jina_api_key",
+    "tavily_api_key",
+    "web_read_provider",
+    "web_read_fallback",
     "ha_url",
     "ha_token",
     "web_password",
@@ -147,8 +150,11 @@ class HomeclawConfig(BaseSettings):
                 numbers.add(normalized)
         return numbers if numbers else None
 
-    # Web search (Jina)
+    # Web search & reading
     jina_api_key: str | None = None
+    tavily_api_key: str | None = None
+    web_read_provider: str = "jina"  # "jina" or "tavily"
+    web_read_fallback: str | None = None  # optional secondary provider
 
     # Home Assistant (optional)
     ha_url: str | None = None
