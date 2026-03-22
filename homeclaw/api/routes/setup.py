@@ -85,6 +85,9 @@ async def setup_status(request: Request) -> dict[str, Any]:
         "anthropic_base_url": config.anthropic_base_url,
         "openai_api_key": _mask(config.openai_api_key),
         "openai_base_url": config.openai_base_url,
+        "fast_provider": config.fast_provider,
+        "fast_api_key": _mask(config.fast_api_key),
+        "fast_base_url": config.fast_base_url,
         "telegram_configured": config.telegram_token is not None,
         "telegram_allowed_users": config.telegram_allowed_users,
         "whatsapp_configured": config.whatsapp_enabled,
@@ -94,7 +97,7 @@ async def setup_status(request: Request) -> dict[str, Any]:
         "jina_api_key": _mask(config.jina_api_key),
         "ha_configured": config.ha_url is not None,
         "conversation_model": config.routing.conversation_model,
-        "routine_model": config.routing.routine_model,
+        "fast_model": config.routing.fast_model,
         "timezone": config.timezone,
         "note_detail_level": config.note_detail_level,
     })
@@ -110,6 +113,9 @@ class SetupBody(BaseModel):
     anthropic_base_url: str | None = None
     openai_api_key: str | None = None
     openai_base_url: str | None = None
+    fast_provider: str | None = None
+    fast_api_key: str | None = None
+    fast_base_url: str | None = None
     model: str | None = None
 
     # Telegram
@@ -130,7 +136,7 @@ class SetupBody(BaseModel):
 
     # Routing
     conversation_model: str | None = None
-    routine_model: str | None = None
+    fast_model: str | None = None
 
     # Timezone
     timezone: str | None = None
@@ -165,6 +171,12 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         config.openai_api_key = body.openai_api_key or None
     if body.openai_base_url is not None:
         config.openai_base_url = body.openai_base_url or None
+    if body.fast_provider is not None:
+        config.fast_provider = body.fast_provider or None
+    if body.fast_api_key is not None:
+        config.fast_api_key = body.fast_api_key or None
+    if body.fast_base_url is not None:
+        config.fast_base_url = body.fast_base_url or None
     if body.model is not None:
         config.model = body.model
     if body.telegram_token is not None:
@@ -185,8 +197,8 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         config.jina_api_key = body.jina_api_key or None
     if body.conversation_model is not None:
         config.routing.conversation_model = body.conversation_model
-    if body.routine_model is not None:
-        config.routing.routine_model = body.routine_model
+    if body.fast_model is not None:
+        config.routing.fast_model = body.fast_model
     if body.timezone is not None:
         config.timezone = body.timezone or None
     if body.note_detail_level is not None:

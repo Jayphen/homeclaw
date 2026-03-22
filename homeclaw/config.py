@@ -30,6 +30,9 @@ _SAVEABLE_FIELDS = {
     "anthropic_base_url",
     "openai_api_key",
     "openai_base_url",
+    "fast_provider",
+    "fast_api_key",
+    "fast_base_url",
     "model",
     "telegram_token",
     "telegram_allowed_users",
@@ -81,6 +84,13 @@ class HomeclawConfig(BaseSettings):
     anthropic_base_url: str | None = None
     openai_api_key: str | None = None
     openai_base_url: str | None = None
+
+    # Fast model provider overrides — when set, the fast model uses a separate
+    # provider instance (e.g. MiniMax via OpenAI protocol while conversation
+    # uses OpenRouter).  Falls back to the main provider when unset.
+    fast_provider: str | None = None  # "anthropic" or "openai"; defaults to main provider
+    fast_api_key: str | None = None
+    fast_base_url: str | None = None
 
     # Model name — set to match your provider
     model: str = "claude-sonnet-4-6"

@@ -119,11 +119,14 @@
   // Editable config fields
   let selectedProvider: "anthropic" | "openai" = $state("anthropic");
   let conversationModel: string = $state("");
-  let routineModel: string = $state("");
+  let fastModel: string = $state("");
   let anthropicKey: string = $state("");
   let anthropicBaseUrl: string = $state("");
   let openaiKey: string = $state("");
   let openaiBaseUrl: string = $state("");
+  let fastProvider: string = $state("");
+  let fastApiKey: string = $state("");
+  let fastBaseUrl: string = $state("");
   let jinaKey: string = $state("");
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
@@ -199,9 +202,11 @@
       setup = await setupRes.json();
       selectedProvider = (setup!.provider === "openai" ? "openai" : setup!.provider === "anthropic" ? "anthropic" : setup!.anthropic_api_key ? "anthropic" : "openai") as "anthropic" | "openai";
       conversationModel = setup!.conversation_model;
-      routineModel = setup!.routine_model;
+      fastModel = setup!.fast_model;
       anthropicBaseUrl = setup!.anthropic_base_url || "";
       openaiBaseUrl = setup!.openai_base_url || "";
+      fastProvider = setup!.fast_provider || "";
+      fastBaseUrl = setup!.fast_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
       whatsappEnabled = setup!.whatsapp_configured;
       whatsappConnected = setup!.whatsapp_connected;
@@ -296,12 +301,15 @@
 
     if (selectedProvider !== setup?.provider) body.provider = selectedProvider;
     if (conversationModel !== setup?.conversation_model) body.conversation_model = conversationModel;
-    if (routineModel !== setup?.routine_model) body.routine_model = routineModel;
+    if (fastModel !== setup?.fast_model) body.fast_model = fastModel;
     if (anthropicKey) body.anthropic_api_key = anthropicKey;
     if (anthropicBaseUrl !== (setup?.anthropic_base_url || "")) body.anthropic_base_url = anthropicBaseUrl || null;
     if (openaiKey) body.openai_api_key = openaiKey;
     if (jinaKey) body.jina_api_key = jinaKey;
     if (openaiBaseUrl !== (setup?.openai_base_url || "")) body.openai_base_url = openaiBaseUrl || null;
+    if (fastProvider !== (setup?.fast_provider || "")) body.fast_provider = fastProvider || null;
+    if (fastApiKey) body.fast_api_key = fastApiKey;
+    if (fastBaseUrl !== (setup?.fast_base_url || "")) body.fast_base_url = fastBaseUrl || null;
     if (telegramToken) body.telegram_token = telegramToken;
     if (telegramAllowedUsers !== (setup?.telegram_allowed_users || "")) {
       body.telegram_allowed_users = telegramAllowedUsers || null;
@@ -334,9 +342,11 @@
       setup = await r.json();
       selectedProvider = (setup!.provider === "openai" ? "openai" : setup!.provider === "anthropic" ? "anthropic" : setup!.anthropic_api_key ? "anthropic" : "openai") as "anthropic" | "openai";
       conversationModel = setup!.conversation_model;
-      routineModel = setup!.routine_model;
+      fastModel = setup!.fast_model;
       anthropicBaseUrl = setup!.anthropic_base_url || "";
       openaiBaseUrl = setup!.openai_base_url || "";
+      fastProvider = setup!.fast_provider || "";
+      fastBaseUrl = setup!.fast_base_url || "";
       telegramAllowedUsers = setup!.telegram_allowed_users || "";
       whatsappEnabled = setup!.whatsapp_configured;
       whatsappConnected = setup!.whatsapp_connected;
@@ -348,6 +358,7 @@
       // Clear secret inputs after save
       anthropicKey = "";
       openaiKey = "";
+      fastApiKey = "";
       jinaKey = "";
       telegramToken = "";
 
@@ -408,10 +419,49 @@
       </div>
 
       <div class="field">
-        <label for="routine-model">Routine model</label>
-        <input id="routine-model" type="text" bind:value={routineModel} />
-        <small class="field-hint">Used for scheduled tasks and simple tool follow-ups (cheaper).</small>
+        <label for="fast-model">Fast model</label>
+        <input id="fast-model" type="text" bind:value={fastModel} />
+        <small class="field-hint">Used for simple tool follow-ups (cheaper/faster). Leave provider fields below empty to reuse the main provider.</small>
       </div>
+
+      <div class="field">
+        <label for="fast-provider">Fast model provider</label>
+        <div class="toggle-group">
+          <button class:active={!fastProvider} onclick={() => { fastProvider = ""; }}>
+            Same as main
+          </button>
+          <button class:active={fastProvider === "anthropic"} onclick={() => { fastProvider = "anthropic"; }}>
+            Anthropic
+          </button>
+          <button class:active={fastProvider === "openai"} onclick={() => { fastProvider = "openai"; }}>
+            OpenAI
+          </button>
+        </div>
+      </div>
+
+      {#if fastProvider}
+      <div class="field">
+        <label for="fast-api-key">Fast model API key</label>
+        <input id="fast-api-key" type="password" bind:value={fastApiKey}
+          placeholder={setup.fast_api_key ? `Current: ${setup.fast_api_key}` : "Falls back to main key"} />
+      </div>
+
+      <div class="field">
+        <label for="fast-base-url">Fast model base URL</label>
+        <input id="fast-base-url" type="url" bind:value={fastBaseUrl} placeholder="Falls back to main URL" />
+        <div class="presets">
+          {#each [
+            ["MiniMax (Anthropic)", "https://api.minimax.io/anthropic"],
+            ["MiniMax (OpenAI)", "https://api.minimax.io/v1"],
+            ["OpenRouter", "https://openrouter.ai/api/v1"],
+          ] as [name, url]}
+            <button class="preset" class:active={fastBaseUrl === url} onclick={() => { fastBaseUrl = url; }}>
+              {name}
+            </button>
+          {/each}
+        </div>
+      </div>
+      {/if}
 
       <div class="field">
         <label for="anthropic-key">Anthropic API key</label>

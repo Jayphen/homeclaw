@@ -90,7 +90,7 @@ class HomeclawApp:
         config: Any | None = None,
     ) -> None:
         from homeclaw.agent.loop import AgentLoop
-        from homeclaw.agent.providers.factory import create_provider
+        from homeclaw.agent.providers.factory import create_fast_provider, create_provider
         from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
         from homeclaw.config import HomeclawConfig
 
@@ -99,6 +99,7 @@ class HomeclawApp:
         _ensure_default_files(self.workspaces)
 
         provider = create_provider(self.config)
+        fast_provider = create_fast_provider(self.config)
 
         self._scheduler: Scheduler | None = None
 
@@ -163,6 +164,7 @@ class HomeclawApp:
             routing=self.config.routing,
             admin_check=_admin_check,
             note_detail_level=self.config.note_detail_level,
+            fast_provider=fast_provider,
         )
 
     async def initialize(self) -> None:

@@ -256,8 +256,10 @@ class AgentLoop:
         routing: RoutingConfig | None = None,
         admin_check: Callable[[str], bool] | None = None,
         note_detail_level: str = "normal",
+        fast_provider: LLMProvider | None = None,
     ) -> None:
         self._provider = provider
+        self._fast_provider = fast_provider
         self._registry = registry
         self._workspaces = workspaces
         self._semantic_memory = semantic_memory
@@ -271,6 +273,12 @@ class AgentLoop:
         # Track last activity per session for idle-based consolidation
         self._last_activity: dict[str, float] = {}
         self._consolidation_task: asyncio.Task[None] | None = None
+
+    def _pick_provider(self, call_type: CallType) -> LLMProvider:
+        """Return the fast provider for cheap call types, main provider otherwise."""
+        if self._fast_provider and call_type in (CallType.TOOL_ONLY, CallType.MEMORY_WRITE):
+            return self._fast_provider
+        return self._provider
 
     def set_interim_callback(self, callback: InterimCallback | None) -> None:
         """Set a callback for interim responses during tool rounds.
@@ -447,15 +455,17 @@ class AgentLoop:
 
         # Apply model routing if configured
         current_call_type = call_type
+        active_provider = self._provider
         if self._routing:
             model = route_model(call_type, self._routing)
-            if hasattr(self._provider, "model"):
-                self._provider.model = model  # type: ignore[attr-defined]
+            active_provider = self._pick_provider(current_call_type)
+            if hasattr(active_provider, "model"):
+                active_provider.model = model  # type: ignore[attr-defined]
             logger.debug("Routed %s → %s", call_type.value, model)
 
         for _ in range(MAX_TOOL_ROUNDS):
             token_limit = max_tokens_for(current_call_type, self._routing) if self._routing else None
-            response = await self._provider.complete(
+            response = await active_provider.complete(
                 messages=history,
                 tools=tools,
                 system=system,
@@ -508,13 +518,14 @@ class AgentLoop:
                     )
                 )
 
-            # Re-route: use cheaper model for follow-up if tools were simple
+            # Re-route: use cheaper model/provider for follow-up if tools were simple
             if self._routing:
                 tool_names = [tc.name for tc in response.tool_calls]
                 current_call_type = classify_tool_round(tool_names)
                 model = route_model(current_call_type, self._routing)
-                if hasattr(self._provider, "model"):
-                    self._provider.model = model  # type: ignore[attr-defined]
+                active_provider = self._pick_provider(current_call_type)
+                if hasattr(active_provider, "model"):
+                    active_provider.model = model  # type: ignore[attr-defined]
                     logger.debug("Re-routed after tools %s → %s (%s)", tool_names, model, current_call_type.value)
 
         if response and response.stop_reason == "tool_use":
