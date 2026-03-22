@@ -671,10 +671,112 @@ class AgentLoop:
                     extra={"model": self._current_model},
                 )
                 results.append(result)
+                asyncio.create_task(
+                    _log_tool_event(
+                        self._workspaces, tc.name, args, person,
+                        self._fast_provider or self._provider,
+                    ),
+                )
             except Exception as e:
                 logger.exception("Tool %s failed", tc.name)
                 results.append({"error": f"Tool {tc.name} failed: {e}"})
         return results
+
+
+# Tools worth surfacing in the activity feed (write/action tools only).
+# Read-only tools like contact_list, memory_read, note_get are excluded.
+_FEED_WORTHY_TOOLS: set[str] = {
+    "memory_save",
+    "note_save",
+    "reminder_add",
+    "reminder_complete",
+    "reminder_delete",
+    "contact_update",
+    "contact_note",
+    "interaction_log",
+    "bookmark_save",
+    "bookmark_delete",
+    "message_send",
+    "image_send",
+    "routine_run",
+    "routine_add",
+    "routine_update",
+    "routine_remove",
+    "decision_log",
+    "household_share",
+    "skill_create",
+    "skill_install",
+    "channel_preference_set",
+}
+
+_SUMMARISE_PROMPT = """\
+You are writing a short activity log entry for a household assistant app.
+
+Given a tool call, write a single concise sentence (max 80 chars) describing \
+what happened in plain English. Use past tense. Be specific — include names, \
+topics, or titles from the arguments when available.
+
+Examples:
+- tool=memory_save args={"topic":"food","person":"alice"} → Saved a food memory for Alice
+- tool=reminder_add args={"person":"bob","note":"dentist"} → Added a dentist reminder for Bob
+- tool=message_send args={"person":"carol","text":"hi"} → Sent a message to Carol
+- tool=bookmark_save args={"title":"Pasta recipe","url":"..."} → Bookmarked "Pasta recipe"
+
+Respond with ONLY the summary sentence, nothing else."""
+
+
+async def _log_tool_event(
+    workspaces: Path,
+    tool_name: str,
+    args: dict[str, Any],
+    person: str,
+    provider: LLMProvider | None,
+) -> None:
+    """Append a tool use event to the JSONL feed log.
+
+    Uses the fast LLM to generate a human-readable summary. Falls back to
+    a basic description if the provider is unavailable or the call fails.
+    """
+    if tool_name not in _FEED_WORTHY_TOOLS:
+        return
+
+    safe_args = {k: str(v)[:100] for k, v in args.items()}
+    summary: str | None = None
+
+    if provider is not None:
+        try:
+            prompt = f"tool={tool_name} args={json.dumps(safe_args, default=str)}"
+            resp = await provider.complete(
+                messages=[Message(role="user", content=prompt)],
+                tools=[],
+                system=_SUMMARISE_PROMPT,
+                max_tokens=60,
+            )
+            text = resp.content.strip().rstrip(".")
+            if 5 < len(text) < 120:
+                summary = text
+        except Exception:
+            logger.debug("LLM summary failed for %s, using fallback", tool_name)
+
+    if summary is None:
+        # Fallback: basic tool name → readable string
+        label = tool_name.replace("_", " ")
+        summary = f"{label.capitalize()} ({person})"
+
+    log_dir = workspaces / "household" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "ts": datetime.now(UTC).isoformat(),
+        "tool": tool_name,
+        "summary": summary,
+        "person": person,
+        "args": safe_args,
+    }
+    try:
+        with open(log_dir / "tool_use.jsonl", "a") as f:
+            f.write(json.dumps(entry, default=str) + "\n")
+    except OSError:
+        logger.debug("Failed to write tool_use.jsonl entry")
 
 
 def _append_chat_log(

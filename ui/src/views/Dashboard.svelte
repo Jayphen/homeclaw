@@ -153,6 +153,7 @@
     interaction: "Interaction",
     note_update: "Note",
     cost_spike: "Cost",
+    tool_use: "Tool",
   };
 
   const feedTypeColors: Record<string, string> = {
@@ -161,6 +162,7 @@
     interaction: "var(--primary)",
     note_update: "var(--text-muted)",
     cost_spike: "var(--secondary)",
+    tool_use: "var(--terracotta)",
   };
 
   // Fetch all three endpoints in parallel

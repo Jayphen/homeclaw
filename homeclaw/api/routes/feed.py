@@ -32,6 +32,7 @@ EventType = Literal[
     "interaction",
     "note_update",
     "cost_spike",
+    "tool_use",
 ]
 
 
@@ -169,6 +170,43 @@ def _note_events(
     return events
 
 
+def _tool_use_events(
+    workspaces: Path, since: datetime,
+) -> list[dict[str, Any]]:
+    """Read tool use events from the JSONL log."""
+    log_path = workspaces / "household" / "logs" / "tool_use.jsonl"
+    if not log_path.exists():
+        return []
+    events: list[dict[str, Any]] = []
+    try:
+        for line in log_path.read_text().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            ts_str = entry.get("ts", "")
+            try:
+                ts = datetime.fromisoformat(ts_str)
+            except (ValueError, TypeError):
+                continue
+            if ts < since:
+                continue
+            events.append({
+                "ts": ts.isoformat(),
+                "type": "tool_use",
+                "summary": entry.get("summary", f"Used {entry.get('tool', '?')}"),
+                "detail": None,
+                "person": entry.get("person"),
+                "meta": {"tool": entry.get("tool", "")},
+            })
+    except OSError:
+        pass
+    return events
+
+
 @router.get("")
 async def activity_feed(
     member: Annotated[str | None, MemberDep],
@@ -188,6 +226,7 @@ async def activity_feed(
     events.extend(_routine_events(workspaces, since))
     events.extend(_interaction_events(workspaces, since))
     events.extend(_note_events(workspaces, members, since))
+    events.extend(_tool_use_events(workspaces, since))
 
     # Sort by timestamp descending (most recent first)
     events.sort(key=lambda e: e["ts"], reverse=True)
