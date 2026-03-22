@@ -38,9 +38,9 @@ class FakePlugin:
 
 
 @pytest.fixture()
-def _setup() -> Any:
+def _setup(tmp_path: Any) -> Any:
     """Set up config and plugin registry for API tests."""
-    config = HomeclawConfig(web_password="")
+    config = HomeclawConfig(web_password="", member_passwords={}, workspaces_path=str(tmp_path))
     set_config(config)
 
     tool_reg = ToolRegistry()
@@ -95,9 +95,9 @@ def test_get_plugin_not_found(client: TestClient) -> None:
     assert resp.status_code == 404
 
 
-def test_list_plugins_no_registry() -> None:
+def test_list_plugins_no_registry(tmp_path: Any) -> None:
     """When no registry is set, returns empty list."""
-    config = HomeclawConfig(web_password="")
+    config = HomeclawConfig(web_password="", member_passwords={}, workspaces_path=str(tmp_path))
     set_config(config)
     set_plugin_registry(None)
     c = TestClient(app)
