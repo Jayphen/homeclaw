@@ -49,7 +49,7 @@ _SAVEABLE_FIELDS = {
 }
 
 # Routing model fields are saved/loaded via the nested RoutingConfig object.
-_ROUTING_FIELDS = {"conversation_model", "routine_model"}
+_ROUTING_FIELDS = {"conversation_model", "fast_model"}
 
 
 class _JsonFileSource(PydanticBaseSettingsSource):
