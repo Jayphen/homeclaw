@@ -280,6 +280,25 @@ class AgentLoop:
             return self._fast_provider
         return self._provider
 
+    def _maybe_activate_skill(self, tool_name: str, person: str) -> str | None:
+        """Auto-load skill instructions if a skill tool is called without read_skill.
+
+        Returns the skill instructions to prepend to the tool result, or None.
+        """
+        if "__" not in tool_name:
+            return None
+        skill_name = tool_name.split("__", 1)[0]
+
+        from homeclaw.agent.tools import activated_skills, load_skill_instructions
+
+        if skill_name in activated_skills:
+            return None
+
+        instructions = load_skill_instructions(self._workspaces, person, skill_name)
+        if instructions:
+            logger.info("Auto-activated skill '%s' for tool %s", skill_name, tool_name)
+        return instructions
+
     def set_interim_callback(self, callback: InterimCallback | None) -> None:
         """Set a callback for interim responses during tool rounds.
 
@@ -609,7 +628,14 @@ class AgentLoop:
                 results.append({"error": f"Unknown tool: {tc.name}"})
                 continue
             try:
+                # Auto-activate skill: if a skill tool is called without
+                # read_skill, load the SKILL.md instructions and prepend
+                # them to the tool result so the LLM has full context.
+                skill_preamble = self._maybe_activate_skill(tc.name, person)
+
                 result = await handler(**args)
+                if skill_preamble:
+                    result = {"_skill_instructions": skill_preamble, **result}
                 result_str = json.dumps(result, default=str)
                 logger.info(
                     "Tool result: %s → %s",

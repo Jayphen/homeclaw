@@ -47,6 +47,27 @@ def _check_content_length(content: str, field: str = "content") -> dict[str, Any
     return None
 
 
+# Module-level set of activated skills — shared between read_skill and
+# auto-activation in the agent loop.  Persists for the process lifetime.
+activated_skills: set[str] = set()
+
+
+def load_skill_instructions(workspaces: Path, person: str, skill_name: str) -> str | None:
+    """Load a skill's SKILL.md instructions.  Returns None if not found."""
+    from homeclaw.plugins.skills.loader import discover_skills, skill_md_to_definition
+
+    locations = discover_skills(workspaces, person)
+    loc = next((sk for sk in locations if sk.name == skill_name), None)
+    if loc is None:
+        return None
+    skill_path = loc.skill_dir / "SKILL.md"
+    if not skill_path.is_file():
+        return None
+    defn = skill_md_to_definition(skill_path.read_text())
+    activated_skills.add(skill_name)
+    return defn.instructions
+
+
 class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, ToolDefinition] = {}
@@ -1765,16 +1786,13 @@ def register_builtin_tools(
 
         return {"error": "Provide content (write), or find+replace (edit), or nothing (read)"}
 
-    # Track activated skills per session to avoid re-injecting
-    _activated_skills: set[str] = set()
-
     @_reg(
         name="read_skill",
         description=(
             "Load a skill's full instructions and see its available resources. "
-            "Call this before using a skill's tools (data_read, data_write, "
-            "http_call, run_skill_script). The skill catalog in your context "
-            "lists available skills."
+            "Skill instructions are auto-loaded on first tool use, but call this "
+            "to browse a skill's resources, scripts, and data files. "
+            "The skill catalog in your context lists available skills."
         ),
     )
     async def read_skill(
@@ -1812,7 +1830,7 @@ def register_builtin_tools(
                 if files:
                     resources[subdir] = files
 
-        _activated_skills.add(name)
+        activated_skills.add(name)
 
         # List registered plugin tools for this skill (e.g. weather__http_call)
         available_tools: list[str] = []
@@ -1829,7 +1847,7 @@ def register_builtin_tools(
             "scope": loc.scope,
             "resources": resources,
             "tools": available_tools,
-            "already_loaded": name in _activated_skills,
+            "already_loaded": name in activated_skills,
         }
 
     @_reg(

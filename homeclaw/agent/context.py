@@ -253,7 +253,7 @@ def _build_skill_catalog(
         return []
 
     lines: list[str] = [
-        "Available skills (call read_skill to load instructions before using):",
+        "Available skills (instructions auto-load on first tool use; call read_skill to browse resources):",
     ]
     for entry in catalog:
         scope_tag = f" [{entry.scope}]" if entry.scope != "household" else ""
