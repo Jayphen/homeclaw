@@ -19,6 +19,8 @@ from homeclaw.api.routes.contacts import router as contacts_router
 from homeclaw.api.routes.cost import router as cost_router
 from homeclaw.api.routes.dashboard import router as dashboard_router
 from homeclaw.api.routes.data import router as data_router
+from homeclaw.api.routes.feed import router as feed_router
+from homeclaw.api.routes.knowledge import router as knowledge_router
 from homeclaw.api.routes.memory import router as memory_router
 from homeclaw.api.routes.notes import router as notes_router
 from homeclaw.api.routes.plugins import router as plugins_router
@@ -40,6 +42,8 @@ app.include_router(calendar_router)
 app.include_router(contacts_router)
 app.include_router(cost_router)
 app.include_router(data_router)
+app.include_router(feed_router)
+app.include_router(knowledge_router)
 app.include_router(dashboard_router)
 app.include_router(memory_router)
 app.include_router(notes_router)

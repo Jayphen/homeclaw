@@ -1,7 +1,9 @@
 <script lang="ts">
   import { api } from "$lib/api";
   import { renderMarkdown } from "$lib/markdown";
+  import { formatRelativeTime as formatTime } from "$lib/time";
 
+  // ---- Existing dashboard types ----
   interface TodayNote {
     person: string;
     content: string;
@@ -40,7 +42,59 @@
     overdue_checkins: OverdueCheckin[];
   }
 
+  // ---- Knowledge types ----
+  interface TopicStat {
+    name: string;
+    entries: number;
+    last_updated: string | null;
+    size_bytes: number;
+  }
+  interface MemberKnowledge {
+    person: string;
+    topic_count: number;
+    total_entries: number;
+    topics: TopicStat[];
+    earliest_entry: string | null;
+    latest_entry: string | null;
+  }
+  interface KnowledgeData {
+    summary: {
+      total_topics: number;
+      total_entries: number;
+      total_contacts: number;
+      total_notes: number;
+      total_bookmarks: number;
+      total_interactions: number;
+      semantic_status: string;
+    };
+    members: MemberKnowledge[];
+    household: MemberKnowledge;
+    contacts: {
+      total: number;
+      with_birthday: number;
+      with_reminders: number;
+    };
+  }
+
+  // ---- Feed types ----
+  interface FeedEvent {
+    ts: string;
+    type: string;
+    summary: string;
+    detail: string | null;
+    person: string | null;
+    meta: Record<string, string>;
+  }
+  interface FeedData {
+    events: FeedEvent[];
+    total: number;
+    type_counts: Record<string, number>;
+    since: string;
+  }
+
   let data: DashboardData | null = $state(null);
+  let knowledge: KnowledgeData | null = $state(null);
+  let feed: FeedData | null = $state(null);
   let error: string | null = $state(null);
   let loading: boolean = $state(true);
 
@@ -72,8 +126,6 @@
     return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   }
 
-  import { formatRelativeTime as formatTime } from "$lib/time";
-
   function daysUntil(iso: string): string {
     const d = new Date(iso + "T12:00:00");
     const now = new Date();
@@ -83,14 +135,42 @@
     return `in ${diff} days`;
   }
 
+  const feedTypeLabels: Record<string, string> = {
+    memory_save: "Memory",
+    routine_run: "Routine",
+    interaction: "Interaction",
+    note_update: "Note",
+    cost_spike: "Cost",
+  };
+
+  const feedTypeColors: Record<string, string> = {
+    memory_save: "var(--sage)",
+    routine_run: "var(--amber)",
+    interaction: "var(--primary)",
+    note_update: "var(--text-muted)",
+    cost_spike: "var(--secondary)",
+  };
+
+  // Fetch all three endpoints in parallel
   $effect(() => {
-    api("/api/dashboard")
-      .then((r) => {
-        if (!r.ok) throw new Error(`${r.status}`);
+    Promise.all([
+      api("/api/dashboard").then((r) => {
+        if (!r.ok) throw new Error(`Dashboard: ${r.status}`);
         return r.json();
-      })
-      .then((d: DashboardData) => {
+      }),
+      api("/api/knowledge").then((r) => {
+        if (!r.ok) return null; // non-critical
+        return r.json();
+      }),
+      api("/api/feed?days=3&limit=20").then((r) => {
+        if (!r.ok) return null; // non-critical
+        return r.json();
+      }),
+    ])
+      .then(([d, k, f]: [DashboardData, KnowledgeData | null, FeedData | null]) => {
         data = d;
+        knowledge = k;
+        feed = f;
         loading = false;
       })
       .catch((e) => {
@@ -122,9 +202,90 @@
     {/if}
   </header>
 
+  <!-- ============ Knowledge Stats Bar ============ -->
+  {#if knowledge}
+    <section class="knowledge-bar" style="animation-delay: 40ms">
+      <div class="stat">
+        <span class="stat-value">{knowledge.summary.total_entries}</span>
+        <span class="stat-label">memories</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-value">{knowledge.summary.total_topics}</span>
+        <span class="stat-label">topics</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-value">{knowledge.summary.total_contacts}</span>
+        <span class="stat-label">contacts</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-value">{knowledge.summary.total_notes}</span>
+        <span class="stat-label">notes</span>
+      </div>
+      {#if knowledge.summary.total_bookmarks > 0}
+        <div class="stat-divider"></div>
+        <div class="stat">
+          <span class="stat-value">{knowledge.summary.total_bookmarks}</span>
+          <span class="stat-label">bookmarks</span>
+        </div>
+      {/if}
+    </section>
+
+    <!-- Per-member knowledge breakdown -->
+    {#if knowledge.members.length > 0 || knowledge.household.topic_count > 0}
+      <section class="card knowledge-detail" style="animation-delay: 60ms">
+        <h2>What homeclaw knows</h2>
+        <div class="knowledge-grid">
+          {#if knowledge.household.topic_count > 0}
+            <div class="knowledge-member">
+              <div class="knowledge-member-header">
+                <span class="knowledge-person">household</span>
+                <span class="knowledge-count">{knowledge.household.total_entries} entries</span>
+              </div>
+              <div class="topic-pills">
+                {#each knowledge.household.topics.slice(0, 8) as topic}
+                  <span class="topic-pill" title="{topic.entries} entries">
+                    {topic.name}
+                    <span class="topic-count">{topic.entries}</span>
+                  </span>
+                {/each}
+                {#if knowledge.household.topics.length > 8}
+                  <span class="topic-pill more">+{knowledge.household.topics.length - 8} more</span>
+                {/if}
+              </div>
+            </div>
+          {/if}
+          {#each knowledge.members as member}
+            {#if member.topic_count > 0}
+              <div class="knowledge-member">
+                <div class="knowledge-member-header">
+                  <span class="knowledge-person">{member.person}</span>
+                  <span class="knowledge-count">{member.total_entries} entries</span>
+                </div>
+                <div class="topic-pills">
+                  {#each member.topics.slice(0, 8) as topic}
+                    <span class="topic-pill" title="{topic.entries} entries">
+                      {topic.name}
+                      <span class="topic-count">{topic.entries}</span>
+                    </span>
+                  {/each}
+                  {#if member.topics.length > 8}
+                    <span class="topic-pill more">+{member.topics.length - 8} more</span>
+                  {/if}
+                </div>
+              </div>
+            {/if}
+          {/each}
+        </div>
+      </section>
+    {/if}
+  {/if}
+
   <!-- Overdue check-ins — urgent, shown first -->
   {#if data.overdue_checkins.length > 0}
-    <section class="card overdue" style="animation-delay: 60ms">
+    <section class="card overdue" style="animation-delay: 80ms">
       <h2>Overdue check-ins</h2>
       <ul>
         {#each data.overdue_checkins as checkin}
@@ -211,8 +372,42 @@
     {/if}
   </div>
 
+  <!-- ============ Activity Feed ============ -->
+  {#if feed && feed.events.length > 0}
+    <section class="card feed" style="animation-delay: 360ms">
+      <div class="feed-header">
+        <h2>Recent activity</h2>
+        <span class="feed-total">{feed.total} events</span>
+      </div>
+      <div class="feed-timeline">
+        {#each feed.events as event}
+          <div class="feed-event">
+            <div class="feed-dot" style="background: {feedTypeColors[event.type] ?? 'var(--text-muted)'}"></div>
+            <div class="feed-content">
+              <div class="feed-event-header">
+                <span class="feed-summary">{event.summary}</span>
+                <span class="feed-time">{formatTime(event.ts)}</span>
+              </div>
+              {#if event.detail}
+                <span class="feed-detail">{event.detail}</span>
+              {/if}
+              <div class="feed-meta">
+                <span class="badge feed-type-badge" style="color: {feedTypeColors[event.type] ?? 'var(--text-muted)'}">
+                  {feedTypeLabels[event.type] ?? event.type}
+                </span>
+                {#if event.person}
+                  <span class="feed-person">{event.person}</span>
+                {/if}
+              </div>
+            </div>
+          </div>
+        {/each}
+      </div>
+    </section>
+  {/if}
+
   <!-- Empty state -->
-  {#if data.today_notes.length === 0 && data.upcoming_reminders.length === 0 && data.upcoming_birthdays.length === 0 && data.recent_interactions.length === 0 && data.overdue_checkins.length === 0}
+  {#if data.today_notes.length === 0 && data.upcoming_reminders.length === 0 && data.upcoming_birthdays.length === 0 && data.recent_interactions.length === 0 && data.overdue_checkins.length === 0 && (!feed || feed.events.length === 0) && (!knowledge || knowledge.summary.total_entries === 0)}
     <div class="empty" style="animation-delay: 120ms">
       <p>Nothing on the board yet.</p>
       <small>Chat with homeclaw on Telegram to start building your household's story.</small>
@@ -235,6 +430,7 @@
 
   .greeting,
   .card,
+  .knowledge-bar,
   .empty {
     opacity: 0;
     animation: fadeUp 0.4s ease-out forwards;
@@ -297,7 +493,7 @@
 
   /* ---- Greeting header ---- */
   .greeting {
-    margin-bottom: 2.75rem;
+    margin-bottom: 2rem;
   }
 
   .greeting h1 {
@@ -321,6 +517,113 @@
     margin: 0.5rem 0 0;
     text-transform: capitalize;
     letter-spacing: 0.02em;
+  }
+
+  /* ---- Knowledge Stats Bar ---- */
+  .knowledge-bar {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1rem 1.5rem;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+  }
+
+  .stat-value {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: 1.5rem;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .stat-divider {
+    width: 1px;
+    height: 2rem;
+    background: var(--border);
+  }
+
+  /* ---- Knowledge Detail Card ---- */
+  .knowledge-detail {
+    margin-bottom: 1.25rem;
+  }
+
+  .knowledge-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .knowledge-member {
+    padding: 0.75rem;
+    background: var(--surface-low);
+    border-radius: var(--radius-sm);
+  }
+
+  .knowledge-member-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+
+  .knowledge-person {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    color: var(--sage);
+    letter-spacing: 0.03em;
+  }
+
+  .knowledge-count {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .topic-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .topic-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.72rem;
+    padding: 0.2rem 0.5rem;
+    background: var(--surface);
+    border-radius: 100px;
+    color: var(--text);
+  }
+
+  .topic-pill .topic-count {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .topic-pill.more {
+    color: var(--text-muted);
+    font-style: italic;
   }
 
   /* ---- Card base ---- */
@@ -543,6 +846,110 @@
   .birthdays li strong::before {
     content: "🎂 ";
     font-size: 0.85rem;
+  }
+
+  /* ---- Activity Feed ---- */
+  .feed {
+    margin-top: 1.25rem;
+  }
+
+  .feed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .feed-header h2 {
+    margin: 0;
+  }
+
+  .feed-total {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .feed-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .feed-event {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.6rem 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .feed-event:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  .feed-event:last-child {
+    padding-bottom: 0;
+  }
+
+  .feed-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 0.35rem;
+    flex-shrink: 0;
+  }
+
+  .feed-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .feed-event-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .feed-summary {
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .feed-time {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .feed-detail {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .feed-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.25rem;
+  }
+
+  .feed-type-badge {
+    background: var(--surface-low);
+    font-size: 0.65rem;
+    padding: 0.1rem 0.35rem;
+  }
+
+  .feed-person {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: capitalize;
   }
 
   /* ---- Empty state ---- */
