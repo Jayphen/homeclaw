@@ -19,8 +19,8 @@ class RoutingConfig(BaseSettings):
     # Primary: used for conversations requiring reasoning
     conversation_model: str = "claude-sonnet-4-6"
 
-    # Cheap: used for scheduled routines and simple tool calls
-    routine_model: str = "claude-haiku-4-5"
+    # Cheap: used for simple tool calls and follow-ups
+    fast_model: str = "claude-haiku-4-5"
 
     # Whether to use OpenRouter (dev) or direct providers (hosted)
     use_openrouter: bool = False
@@ -38,7 +38,7 @@ class RoutingConfig(BaseSettings):
 
     # Output token limits
     max_output_tokens: int = 4096
-    routine_max_output_tokens: int = 2048
+    fast_max_output_tokens: int = 2048
 
     @model_validator(mode="after")
     def _apply_provider_defaults(self) -> "RoutingConfig":
@@ -79,16 +79,16 @@ def route_model(call_type: CallType, config: RoutingConfig) -> str:
 
     Routines use the conversation model for the initial call so the LLM is
     capable enough to decide which tools to invoke (e.g. web_search).  After
-    tool dispatch, classify_tool_round downgrades to the routine model for
+    tool dispatch, classify_tool_round downgrades to the fast model for
     simple follow-up rounds.
     """
     if call_type in (CallType.TOOL_ONLY, CallType.MEMORY_WRITE):
-        return config.routine_model
+        return config.fast_model
     return config.conversation_model
 
 
 def max_tokens_for(call_type: CallType, config: RoutingConfig) -> int:
     """Return the max output tokens for a given call type."""
     if call_type in (CallType.TOOL_ONLY, CallType.MEMORY_WRITE):
-        return config.routine_max_output_tokens
+        return config.fast_max_output_tokens
     return config.max_output_tokens

@@ -55,8 +55,8 @@ class RoutingConfig(BaseModel):
     # Primary: used for conversations requiring reasoning
     conversation_model: str = "anthropic/claude-sonnet-4-6"
 
-    # Cheap: used for scheduled routines and simple tool calls
-    routine_model: str = "anthropic/claude-haiku-4-5-20251001"
+    # Cheap: used for simple tool calls and follow-ups
+    fast_model: str = "anthropic/claude-haiku-4-5-20251001"
 
     # Whether to use OpenRouter (dev) or direct providers (hosted)
     use_openrouter: bool = True
@@ -64,11 +64,11 @@ class RoutingConfig(BaseModel):
 
     # Cost controls
     max_output_tokens: int = 1024     # prevents runaway verbose responses
-    routine_max_output_tokens: int = 512
+    fast_max_output_tokens: int = 512
 
 def route_model(call_type: CallType, config: RoutingConfig) -> str:
     if call_type in (CallType.ROUTINE, CallType.TOOL_ONLY, CallType.MEMORY_WRITE):
-        return config.routine_model
+        return config.fast_model
     return config.conversation_model
 ```
 

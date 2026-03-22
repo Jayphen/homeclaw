@@ -17,9 +17,9 @@
   let openaiBaseUrl: string = $state("https://openrouter.ai/api/v1");
   let model: string = $state("claude-sonnet-4-6");
 
-  const providerDefaults: Record<string, { model: string; routineModel: string; baseUrl?: string }> = {
-    anthropic: { model: "claude-sonnet-4-6", routineModel: "claude-haiku-4-5" },
-    openai: { model: "anthropic/claude-sonnet-4-6", routineModel: "anthropic/claude-haiku-4-5", baseUrl: "https://openrouter.ai/api/v1" },
+  const providerDefaults: Record<string, { model: string; fastModel: string; baseUrl?: string }> = {
+    anthropic: { model: "claude-sonnet-4-6", fastModel: "claude-haiku-4-5" },
+    openai: { model: "anthropic/claude-sonnet-4-6", fastModel: "anthropic/claude-haiku-4-5", baseUrl: "https://openrouter.ai/api/v1" },
   };
 
   function switchProvider(p: "anthropic" | "openai") {
@@ -86,7 +86,7 @@
           provider,
           model,
           conversation_model: model,
-          routine_model: defaults.routineModel,
+          fast_model: defaults.fastModel,
         };
         if (provider === "anthropic") {
           body.anthropic_api_key = anthropicKey;
