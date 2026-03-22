@@ -692,7 +692,7 @@
 
           <div class="field">
             <label for="fast-model">Model</label>
-            <input id="fast-model" type="text" bind:value={fastModel} />
+            <input id="fast-model" type="text" bind:value={fastModel} placeholder="Same as main" />
             <small class="field-hint">Used for simple tool follow-ups (cheaper/faster).</small>
           </div>
 
