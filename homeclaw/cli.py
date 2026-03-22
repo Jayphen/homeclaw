@@ -162,6 +162,7 @@ class HomeclawApp:
             on_tool_call=on_tool_call,
             routing=self.config.routing,
             admin_check=_admin_check,
+            note_detail_level=self.config.note_detail_level,
         )
 
     async def initialize(self) -> None:

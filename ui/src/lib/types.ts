@@ -28,6 +28,7 @@ export interface SetupStatus {
   conversation_model?: string;
   routine_model?: string;
   timezone?: string | null;
+  note_detail_level?: string;
   members?: string[];
   members_with_passwords?: string[];
   admin_members?: string[];

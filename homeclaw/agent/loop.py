@@ -74,7 +74,19 @@ already shows a settled decision, respect it — do not re-ask unless they want 
 - Someone mentions contacting, calling, or meeting a person → interaction_log. After logging, \
 treat that contact as up-to-date.
 - Someone wants to be reminded of something → reminder_add.
-- Something noteworthy happened today → note_save.
+
+Daily notes are a journal of what the household is doing. Use note_save liberally — it's the \
+household's daily log. Save things like:
+- What someone cooked, ate, or is planning to eat
+- Activities, outings, errands, or plans mentioned
+- Health updates (feeling sick, exercise, sleep)
+- Home maintenance or projects in progress
+- Visitors, social plans, or events
+- Anything the person tells you about their day
+- Decisions made, things purchased, or deliveries expected
+Keep each note_save entry short (one line). Call it silently — don't announce you're saving \
+a note. When in doubt about whether something is "noteworthy enough", save it. The daily log \
+is meant to be a rich record of household life, not just major events.
 
 When saving bookmarks: check bookmark_categories first and prefer an existing category. If the \
 link has no context, ask briefly what it is. Use bookmark_note for extra detail — location, \
@@ -213,6 +225,7 @@ class AgentLoop:
         on_tool_call: Callable[[str, dict[str, Any]], None] | None = None,
         routing: RoutingConfig | None = None,
         admin_check: Callable[[str], bool] | None = None,
+        note_detail_level: str = "normal",
     ) -> None:
         self._provider = provider
         self._registry = registry
@@ -221,6 +234,7 @@ class AgentLoop:
         self._on_tool_call = on_tool_call
         self._routing = routing
         self._admin_check = admin_check or (lambda _: True)
+        self._note_detail_level = note_detail_level
         self._lock_pool = LockPool()
         self._on_interim: InterimCallback | None = None
         # Track last activity per session for idle-based consolidation
@@ -364,6 +378,22 @@ class AgentLoop:
             is_admin=self._admin_check(person),
         )
         system = SYSTEM_PROMPT.format(context=context)
+
+        # Inject note-taking level guidance
+        level = self._note_detail_level
+        if level == "minimal":
+            system += (
+                "\n\nNote-taking level: MINIMAL. Only save notes for truly significant events "
+                "— major decisions, important plans, health emergencies. Skip routine daily activities."
+            )
+        elif level == "detailed":
+            system += (
+                "\n\nNote-taking level: DETAILED. Save notes aggressively for almost everything "
+                "mentioned — meals, activities, moods, weather observations, conversations, "
+                "purchases, plans, ideas, health, exercise, chores. The household wants a rich, "
+                "comprehensive daily journal. When in doubt, always save."
+            )
+        # "normal" gets no extra injection — the base prompt covers it
 
         history = _load_history(self._workspaces, history_key)
 

@@ -308,7 +308,6 @@
               {#each searchResults as result}
                 <li>
                   <p class="recall-text">{result.text}</p>
-                  <span class="recall-score">{(result.score * 100).toFixed(0)}%</span>
                 </li>
               {/each}
             </ul>
