@@ -195,6 +195,8 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         config.vision_base_url = body.vision_base_url or None
     if body.model is not None:
         config.model = body.model
+    if body.provider_mode is not None:
+        config.provider_mode = body.provider_mode or None
     if body.telegram_token is not None:
         config.telegram_token = body.telegram_token or None
     if body.telegram_allowed_users is not None:
