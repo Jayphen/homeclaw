@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.0](https://github.com/Jayphen/homeclaw/compare/v0.8.0...v0.9.0) (2026-03-22)
+
+
+### Features
+
+* add activity feed and knowledge stats to dashboard ([5e4a0d3](https://github.com/Jayphen/homeclaw/commit/5e4a0d319250fd2d96185dc27677d2ca1222bd39))
+* add activity feed and knowledge stats to dashboard ([d2e6fb2](https://github.com/Jayphen/homeclaw/commit/d2e6fb226ee2a0e066b82c6407d678f6dec9c817))
+* replace top nav bar with sidebar navigation ([491a0bf](https://github.com/Jayphen/homeclaw/commit/491a0bf59645e19d2b3627cb990e96179ffe7f53))
+
 ## [0.8.0](https://github.com/Jayphen/homeclaw/compare/v0.7.2...v0.8.0) (2026-03-22)
 
 
