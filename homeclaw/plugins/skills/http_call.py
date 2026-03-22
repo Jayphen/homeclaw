@@ -57,6 +57,17 @@ def _is_private_ip(addr: str) -> bool:
     )
 
 
+def _normalize_domain(entry: str) -> str:
+    """Extract hostname from an allowed-domains entry.
+
+    Accepts both bare hostnames (``api.example.com``) and full URLs
+    (``https://api.example.com/path``).
+    """
+    if "://" in entry:
+        return urlparse(entry).hostname or entry
+    return entry
+
+
 def _check_domain(url: str, allowed_domains: list[str]) -> str:
     """Parse *url* and return the hostname if it's in *allowed_domains*.
 
@@ -66,7 +77,8 @@ def _check_domain(url: str, allowed_domains: list[str]) -> str:
     hostname = parsed.hostname
     if not hostname:
         raise ValueError(f"Cannot parse hostname from URL: {url}")
-    if hostname not in allowed_domains:
+    normalized = [_normalize_domain(d) for d in allowed_domains]
+    if hostname not in normalized:
         raise ValueError(
             f"Domain '{hostname}' is not in the allowed list: {allowed_domains}"
         )
