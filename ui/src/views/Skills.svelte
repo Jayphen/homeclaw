@@ -563,7 +563,7 @@
   .toggle::after {
     content: ""; position: absolute; top: 2px; left: 2px;
     width: 18px; height: 18px; border-radius: 50%;
-    background: white; transition: transform 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    background: white; transition: transform 0.2s; box-shadow: 0 1px 2px rgba(28, 28, 23, 0.15);
   }
   .toggle:checked { background: var(--sage); }
   .toggle:checked::after { transform: translateX(16px); }
@@ -579,7 +579,7 @@
   .delete-confirm { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; }
   .delete-confirm span { color: var(--text-muted); }
   .btn-danger {
-    background: var(--rose, #c44); border: 1px solid var(--rose, #c44); color: #fff;
+    background: var(--rose, #c44); border: none; color: #fff;
     padding: 0.3rem 0.75rem; border-radius: var(--radius-pill); font-size: 0.78rem; cursor: pointer;
   }
   .btn-danger:hover:not(:disabled) { opacity: 0.9; }
@@ -611,11 +611,11 @@
   .dep-heading { margin: 0 0 0.4rem; font-weight: 600; }
   .dep-runtime {
     font-size: 0.68rem; font-weight: 600; background: #e8dcc8; color: #6b563e;
-    padding: 0.1rem 0.35rem; border-radius: 3px; margin-left: 0.3rem; vertical-align: middle;
+    padding: 0.1rem 0.35rem; border-radius: var(--radius-sm); margin-left: 0.3rem; vertical-align: middle;
   }
   .dep-item { padding: 0.25rem 0; display: flex; flex-direction: column; gap: 0.1rem; }
   .dep-item + .dep-item { }
-  .dep-item code { background: rgba(0,0,0,0.05); padding: 0.1rem 0.3rem; border-radius: 3px; width: fit-content; }
+  .dep-item code { background: rgba(28, 28, 23, 0.05); padding: 0.1rem 0.3rem; border-radius: var(--radius-sm); width: fit-content; }
   .dep-hint { font-size: 0.75rem; color: #a08050; }
   .skill-compat { font-size: 0.8rem; color: var(--text-muted); margin: 0.3rem 0 0; font-style: italic; }
 
@@ -627,7 +627,7 @@
   .sep { color: var(--border); }
   .owner-tag {
     font-size: 0.7rem; font-weight: 600; color: var(--primary);
-    background: var(--surface-low); padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.3rem;
+    background: var(--surface-low); padding: 0.1rem 0.4rem; border-radius: var(--radius-sm); margin-left: 0.3rem;
   }
 
   /* Page title */
@@ -645,7 +645,7 @@
   }
   .skill-count, .file-count {
     font-family: var(--font-sans); font-size: 0.72rem; font-weight: 600;
-    color: var(--text-muted); background: var(--surface-low); padding: 0.1rem 0.45rem; border-radius: 4px;
+    color: var(--text-muted); background: var(--surface-low); padding: 0.1rem 0.45rem; border-radius: var(--radius-sm);
   }
 
   /* Skill cards (index) */
@@ -657,7 +657,7 @@
     transition: background 0.15s;
     opacity: 0; animation: fadeUp 0.3s ease-out forwards;
   }
-  .skill-card:hover { background: var(--surface-low); }
+  .skill-card:hover { background: var(--surface-low); box-shadow: inset 0 0 0 1px rgba(198, 200, 184, 0.2); }
   .skill-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem; }
   .skill-card-name { font-weight: 600; font-size: 0.9rem; }
   .skill-card-files { font-size: 0.72rem; color: var(--text-muted); }
@@ -665,7 +665,7 @@
   .skill-card-domains { margin-top: 0.4rem; display: flex; gap: 0.3rem; flex-wrap: wrap; }
   .domain-tag-sm {
     font-size: 0.68rem; background: var(--surface-low); color: var(--primary);
-    padding: 0.1rem 0.35rem; border-radius: 3px;
+    padding: 0.1rem 0.35rem; border-radius: var(--radius-sm);
   }
 
   /* Skill detail header */
@@ -676,7 +676,7 @@
   .skill-domains { display: flex; gap: 0.4rem; flex-wrap: wrap; }
   .domain-tag {
     font-size: 0.75rem; background: var(--surface-low); color: var(--primary);
-    padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 500;
+    padding: 0.15rem 0.5rem; border-radius: var(--radius-sm); font-weight: 500;
   }
 
   /* File list (detail view) */
@@ -689,7 +689,7 @@
   .file-card {
     display: flex; align-items: center; gap: 0.6rem;
     padding: 0.55rem 0.85rem; background: var(--surface);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     text-decoration: none; color: var(--text); font-size: 0.85rem;
     transition: background 0.15s;
     opacity: 0; animation: fadeUp 0.3s ease-out forwards;
@@ -715,7 +715,7 @@
   .instructions-body :global(h2) { font-size: 1rem; }
   .instructions-body :global(p) { margin: 0.4rem 0; }
   .instructions-body :global(ul), .instructions-body :global(ol) { margin: 0.4rem 0; padding-left: 1.5rem; }
-  .instructions-body :global(code) { background: var(--surface-low); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85em; }
+  .instructions-body :global(code) { background: var(--surface-low); padding: 0.1rem 0.3rem; border-radius: var(--radius-sm); font-size: 0.85em; }
 
   /* File article (file view/edit) */
   .file-article {
@@ -738,7 +738,7 @@
   .file-body :global(h1), .file-body :global(h2), .file-body :global(h3) { font-family: var(--font-serif); margin: 1rem 0 0.4rem; }
   .file-body :global(p) { margin: 0.4rem 0; }
   .file-body :global(ul), .file-body :global(ol) { margin: 0.4rem 0; padding-left: 1.5rem; }
-  .file-body :global(code) { background: var(--surface-low); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85em; }
+  .file-body :global(code) { background: var(--surface-low); padding: 0.1rem 0.3rem; border-radius: var(--radius-sm); font-size: 0.85em; }
   .file-body :global(a) { color: var(--primary); }
 
   /* Edit button & editor */

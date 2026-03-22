@@ -269,7 +269,7 @@
 
   .category-chip {
     padding: 0.3rem 0.7rem;
-    border: 1px solid var(--border);
+    border: none;
     border-radius: var(--radius-pill);
     background: var(--surface);
     color: var(--text-muted);
@@ -277,19 +277,19 @@
     font-size: 0.78rem;
     font-weight: 500;
     cursor: pointer;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    transition: color 0.15s, background 0.15s, box-shadow 0.15s;
     text-transform: capitalize;
   }
 
   .category-chip:hover {
-    border-color: #d0c8be;
+    background: var(--surface-low);
     color: var(--text);
   }
 
   .category-chip.active {
-    border-color: var(--primary);
     background: var(--surface-low);
     color: var(--primary);
+    box-shadow: inset 0 0 0 1px rgba(198, 200, 184, 0.2);
   }
 
   /* ---- Bookmark list ---- */
@@ -344,7 +344,7 @@
     cursor: pointer;
     padding: 0 0.2rem;
     line-height: 1;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     opacity: 0;
     transition: opacity 0.15s, color 0.15s;
   }

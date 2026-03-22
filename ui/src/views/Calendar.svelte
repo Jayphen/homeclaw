@@ -407,7 +407,7 @@
     width: 2rem;
     height: 2rem;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     background: var(--surface-low);
     color: var(--text);
     font-size: 1.1rem;
@@ -426,7 +426,7 @@
     height: 2rem;
     padding: 0 0.75rem;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     background: var(--surface-low);
     color: var(--text-muted);
     font-family: var(--font-sans);

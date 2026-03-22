@@ -483,7 +483,7 @@
     flex: 1;
     padding: 0.5rem;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     background: var(--surface-low);
     font-size: 0.82rem;
     font-weight: 500;

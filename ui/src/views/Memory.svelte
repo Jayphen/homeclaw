@@ -256,6 +256,7 @@
 
   .member-card:hover {
     background: var(--surface-low);
+    box-shadow: inset 0 0 0 1px rgba(198, 200, 184, 0.2);
   }
 
   .member-card.active {
@@ -315,7 +316,7 @@
     margin-bottom: 1rem;
     padding: 0.75rem 1rem;
     background: var(--surface-low);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
   }
 
   .topic-card h3 {

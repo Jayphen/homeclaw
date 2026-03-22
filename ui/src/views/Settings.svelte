@@ -688,7 +688,7 @@
     flex: 1;
     padding: 0.5rem;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     background: var(--surface-low);
     font-size: 0.82rem;
     font-weight: 500;
@@ -842,7 +842,7 @@
     font-size: 0.78rem;
     background: rgba(45, 41, 38, 0.06);
     padding: 0.1rem 0.35rem;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
 
   /* ---- WhatsApp status & QR ---- */
@@ -907,7 +907,7 @@
     color: var(--primary);
     background: var(--surface-low);
     padding: 0.1rem 0.4rem;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
 
   .admin-badge {
@@ -943,7 +943,7 @@
     flex: 1;
     padding: 0.45rem 0.65rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     font-size: 0.82rem;
     font-family: var(--font-sans);
     background: var(--surface-low);
@@ -1027,7 +1027,7 @@
     margin-left: auto;
     padding: 0.3rem 0.6rem;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--surface-low);
     color: var(--secondary);
     font-size: 0.78rem;
@@ -1117,7 +1117,7 @@
     flex: 1;
     padding: 0.4rem 0.6rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     font-size: 0.8rem;
     font-family: var(--font-sans);
     background: var(--surface-low);
@@ -1162,7 +1162,7 @@
   .log-date-range input {
     padding: 0.3rem 0.5rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     font-size: 0.75rem;
     font-family: var(--font-sans);
     background: var(--surface-low);
@@ -1177,7 +1177,7 @@
   .log-controls select {
     padding: 0.4rem 0.6rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     font-size: 0.8rem;
     font-family: var(--font-sans);
     background: var(--surface-low);

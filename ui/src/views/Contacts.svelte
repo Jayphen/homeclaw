@@ -455,6 +455,7 @@
 
   .contact-row:hover {
     background: var(--surface-low);
+    box-shadow: inset 0 0 0 1px rgba(198, 200, 184, 0.2);
   }
 
   /* ---- Avatar ---- */

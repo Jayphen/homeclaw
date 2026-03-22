@@ -343,7 +343,7 @@
   /* Installed plugins */
   .plugin-list { display: flex; flex-direction: column; gap: 0.5rem; }
   .plugin-card { background: var(--surface); border-radius: var(--radius); padding: 0.85rem 1.1rem; transition: background 0.15s; opacity: 0; animation: fadeUp 0.4s ease-out forwards; }
-  .plugin-card:hover { background: var(--surface-low); }
+  .plugin-card:hover { background: var(--surface-low); box-shadow: inset 0 0 0 1px rgba(198, 200, 184, 0.2); }
 
   .plugin-title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
   .plugin-identity { display: flex; align-items: center; gap: 0.5rem; }
@@ -377,19 +377,19 @@
   .toggle-btn.active { background: var(--surface-low); color: var(--primary); }
   .toggle-btn:not(:disabled):hover { background: var(--surface-low); }
 
-  .tool-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: var(--surface-low); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.15rem; }
+  .tool-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: var(--surface-low); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 0.15rem; }
   .tool-item { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }
 
   /* Skill archives */
   .archive-list { display: flex; flex-direction: column; gap: 0.5rem; }
   .archive-card { background: var(--surface); border-radius: var(--radius); padding: 0.85rem 1.1rem; transition: background 0.15s; opacity: 0; animation: fadeUp 0.4s ease-out forwards; }
-  .archive-card:hover { background: var(--surface-low); }
+  .archive-card:hover { background: var(--surface-low); box-shadow: inset 0 0 0 1px rgba(198, 200, 184, 0.2); }
 
   .archive-title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
   .archive-identity { display: flex; align-items: center; gap: 0.5rem; }
   .archive-name { font-weight: 600; font-size: 0.92rem; color: var(--text); }
 
-  .scope-badge { font-size: 0.68rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 4px; background: var(--surface-low); color: var(--text-muted); letter-spacing: 0.02em; }
+  .scope-badge { font-size: 0.68rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: var(--radius-sm); background: var(--surface-low); color: var(--text-muted); letter-spacing: 0.02em; }
   .scope-badge.household { background: var(--surface-low); color: var(--sage); }
 
   .archive-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
@@ -400,10 +400,10 @@
   .files-toggle { background: none; border: none; padding: 0; font-family: var(--font-sans); font-size: 0.75rem; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 0.2rem; transition: color 0.15s; }
   .files-toggle:hover { color: var(--text); }
 
-  .file-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: var(--surface-low); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.15rem; }
+  .file-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: var(--surface-low); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 0.15rem; }
   .file-item { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }
 
-  .btn { border: none; border-radius: var(--radius-sm); font-family: var(--font-sans); font-weight: 500; cursor: pointer; transition: filter 0.15s, opacity 0.15s; white-space: nowrap; }
+  .btn { border: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-weight: 500; cursor: pointer; transition: filter 0.15s, opacity 0.15s; white-space: nowrap; }
   .btn:disabled { opacity: 0.45; cursor: default; }
   .btn-ghost-sm { background: transparent; color: var(--text-muted); font-size: 0.75rem; padding: 0.25rem 0.6rem; }
   .btn-ghost-sm:not(:disabled):hover { background: var(--surface-low); color: var(--text); }

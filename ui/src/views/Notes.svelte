@@ -364,6 +364,7 @@
 
   .note-card:hover {
     background: var(--surface-low);
+    box-shadow: inset 0 0 0 1px rgba(198, 200, 184, 0.2);
   }
 
   .note-card-header {
@@ -525,7 +526,7 @@
   .note-body :global(code) {
     background: var(--surface-low);
     padding: 0.1rem 0.3rem;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     font-size: 0.85em;
   }
 

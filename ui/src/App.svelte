@@ -248,8 +248,7 @@
     display: flex;
     flex-direction: column;
     padding: 1.5rem 1rem;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
+    background: var(--surface-low);
     z-index: 100;
     overflow-y: auto;
   }
@@ -356,7 +355,6 @@
       background: var(--surface-bright);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border-top: 1px solid var(--border);
       padding: 0.5rem 0.75rem;
       justify-content: space-around;
       z-index: 100;

@@ -493,7 +493,7 @@
 
   /* ---- Greeting header ---- */
   .greeting {
-    margin-bottom: 2rem;
+    margin-bottom: 2.75rem;
   }
 
   .greeting h1 {
@@ -528,7 +528,7 @@
     background: var(--surface);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    margin-bottom: 1.25rem;
+    margin-bottom: 2rem;
     flex-wrap: wrap;
   }
 
@@ -557,13 +557,13 @@
 
   .stat-divider {
     width: 1px;
-    height: 2rem;
-    background: var(--border);
+    height: 1.5rem;
+    background: var(--surface-low);
   }
 
   /* ---- Knowledge Detail Card ---- */
   .knowledge-detail {
-    margin-bottom: 1.25rem;
+    margin-bottom: 2rem;
   }
 
   .knowledge-grid {
@@ -575,7 +575,7 @@
   .knowledge-member {
     padding: 0.75rem;
     background: var(--surface-low);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
   }
 
   .knowledge-member-header {
@@ -632,6 +632,12 @@
     border-radius: var(--radius);
     padding: 1.5rem;
     box-shadow: var(--shadow);
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+
+  .card:hover {
+    background: var(--surface-bright);
+    box-shadow: 0 0 0 1px rgba(198, 200, 184, 0.2), var(--shadow);
   }
 
   .card h2 {
@@ -650,16 +656,13 @@
   }
 
   .card li {
-    padding: 0.6rem 0;
+    padding: 0.5rem 0.6rem;
     font-size: 0.88rem;
+    border-radius: var(--radius-sm);
   }
 
-  .card li:first-child {
-    padding-top: 0;
-  }
-
-  .card li:last-child {
-    padding-bottom: 0;
+  .card li:nth-child(even) {
+    background: var(--surface-low);
   }
 
   .card li strong {
@@ -678,7 +681,7 @@
   .grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1.25rem;
+    gap: 2rem;
   }
 
   @media (max-width: 640px) {
@@ -695,7 +698,7 @@
   .note-block {
     padding: 0.75rem;
     background: var(--surface-low);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     margin-bottom: 0.5rem;
   }
 
@@ -804,7 +807,7 @@
     font-size: 0.7rem;
     font-weight: 600;
     padding: 0.15rem 0.45rem;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-pill);
     letter-spacing: 0.02em;
     text-transform: capitalize;
   }
@@ -822,7 +825,7 @@
   /* ---- Overdue section ---- */
   .overdue {
     background: #fffbfa;
-    margin-bottom: 1rem;
+    margin-bottom: 2rem;
   }
 
   .overdue h2 {
@@ -850,7 +853,7 @@
 
   /* ---- Activity Feed ---- */
   .feed {
-    margin-top: 1.25rem;
+    margin-top: 2rem;
   }
 
   .feed-header {
@@ -878,17 +881,12 @@
   .feed-event {
     display: flex;
     gap: 0.75rem;
-    padding: 0.6rem 0;
-    border-top: 1px solid var(--border);
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--radius-sm);
   }
 
-  .feed-event:first-child {
-    border-top: none;
-    padding-top: 0;
-  }
-
-  .feed-event:last-child {
-    padding-bottom: 0;
+  .feed-event:nth-child(even) {
+    background: var(--surface-low);
   }
 
   .feed-dot {
