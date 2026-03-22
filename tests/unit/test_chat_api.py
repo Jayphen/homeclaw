@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -14,11 +16,16 @@ from homeclaw.config import HomeclawConfig
 
 
 @pytest.fixture()
-def _open_access(tmp_path):
-    """Set up open-access config (no passwords)."""
+def workspaces(tmp_path) -> Path:
     ws = tmp_path / "workspaces"
     (ws / "household").mkdir(parents=True)
-    config = HomeclawConfig(workspaces_path=str(ws), web_password="")
+    return ws
+
+
+@pytest.fixture()
+def _open_access(workspaces):
+    """Set up open-access config (no passwords)."""
+    config = HomeclawConfig(workspaces_path=str(workspaces), web_password="")
     set_config(config)
     yield
     set_agent_loop(None)
@@ -100,3 +107,49 @@ class TestChatEndpoint:
         )
         assert resp.status_code == 200
         assert "something went wrong" in resp.text.lower()
+
+
+class TestChatHistory:
+    def test_empty_history(self, client: TestClient):
+        resp = client.get("/api/chat/history")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_returns_user_and_assistant_messages(
+        self, client: TestClient, workspaces: Path,
+    ):
+        person_dir = workspaces / "user"
+        person_dir.mkdir(parents=True)
+        lines = [
+            json.dumps({"role": "user", "content": "hello"}),
+            json.dumps({"role": "assistant", "content": "hi there!"}),
+            json.dumps({"role": "tool", "content": '{"ok": true}',
+                         "tool_call_id": "t1"}),
+            json.dumps({"role": "user", "content": "bye"}),
+            json.dumps({"role": "assistant", "content": "see ya"}),
+        ]
+        (person_dir / "history.jsonl").write_text("\n".join(lines))
+
+        resp = client.get("/api/chat/history")
+        data = resp.json()
+        assert len(data) == 4
+        assert data[0] == {"role": "user", "content": "hello"}
+        assert data[1] == {"role": "assistant", "content": "hi there!"}
+        assert data[2] == {"role": "user", "content": "bye"}
+        assert data[3] == {"role": "assistant", "content": "see ya"}
+
+    def test_skips_metadata_lines(
+        self, client: TestClient, workspaces: Path,
+    ):
+        person_dir = workspaces / "user"
+        person_dir.mkdir(parents=True)
+        lines = [
+            json.dumps({"_type": "metadata", "last_consolidated": 0}),
+            json.dumps({"role": "user", "content": "test"}),
+            json.dumps({"role": "assistant", "content": "reply"}),
+        ]
+        (person_dir / "history.jsonl").write_text("\n".join(lines))
+
+        resp = client.get("/api/chat/history")
+        data = resp.json()
+        assert len(data) == 2

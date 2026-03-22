@@ -7,17 +7,22 @@ Streams the agent response as plain text, compatible with the Vercel AI SDK's
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from homeclaw.api.deps import get_agent_loop, get_current_member
+from homeclaw.api.deps import get_agent_loop, get_config, get_current_member
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+# Maximum number of user/assistant turns to return from history.
+_MAX_HISTORY_PAIRS = 50
 
 
 def _extract_text(message: dict[str, Any]) -> str:
@@ -31,6 +36,53 @@ def _extract_text(message: dict[str, Any]) -> str:
         ).strip()
     # Legacy / simple: plain `content` string
     return (message.get("content") or "").strip()
+
+
+def _load_visible_history(
+    workspaces: Path, person: str,
+) -> list[dict[str, str]]:
+    """Read the JSONL history and return recent user/assistant pairs."""
+    hist = workspaces / person / "history.jsonl"
+    if not hist.exists():
+        return []
+
+    messages: list[dict[str, str]] = []
+    for line in hist.read_text().strip().splitlines():
+        if not line:
+            continue
+        try:
+            data = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        # Skip metadata lines and tool messages
+        if not isinstance(data, dict) or data.get("_type"):
+            continue
+        role = data.get("role")
+        if role not in ("user", "assistant"):
+            continue
+        content = data.get("content", "")
+        # Skip multimodal content blocks — just show text
+        if isinstance(content, list):
+            content = " ".join(
+                b.get("text", "")
+                for b in content
+                if isinstance(b, dict) and b.get("type") == "text"
+            )
+        if not content:
+            continue
+        messages.append({"role": role, "content": content})
+
+    # Return last N pairs (2 messages per pair)
+    return messages[-(_MAX_HISTORY_PAIRS * 2):]
+
+
+@router.get("/history")
+async def chat_history(request: Request) -> list[dict[str, str]]:
+    """Return recent conversation messages for the current user."""
+    member = await get_current_member(request)
+    person = member or "user"
+    config = get_config()
+    return _load_visible_history(config.workspaces.resolve(), person)
 
 
 @router.post("")

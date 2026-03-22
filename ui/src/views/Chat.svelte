@@ -1,19 +1,9 @@
 <script lang="ts">
-  import { Chat } from "@ai-sdk/svelte";
-  import { TextStreamChatTransport } from "ai";
-  import { getToken } from "$lib/api";
+  import { chat, loadHistory } from "$lib/chat";
   import { renderMarkdown } from "$lib/markdown";
-  import { tick } from "svelte";
+  import { onMount, tick } from "svelte";
 
-  const chat = new Chat({
-    transport: new TextStreamChatTransport({
-      api: "/api/chat",
-      headers: () => {
-        const token = getToken();
-        return token ? { Authorization: `Bearer ${token}` } : {};
-      },
-    }),
-  });
+  onMount(() => { loadHistory(); });
 
   let inputText = $state("");
   let messagesEl: HTMLElement | undefined = $state();
