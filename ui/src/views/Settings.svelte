@@ -263,6 +263,8 @@
     visionProvider = s.vision_provider || "";
     visionBaseUrl = s.vision_base_url || "";
     visionModel = s.vision_model || "";
+    // Provider mode
+    providerMode = s.provider_mode === "advanced" ? "advanced" : "simple";
     // Simple mode
     simpleProvider = detectSimpleProvider(s);
     simpleModel = s.conversation_model ?? "";
@@ -360,10 +362,6 @@
       if (!setupRes.ok) throw new Error(`${setupRes.status}`);
       const s: SetupStatus = await setupRes.json();
       syncFromSetup(s);
-      // Auto-detect advanced mode
-      if (s.fast_provider || s.vision_provider) {
-        providerMode = "advanced";
-      }
       if (whatsappEnabled && !whatsappConnected) fetchWhatsAppQr();
       pageState = "ready";
     } catch (e: any) {
@@ -413,6 +411,8 @@
       if (visionBaseUrl !== (setup?.vision_base_url || "")) body.vision_base_url = visionBaseUrl || null;
       if (visionModel !== (setup?.vision_model || "")) body.vision_model = visionModel || null;
     }
+
+    body.provider_mode = providerMode;
 
     if (Object.keys(body).length === 0) { providerSaveState = "idle"; return; }
 

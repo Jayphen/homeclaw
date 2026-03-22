@@ -104,6 +104,7 @@ async def setup_status(request: Request) -> dict[str, Any]:
         "vision_model": config.routing.vision_model,
         "timezone": config.timezone,
         "note_detail_level": config.note_detail_level,
+        "provider_mode": config.provider_mode,
     })
     return base
 
@@ -124,6 +125,7 @@ class SetupBody(BaseModel):
     vision_api_key: str | None = None
     vision_base_url: str | None = None
     model: str | None = None
+    provider_mode: str | None = None
 
     # Telegram
     telegram_token: str | None = None

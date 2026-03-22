@@ -52,6 +52,7 @@ _SAVEABLE_FIELDS = {
     "timezone",
     "skill_approval_required",
     "skill_allow_local_network",
+    "provider_mode",
 }
 
 # Routing model fields are saved/loaded via the nested RoutingConfig object.
@@ -101,6 +102,9 @@ class HomeclawConfig(BaseSettings):
     vision_provider: str | None = None  # "anthropic" or "openai"; defaults to main provider
     vision_api_key: str | None = None
     vision_base_url: str | None = None
+
+    # UI mode for provider settings — "simple" or "advanced"
+    provider_mode: str | None = None
 
     # Model name — set to match your provider
     model: str = "claude-sonnet-4-6"

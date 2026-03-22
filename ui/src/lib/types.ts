@@ -35,6 +35,7 @@ export interface SetupStatus {
   conversation_model?: string;
   fast_model?: string;
   vision_model?: string;
+  provider_mode?: string | null;
   timezone?: string | null;
   note_detail_level?: string;
   members?: string[];
