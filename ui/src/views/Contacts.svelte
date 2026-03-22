@@ -135,6 +135,11 @@
     <p>Couldn't load contacts</p>
     <small>{error}</small>
   </div>
+{:else if contacts.length === 0}
+  <div class="empty" style="animation-delay: 120ms">
+    <p>No contacts yet</p>
+    <small>Chat with homeclaw to start building your address book.</small>
+  </div>
 {:else}
   <header class="page-header" style="animation-delay: 0ms">
     <h1>Contacts</h1>
@@ -255,12 +260,7 @@
     <!-- Contact list -->
     {#if filtered.length === 0}
       <div class="empty" style="animation-delay: 120ms">
-        {#if search.trim()}
-          <p>No contacts match "{search}"</p>
-        {:else}
-          <p>No contacts yet</p>
-          <small>Chat with homeclaw to start building your address book.</small>
-        {/if}
+        <p>No contacts match "{search}"</p>
       </div>
     {:else}
       <div class="contact-list">
