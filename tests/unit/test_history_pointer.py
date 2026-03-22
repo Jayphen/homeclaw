@@ -95,8 +95,8 @@ class TestReadHistoryFile:
         assert last_consolidated == 0
         assert messages == []
 
-    def test_filters_tool_messages(self, tmp_path: Path) -> None:
-        """Tool messages are filtered out — only user and assistant kept."""
+    def test_loads_tool_messages(self, tmp_path: Path) -> None:
+        """Tool messages are loaded alongside user and assistant."""
         path = tmp_path / "history.jsonl"
         _write_jsonl(path, [
             _metadata_line(0),
@@ -107,9 +107,10 @@ class TestReadHistoryFile:
 
         _, messages = _read_history_file(path)
 
-        assert len(messages) == 2
+        assert len(messages) == 3
         assert messages[0].role == "user"
-        assert messages[1].role == "assistant"
+        assert messages[1].role == "tool"
+        assert messages[2].role == "assistant"
 
     def test_invalid_json_lines_skipped(self, tmp_path: Path) -> None:
         """Invalid JSON lines are silently skipped."""
@@ -185,15 +186,15 @@ class TestLoadHistory:
         path = alice_dir / "history.jsonl"
 
         lines: list[dict] = [_metadata_line(0)]
-        for i in range(60):
+        for i in range(250):
             lines.append(_msg_dict("user", f"msg {i}"))
             lines.append(_msg_dict("assistant", f"resp {i}"))
         _write_jsonl(path, lines)
 
-        # Default max_messages is 50
+        # Default max_messages is 200
         result = _load_history(tmp_path, "alice")
 
-        assert len(result) == 50
+        assert len(result) == 200
 
     def test_group_channel_history_path(self, tmp_path: Path) -> None:
         """Group channel history goes under household/channels/."""
@@ -267,8 +268,8 @@ class TestSaveHistory:
         assert last_consolidated == 0
         assert len(all_messages) == 2
 
-    def test_filters_tool_messages_on_save(self, tmp_path: Path) -> None:
-        """Tool messages and assistant messages with tool_calls are filtered."""
+    def test_preserves_tool_chain_on_save(self, tmp_path: Path) -> None:
+        """Full tool chain (including tool results) is preserved on save."""
         from homeclaw.agent.providers.base import ToolCall
 
         messages = [
@@ -287,13 +288,13 @@ class TestSaveHistory:
         path = tmp_path / "alice" / "history.jsonl"
         _, saved_messages = _read_history_file(path)
 
-        # Only user + final assistant (without tool_calls) should be saved
-        roles = [m.role for m in saved_messages]
-        assert "tool" not in roles
-        # The assistant message with tool_calls should be excluded
-        assert len(saved_messages) == 2
-        assert saved_messages[0].content == "do something"
-        assert saved_messages[1].content == "done!"
+        assert len(saved_messages) == 4
+        assert saved_messages[0].role == "user"
+        assert saved_messages[1].role == "assistant"
+        assert saved_messages[1].content == "calling a tool"
+        assert saved_messages[2].role == "tool"
+        assert saved_messages[3].role == "assistant"
+        assert saved_messages[3].content == "done!"
 
 
 # ---------------------------------------------------------------------------

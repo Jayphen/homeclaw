@@ -690,7 +690,7 @@ def _read_history_file(path: Path) -> tuple[int, list[Message]]:
             continue
         try:
             msg = Message.model_validate(data)
-            if msg.role in ("user", "assistant"):
+            if msg.role in ("user", "assistant", "tool"):
                 # Strip stale reasoning/thinking blocks — they only matter
                 # within a tool chain, not across persisted turns.  Leaving
                 # them causes 400s on OpenRouter and other Anthropic proxies
@@ -704,7 +704,7 @@ def _read_history_file(path: Path) -> tuple[int, list[Message]]:
     return last_consolidated, messages
 
 
-def _load_history(workspaces: Path, person: str, max_messages: int = 50) -> list[Message]:
+def _load_history(workspaces: Path, person: str, max_messages: int = 200) -> list[Message]:
     """Load unconsolidated history — messages after the consolidation pointer."""
     path = _history_path(workspaces, person)
     last_consolidated, all_messages = _read_history_file(path)
@@ -726,15 +726,26 @@ def _strip_images(content: str | list[Any]) -> str:
     return " ".join(parts) if parts else ""
 
 
+_MAX_TOOL_RESULT_CHARS = 4000  # cap individual tool results to avoid history bloat
+
+
 def _persistable_messages(messages: list[Message]) -> list[Message]:
-    """Filter messages to only user + final assistant turns (no tool calls)."""
+    """Prepare messages for persistence — all roles kept, images and reasoning stripped."""
     persistent: list[Message] = []
     for m in messages:
-        if m.role == "user" or m.role == "assistant" and not m.tool_calls:
+        if m.role == "user":
+            persistent.append(m.model_copy(update={"content": _strip_images(m.content)}))
+        elif m.role == "assistant":
             persistent.append(m.model_copy(update={
                 "content": _strip_images(m.content),
                 "reasoning": [],  # only needed within tool chains, not across turns
             }))
+        elif m.role == "tool":
+            # Cap tool results to prevent huge API responses from bloating history
+            content = m.content if isinstance(m.content, str) else json.dumps(m.content)
+            if len(content) > _MAX_TOOL_RESULT_CHARS:
+                content = content[:_MAX_TOOL_RESULT_CHARS] + "\n...(truncated)"
+            persistent.append(m.model_copy(update={"content": content}))
     return persistent
 
 
