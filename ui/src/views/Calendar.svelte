@@ -406,29 +406,28 @@
   .nav-btn {
     width: 2rem;
     height: 2rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--surface-low);
     color: var(--text);
     font-size: 1.1rem;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s, border-color 0.15s;
+    transition: background 0.15s;
   }
 
   .nav-btn:hover {
-    background: #f0ebe5;
-    border-color: #d0c8be;
+    background: var(--surface-low);
   }
 
   .today-btn {
     height: 2rem;
     padding: 0 0.75rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--surface-low);
     color: var(--text-muted);
     font-family: var(--font-sans);
     font-size: 0.78rem;
@@ -438,7 +437,7 @@
   }
 
   .today-btn:hover {
-    background: #f0ebe5;
+    background: var(--surface-low);
     color: var(--text);
   }
 
@@ -467,15 +466,14 @@
   .grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow: hidden;
-    background: var(--border);
-    gap: 1px;
+    background: var(--surface-low);
+    gap: 2px;
   }
 
   .weekday-header {
-    background: #f5f0ea;
+    background: var(--surface-low);
     padding: 0.5rem;
     text-align: center;
     font-size: 0.72rem;
@@ -502,11 +500,11 @@
   }
 
   .day-cell:hover {
-    background: #fdfcfa;
+    background: var(--surface-low);
   }
 
   .day-cell.out-of-month {
-    background: #faf8f4;
+    background: var(--bg);
   }
 
   .day-cell.out-of-month .day-number {
@@ -514,11 +512,11 @@
   }
 
   .day-cell.today {
-    background: #fef9f4;
+    background: var(--surface-low);
   }
 
   .day-cell.today .day-number {
-    background: var(--terracotta);
+    background: var(--secondary);
     color: #fff;
     width: 1.5rem;
     height: 1.5rem;
@@ -529,8 +527,8 @@
   }
 
   .day-cell.selected {
-    background: #f5f0ea;
-    box-shadow: inset 0 0 0 2px var(--terracotta);
+    background: var(--surface-low);
+    box-shadow: inset 0 0 0 2px var(--primary);
   }
 
   .day-number {
@@ -565,7 +563,6 @@
   .detail-drawer {
     margin-top: 1rem;
     background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 1.25rem 1.5rem;
     animation: fadeUp 0.25s ease-out;
@@ -589,7 +586,6 @@
     display: flex;
     gap: 0.75rem;
     padding: 0.6rem 0;
-    border-top: 1px solid var(--border);
     align-items: flex-start;
   }
 
@@ -643,7 +639,7 @@
   .ev-link {
     margin-left: auto;
     font-size: 0.72rem;
-    color: var(--terracotta);
+    color: var(--primary);
     text-decoration: none;
   }
 
@@ -700,7 +696,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--terracotta);
+    background: var(--primary);
     opacity: 0.3;
     animation: pulse 1s ease-in-out infinite;
   }
@@ -715,11 +711,10 @@
 
   .error-card {
     background: #fef2f0;
-    border: 1px solid #f0c4bc;
     border-radius: var(--radius);
     padding: 1.5rem;
     text-align: center;
-    color: var(--terracotta);
+    color: var(--secondary);
   }
 
   .error-card p { margin: 0 0 0.5rem; font-weight: 500; }
@@ -728,10 +723,10 @@
   /* ---- View toggle ---- */
   .view-toggle {
     display: flex;
-    border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-pill);
     overflow: hidden;
     margin-right: 0.5rem;
+    background: var(--surface-low);
   }
 
   .toggle-btn {
@@ -746,26 +741,21 @@
     transition: background 0.15s, color 0.15s;
   }
 
-  .toggle-btn:not(:last-child) {
-    border-right: 1px solid var(--border);
-  }
-
   .toggle-btn.active {
-    background: var(--terracotta);
+    background: var(--primary);
     color: #fff;
   }
 
   .toggle-btn:not(.active):hover {
-    background: #f0ebe5;
+    background: var(--surface-low);
   }
 
   /* ---- Schedule view ---- */
   .schedule {
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    background: var(--border);
-    border: 1px solid var(--border);
+    gap: 2px;
+    background: var(--surface-low);
     border-radius: var(--radius);
     overflow: hidden;
   }
@@ -779,7 +769,7 @@
   }
 
   .schedule-day.schedule-today {
-    background: #fef9f4;
+    background: var(--surface-low);
   }
 
   .schedule-date {
@@ -801,7 +791,7 @@
   }
 
   .schedule-today .schedule-daynum {
-    color: var(--terracotta);
+    color: var(--primary);
   }
 
   .schedule-meta {
@@ -816,7 +806,7 @@
   }
 
   .schedule-today .schedule-weekday {
-    color: var(--terracotta);
+    color: var(--primary);
   }
 
   .schedule-month {

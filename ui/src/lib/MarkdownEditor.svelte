@@ -151,10 +151,10 @@
 
 <style>
   .md-editor {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border: none;
+    border-radius: var(--radius-sm);
     overflow: hidden;
-    background: var(--bg);
+    background: var(--surface-low);
   }
 
   .md-editor.disabled {
@@ -168,8 +168,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.3rem 0.5rem;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
+    background: var(--surface-low);
   }
 
   .md-toolbar-actions {
@@ -184,7 +183,7 @@
     width: 28px;
     height: 28px;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: none;
     color: var(--text-muted);
     cursor: pointer;
@@ -193,7 +192,7 @@
   }
 
   .md-tool:hover {
-    background: #f0ebe5;
+    background: var(--surface);
     color: var(--text);
   }
 
@@ -208,7 +207,7 @@
 
   .md-tool-italic {
     font-style: italic;
-    font-family: Georgia, serif;
+    font-family: var(--font-serif);
     font-size: 0.85rem;
   }
 
@@ -219,13 +218,13 @@
     font-size: 0.75rem;
     cursor: pointer;
     padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     transition: background 0.12s, color 0.12s;
   }
 
   .md-preview-toggle:hover,
   .md-preview-toggle.active {
-    background: #f0ebe5;
+    background: var(--surface);
     color: var(--text);
   }
 

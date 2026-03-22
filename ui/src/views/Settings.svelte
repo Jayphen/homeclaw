@@ -561,7 +561,7 @@
               </div>
             </div>
             {#if memberSaveStatus[member] === "error"}
-              <small class="field-hint" style="color: var(--terracotta);">Failed to update.</small>
+              <small class="field-hint" style="color: var(--secondary);">Failed to update.</small>
             {/if}
           </div>
         {/each}
@@ -687,9 +687,9 @@
   .provider-toggle button {
     flex: 1;
     padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: #fdfcfa;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--surface-low);
     font-size: 0.82rem;
     font-weight: 500;
     font-family: var(--font-sans);
@@ -699,9 +699,8 @@
   }
 
   .provider-toggle button.selected {
-    border-color: var(--terracotta);
-    color: var(--terracotta);
-    background: #fff;
+    color: #fff;
+    background: var(--primary);
   }
 
   .field-label {
@@ -733,7 +732,6 @@
 
   .card {
     background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 1.25rem 1.5rem;
   }
@@ -764,17 +762,17 @@
     width: 100%;
     padding: 0.55rem 0.75rem;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     font-size: 0.85rem;
     font-family: var(--font-sans);
-    background: #fdfcfa;
+    background: var(--surface-low);
     color: var(--text);
     transition: border-color 0.15s;
   }
 
   .field input:focus {
     outline: none;
-    border-color: var(--terracotta);
+    border-color: var(--primary);
   }
 
   .field input::placeholder {
@@ -798,9 +796,9 @@
 
   .preset {
     padding: 0.25rem 0.55rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: #fdfcfa;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--surface-low);
     font-size: 0.75rem;
     font-weight: 500;
     font-family: var(--font-sans);
@@ -811,13 +809,11 @@
 
   .preset:hover {
     color: var(--text);
-    border-color: var(--text-muted);
   }
 
   .preset.active {
-    border-color: var(--terracotta);
-    color: var(--terracotta);
-    background: #fff;
+    color: #fff;
+    background: var(--primary);
   }
 
   /* ---- Toggle ---- */
@@ -832,7 +828,7 @@
   .toggle-row input[type="checkbox"] {
     width: 1rem;
     height: 1rem;
-    accent-color: var(--terracotta);
+    accent-color: var(--primary);
     cursor: pointer;
   }
 
@@ -884,18 +880,16 @@
   .wa-qr-img {
     display: block;
     max-width: 256px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     margin-bottom: 0.5rem;
   }
 
   /* ---- Member accounts ---- */
   .member-row {
     padding: 0.6rem 0;
-    border-bottom: 1px solid var(--border);
   }
 
-  .member-row:last-child { border-bottom: none; }
+  .member-row:last-child { }
 
   .member-name {
     display: flex;
@@ -910,15 +904,15 @@
   .member-badge {
     font-size: 0.7rem;
     font-weight: 500;
-    color: var(--sage);
-    background: rgba(106, 153, 78, 0.1);
+    color: var(--primary);
+    background: var(--surface-low);
     padding: 0.1rem 0.4rem;
     border-radius: 4px;
   }
 
   .admin-badge {
-    color: var(--terracotta);
-    background: rgba(180, 100, 60, 0.1);
+    color: var(--secondary);
+    background: var(--surface-low);
   }
 
   .member-controls {
@@ -949,16 +943,16 @@
     flex: 1;
     padding: 0.45rem 0.65rem;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     font-size: 0.82rem;
     font-family: var(--font-sans);
-    background: #fdfcfa;
+    background: var(--surface-low);
     color: var(--text);
   }
 
   .member-pw-row input:focus {
     outline: none;
-    border-color: var(--terracotta);
+    border-color: var(--primary);
   }
 
   /* ---- Save row ---- */
@@ -970,13 +964,13 @@
 
   .btn.primary {
     padding: 0.55rem 1.25rem;
-    border-radius: 8px;
+    border-radius: var(--radius-pill);
     font-size: 0.85rem;
     font-weight: 600;
     font-family: var(--font-sans);
     cursor: pointer;
     border: none;
-    background: var(--terracotta);
+    background: var(--primary);
     color: #fff;
     transition: filter 0.15s;
   }
@@ -1003,7 +997,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--terracotta);
+    background: var(--primary);
     opacity: 0.3;
     animation: pulse 1s ease-in-out infinite;
   }
@@ -1018,10 +1012,9 @@
 
   .error-card {
     background: #fef2f0;
-    border: 1px solid #f0c4bc;
     border-radius: var(--radius);
     padding: 1rem 1.25rem;
-    color: var(--terracotta);
+    color: var(--secondary);
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -1033,10 +1026,10 @@
   .dismiss {
     margin-left: auto;
     padding: 0.3rem 0.6rem;
-    border: 1px solid #f0c4bc;
+    border: none;
     border-radius: 6px;
-    background: transparent;
-    color: var(--terracotta);
+    background: var(--surface-low);
+    color: var(--secondary);
     font-size: 0.78rem;
     font-weight: 500;
     cursor: pointer;
@@ -1057,18 +1050,18 @@
 
   .btn.secondary {
     padding: 0.5rem 1rem;
-    border-radius: 8px;
+    border-radius: var(--radius-pill);
     font-size: 0.82rem;
     font-weight: 500;
     font-family: var(--font-sans);
     cursor: pointer;
-    border: 1px solid var(--border);
-    background: #fdfcfa;
+    border: none;
+    background: var(--surface-low);
     color: var(--text);
     transition: all 0.15s;
   }
 
-  .btn.secondary:hover { background: #f0ebe5; }
+  .btn.secondary:hover { background: var(--surface-low); }
   .btn.secondary:disabled { opacity: 0.5; cursor: default; }
 
   .import-label {
@@ -1090,7 +1083,7 @@
 
   .import-err {
     font-size: 0.82rem;
-    color: var(--terracotta);
+    color: var(--secondary);
     font-weight: 500;
     margin: 0.75rem 0 0;
   }
@@ -1124,17 +1117,17 @@
     flex: 1;
     padding: 0.4rem 0.6rem;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 0.8rem;
     font-family: var(--font-sans);
-    background: #fdfcfa;
+    background: var(--surface-low);
     color: var(--text);
     min-width: 0;
   }
 
   .log-search:focus {
     outline: none;
-    border-color: var(--terracotta);
+    border-color: var(--primary);
   }
 
   .log-toggle {
@@ -1149,7 +1142,7 @@
 
   .log-toggle input {
     cursor: pointer;
-    accent-color: var(--terracotta);
+    accent-color: var(--primary);
   }
 
   .log-date-range {
@@ -1169,25 +1162,25 @@
   .log-date-range input {
     padding: 0.3rem 0.5rem;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 0.75rem;
     font-family: var(--font-sans);
-    background: #fdfcfa;
+    background: var(--surface-low);
     color: var(--text);
   }
 
   .log-date-range input:focus {
     outline: none;
-    border-color: var(--terracotta);
+    border-color: var(--primary);
   }
 
   .log-controls select {
     padding: 0.4rem 0.6rem;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     font-size: 0.8rem;
     font-family: var(--font-sans);
-    background: #fdfcfa;
+    background: var(--surface-low);
     color: var(--text);
   }
 
@@ -1203,9 +1196,9 @@
     align-items: center;
     gap: 0.3rem;
     padding: 0.2rem 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: #fdfcfa;
+    border: none;
+    border-radius: var(--radius-pill);
+    background: var(--surface-low);
     font-size: 0.7rem;
     font-family: "SF Mono", "Fira Code", monospace;
     color: var(--text);
@@ -1214,7 +1207,6 @@
   }
 
   .logger-pill:hover {
-    border-color: var(--text-muted);
   }
 
   .logger-pill.hidden-logger {
@@ -1233,7 +1225,7 @@
     max-height: 400px;
     overflow: auto;
     background: #1e1e1e;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     padding: 0.75rem;
     font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
     font-size: 0.72rem;

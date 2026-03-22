@@ -278,7 +278,7 @@
   }
 
   .breadcrumb a {
-    color: var(--terracotta);
+    color: var(--primary);
     text-decoration: none;
     text-transform: capitalize;
   }
@@ -330,7 +330,7 @@
   }
 
   .person-section h2 a:hover {
-    color: var(--terracotta);
+    color: var(--primary);
   }
 
   .note-count {
@@ -338,9 +338,9 @@
     font-size: 0.72rem;
     font-weight: 600;
     color: var(--text-muted);
-    background: #f0ebe5;
+    background: var(--surface-low);
     padding: 0.1rem 0.45rem;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
 
   /* ---- Note cards ---- */
@@ -354,18 +354,16 @@
     display: block;
     padding: 0.75rem 1rem;
     background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: var(--radius);
     text-decoration: none;
     color: var(--text);
-    transition: border-color 0.15s, background 0.15s;
+    transition: background 0.15s;
     opacity: 0;
     animation: fadeUp 0.3s ease-out forwards;
   }
 
   .note-card:hover {
-    border-color: var(--terracotta);
-    background: #fef9f4;
+    background: var(--surface-low);
   }
 
   .note-card-header {
@@ -422,7 +420,7 @@
     padding: 0.5rem;
     text-align: center;
     font-size: 0.82rem;
-    color: var(--terracotta);
+    color: var(--primary);
     text-decoration: none;
   }
 
@@ -433,7 +431,6 @@
   /* ---- Note article (detail view) ---- */
   .note-article {
     background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 1.5rem 2rem;
   }
@@ -441,7 +438,6 @@
   .note-article header {
     margin-bottom: 1.5rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border);
   }
 
   .note-article h1 {
@@ -471,7 +467,7 @@
   }
 
   .note-cal-link {
-    color: var(--terracotta);
+    color: var(--primary);
     text-decoration: none;
     margin-left: auto;
   }
@@ -517,17 +513,17 @@
   }
 
   .note-body :global(a) {
-    color: var(--terracotta);
+    color: var(--primary);
     text-decoration: underline;
-    text-decoration-color: rgba(196, 101, 58, 0.3);
+    text-decoration-color: rgba(86, 100, 43, 0.3);
   }
 
   .note-body :global(a:hover) {
-    text-decoration-color: var(--terracotta);
+    text-decoration-color: var(--primary);
   }
 
   .note-body :global(code) {
-    background: #f0ebe5;
+    background: var(--surface-low);
     padding: 0.1rem 0.3rem;
     border-radius: 3px;
     font-size: 0.85em;
@@ -543,26 +539,26 @@
   .note-body :global(th),
   .note-body :global(td) {
     padding: 0.4rem 0.6rem;
-    border: 1px solid var(--border);
+    border: none;
     text-align: left;
   }
 
   .note-body :global(th) {
-    background: #f5f0ea;
+    background: var(--surface-low);
     font-weight: 600;
   }
 
   .note-body :global(blockquote) {
     margin: 0.75rem 0;
-    padding: 0.5rem 1rem;
-    border-left: 3px solid var(--sage);
-    background: #fdfcfa;
+    padding: 0.75rem 1rem;
+    background: var(--surface-low);
     color: var(--text-muted);
   }
 
   .note-body :global(hr) {
     border: none;
-    border-top: 1px solid var(--border);
+    background: var(--surface-low);
+    height: 2px;
     margin: 1.25rem 0;
   }
 
@@ -594,7 +590,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--terracotta);
+    background: var(--primary);
     opacity: 0.3;
     animation: pulse 1s ease-in-out infinite;
   }
@@ -609,11 +605,10 @@
 
   .error-card {
     background: #fef2f0;
-    border: 1px solid #f0c4bc;
     border-radius: var(--radius);
     padding: 1.5rem;
     text-align: center;
-    color: var(--terracotta);
+    color: var(--secondary);
   }
 
   .error-card p { margin: 0 0 0.5rem; font-weight: 500; }
@@ -622,19 +617,19 @@
   /* ---- Edit button ---- */
   .btn-edit {
     float: right;
-    background: none;
-    border: 1px solid var(--border);
+    background: var(--surface-low);
+    border: none;
     border-radius: var(--radius);
     padding: 0.3rem 0.75rem;
     font-size: 0.78rem;
     color: var(--text-muted);
     cursor: pointer;
-    transition: border-color 0.15s, color 0.15s;
+    transition: background 0.15s, color 0.15s;
   }
 
   .btn-edit:hover {
-    border-color: var(--terracotta);
-    color: var(--terracotta);
+    background: var(--primary);
+    color: #fff;
   }
 
   /* ---- Editor ---- */
@@ -665,24 +660,25 @@
   }
 
   .btn-secondary {
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--surface-low);
+    border: none;
     color: var(--text-muted);
+    border-radius: var(--radius-pill);
   }
 
   .btn-secondary:hover:not(:disabled) {
-    border-color: var(--text-muted);
+    background: var(--border);
   }
 
   .btn-primary {
-    background: var(--terracotta);
-    border: 1px solid var(--terracotta);
+    background: var(--primary);
+    border: none;
     color: #fff;
+    border-radius: var(--radius-pill);
   }
 
   .btn-primary:hover:not(:disabled) {
-    background: #b35a36;
-    border-color: #b35a36;
+    background: #455020;
   }
 
   @media (max-width: 640px) {

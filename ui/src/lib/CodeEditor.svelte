@@ -25,10 +25,10 @@
 
 <style>
   .code-editor {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border: none;
+    border-radius: var(--radius-sm);
     overflow: hidden;
-    background: var(--bg);
+    background: var(--surface-low);
   }
 
   .code-editor.disabled {
@@ -40,8 +40,7 @@
     display: flex;
     align-items: center;
     padding: 0.3rem 0.6rem;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
+    background: var(--surface-low);
   }
 
   .code-lang {

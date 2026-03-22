@@ -252,7 +252,7 @@
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--terracotta);
+    background: var(--primary);
     opacity: 0.3;
     animation: pulse 1s ease-in-out infinite;
   }
@@ -280,11 +280,10 @@
   /* ---- Error ---- */
   .error-card {
     background: #fef2f0;
-    border: 1px solid #f0c4bc;
     border-radius: var(--radius);
     padding: 1.5rem;
     text-align: center;
-    color: var(--terracotta);
+    color: var(--secondary);
   }
 
   .error-card p {
@@ -298,7 +297,7 @@
 
   /* ---- Greeting header ---- */
   .greeting {
-    margin-bottom: 2rem;
+    margin-bottom: 2.75rem;
   }
 
   .greeting h1 {
@@ -327,9 +326,9 @@
   /* ---- Card base ---- */
   .card {
     background: var(--surface);
-    border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 1.25rem 1.5rem;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
   }
 
   .card h2 {
@@ -349,12 +348,10 @@
 
   .card li {
     padding: 0.6rem 0;
-    border-top: 1px solid var(--border);
     font-size: 0.88rem;
   }
 
   .card li:first-child {
-    border-top: none;
     padding-top: 0;
   }
 
@@ -378,7 +375,7 @@
   .grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    gap: 1.25rem;
   }
 
   @media (max-width: 640px) {
@@ -394,10 +391,9 @@
 
   .note-block {
     padding: 0.75rem;
-    background: #fdfcfa;
-    border-radius: 8px;
+    background: var(--surface-low);
+    border-radius: var(--radius-sm);
     margin-bottom: 0.5rem;
-    border-left: 3px solid var(--sage);
   }
 
   .note-block:last-child {
@@ -458,16 +454,16 @@
   }
 
   .note-content :global(code) {
-    background: #f0ebe5;
+    background: var(--surface-low);
     padding: 0.1rem 0.3rem;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
     font-size: 0.82rem;
   }
 
   .note-content :global(a) {
-    color: var(--terracotta);
+    color: var(--primary);
     text-decoration: underline;
-    text-decoration-color: rgba(196, 101, 58, 0.3);
+    text-decoration-color: rgba(86, 100, 43, 0.3);
   }
 
   .note-content :global(h1),
@@ -505,30 +501,29 @@
     font-size: 0.7rem;
     font-weight: 600;
     padding: 0.15rem 0.45rem;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     letter-spacing: 0.02em;
     text-transform: capitalize;
   }
 
   .type-badge {
-    background: #f0ebe5;
+    background: var(--surface-low);
     color: var(--text-muted);
   }
 
   .overdue-badge {
     background: #fef2f0;
-    color: var(--terracotta);
+    color: var(--secondary);
   }
 
   /* ---- Overdue section ---- */
   .overdue {
-    border-color: #f0c4bc;
     background: #fffbfa;
     margin-bottom: 1rem;
   }
 
   .overdue h2 {
-    color: var(--terracotta);
+    color: var(--secondary);
   }
 
   .overdue-row {
