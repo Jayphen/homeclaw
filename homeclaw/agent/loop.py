@@ -4,6 +4,7 @@ import asyncio
 import copy
 import json
 import logging
+import re
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -134,6 +135,7 @@ _ROUTINE_PREAMBLE = (
 _PERSONAL_WRITE_TOOLS = frozenset({
     "note_save",
     "memory_save",
+    "contact_note",
     "reminder_add",
     "reminder_complete",
     "reminder_delete",

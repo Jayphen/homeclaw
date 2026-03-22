@@ -144,13 +144,16 @@ def register_builtin_tools(
         description=(
             "Add a note about a contact — a fact, observation, preference, or "
             "anything worth remembering about this person. Notes are searchable "
-            "via semantic memory. Use this instead of storing facts on the contact."
+            "via semantic memory. Use this instead of storing facts on the contact. "
+            "Set person to save as a private note visible only to that member, "
+            "or omit for a shared household note."
         ),
     )
     async def contact_note(
         *,
         contact_id: Annotated[str, Desc("Contact ID")],
         content: Annotated[str, Desc("The note to add about this contact")],
+        person: Annotated[str | None, Desc("Member name for a private note, or omit for shared")] = None,
         **_: Any,
     ) -> dict[str, Any]:
         if err := _check_content_length(content):
@@ -159,7 +162,8 @@ def register_builtin_tools(
         if contact is None:
             return {"error": f"Contact '{contact_id}' not found"}
 
-        notes_dir = workspaces / HOUSEHOLD_WORKSPACE / "contacts" / "notes"
+        base = workspaces / person if person else workspaces / HOUSEHOLD_WORKSPACE
+        notes_dir = base / "contacts" / "notes"
         notes_dir.mkdir(parents=True, exist_ok=True)
         safe_id = safe_slug(contact.id)
         path = notes_dir / f"{safe_id}.md"
@@ -171,7 +175,8 @@ def register_builtin_tools(
             with path.open("a") as f:
                 f.write(f"- [{timestamp}] {content}\n")
 
-        return {"status": "saved", "contact_id": contact.id, "name": contact.name}
+        scope = f"private ({person})" if person else "household"
+        return {"status": "saved", "contact_id": contact.id, "name": contact.name, "scope": scope}
 
     @_reg(
         name="interaction_log",

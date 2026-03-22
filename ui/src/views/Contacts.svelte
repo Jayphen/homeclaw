@@ -39,6 +39,7 @@
     last_contact: string | null;
     member: string | null;
     notes_md: string | null;
+    personal_notes_md: string | null;
   }
 
   let contacts: ContactSummary[] = $state([]);
@@ -58,6 +59,9 @@
         c.nicknames.some((n) => n.toLowerCase().includes(q)),
     );
   });
+
+  const members = $derived(filtered.filter((c) => c.member));
+  const others = $derived(filtered.filter((c) => !c.member));
 
   function formatDate(iso: string): string {
     const d = new Date(iso + "T12:00:00");
@@ -131,6 +135,39 @@
   });
 </script>
 
+{#snippet contactRow(contact: ContactSummary)}
+  <a
+    class="contact-row"
+    href="#/contacts/{contact.id}"
+  >
+    <div class="contact-avatar" class:member-avatar={contact.member}>
+      {contact.name
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()}
+    </div>
+    <div class="contact-info">
+      <div class="contact-name">
+        {contact.name}
+      </div>
+      <div class="contact-meta">
+        <span>{contact.relationship}</span>
+        {#if contact.birthday}
+          <span class="sep">&middot;</span>
+          <span>{birthdayDisplay(contact.birthday)}</span>
+        {/if}
+        {#if contact.last_contact}
+          <span class="sep">&middot;</span>
+          <span>{timeAgo(contact.last_contact)}</span>
+        {/if}
+      </div>
+    </div>
+    <div class="contact-arrow">&rsaquo;</div>
+  </a>
+{/snippet}
+
 {#if loading}
   <div class="loading">
     <div class="loading-dot"></div>
@@ -191,7 +228,7 @@
           </div>
         </div>
 
-        {@const hasData = selected.birthday || selected.last_contact || selected.member || selected.notes_md || selected.reminders.length > 0 || selected.interactions.length > 0}
+        {@const hasData = selected.birthday || selected.last_contact || selected.member || selected.notes_md || selected.personal_notes_md || selected.reminders.length > 0 || selected.interactions.length > 0}
         {#if hasData}
         <div class="detail-grid">
           <!-- Info card -->
@@ -223,6 +260,14 @@
             <section class="card">
               <h3>Notes</h3>
               <div class="contact-notes">{@html renderMarkdown(selected.notes_md)}</div>
+            </section>
+          {/if}
+
+          <!-- Personal notes -->
+          {#if selected.personal_notes_md}
+            <section class="card personal-notes-card">
+              <h3>Your notes</h3>
+              <div class="contact-notes">{@html renderMarkdown(selected.personal_notes_md)}</div>
             </section>
           {/if}
 
@@ -286,43 +331,23 @@
         <p>No contacts match "{search}"</p>
       </div>
     {:else}
-      <div class="contact-list">
-        {#each filtered as contact, i}
-          <a
-            class="contact-row"
-            href="#/contacts/{contact.id}"
-          >
-            <div class="contact-avatar">
-              {contact.name
-                .split(" ")
-                .map((w) => w[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase()}
-            </div>
-            <div class="contact-info">
-              <div class="contact-name">
-                {contact.name}
-                {#if contact.member}
-                  <span class="badge member-badge">member</span>
-                {/if}
-              </div>
-              <div class="contact-meta">
-                <span>{contact.relationship}</span>
-                {#if contact.birthday}
-                  <span class="sep">&middot;</span>
-                  <span>{birthdayDisplay(contact.birthday)}</span>
-                {/if}
-                {#if contact.last_contact}
-                  <span class="sep">&middot;</span>
-                  <span>{timeAgo(contact.last_contact)}</span>
-                {/if}
-              </div>
-            </div>
-            <div class="contact-arrow">&rsaquo;</div>
-          </a>
-        {/each}
-      </div>
+      {#if members.length > 0}
+        <h3 class="group-label">Household</h3>
+        <div class="contact-list">
+          {#each members as contact}
+            {@render contactRow(contact)}
+          {/each}
+        </div>
+      {/if}
+
+      {#if others.length > 0}
+        <h3 class="group-label">Contacts</h3>
+        <div class="contact-list">
+          {#each others as contact}
+            {@render contactRow(contact)}
+          {/each}
+        </div>
+      {/if}
     {/if}
   {/if}
 {/if}
@@ -430,6 +455,21 @@
     color: var(--text-muted);
   }
 
+  /* ---- Group labels ---- */
+  .group-label {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 1.25rem 0 0.5rem;
+  }
+
+  .group-label:first-of-type {
+    margin-top: 0;
+  }
+
   /* ---- Contact list ---- */
   .contact-list {
     display: flex;
@@ -476,6 +516,10 @@
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.03em;
+  }
+
+  .member-avatar {
+    background: var(--sage);
   }
 
   .detail-avatar {
@@ -678,6 +722,11 @@
 
   .reminder-note {
     font-weight: 500;
+  }
+
+  /* ---- Personal notes ---- */
+  .personal-notes-card h3 {
+    color: var(--sage);
   }
 
   /* ---- Contact notes ---- */
