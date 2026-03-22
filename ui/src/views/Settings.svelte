@@ -736,7 +736,7 @@
 
           <div class="field">
             <label for="vision-model">Model</label>
-            <input id="vision-model" type="text" bind:value={visionModel} placeholder="Same as conversation model" />
+            <input id="vision-model" type="text" bind:value={visionModel} placeholder="Same as main" />
             <small class="field-hint">Only needed if your main provider doesn't support image input.</small>
           </div>
 
