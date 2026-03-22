@@ -61,7 +61,10 @@ def _has_image(ev: Any) -> bool:
     """Return True if the message contains an image."""
     try:
         img = ev.Message.imageMessage
-        return bool(img and img.url)
+        # Check mimetype rather than url — the CDN url field isn't always
+        # populated (group messages often use directPath instead), but
+        # mimetype is always set for real image messages.
+        return bool(img and img.mimetype)
     except AttributeError:
         return False
 
@@ -289,6 +292,7 @@ class WhatsAppChannel:
 
         text = _extract_text(ev)
         if not text:
+            logger.debug("Dropping non-text, non-image WhatsApp message from %s", phone)
             return
         text = text.strip()
 
