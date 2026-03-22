@@ -691,6 +691,12 @@ def _read_history_file(path: Path) -> tuple[int, list[Message]]:
         try:
             msg = Message.model_validate(data)
             if msg.role in ("user", "assistant"):
+                # Strip stale reasoning/thinking blocks — they only matter
+                # within a tool chain, not across persisted turns.  Leaving
+                # them causes 400s on OpenRouter and other Anthropic proxies
+                # that don't accept Anthropic-specific signature fields.
+                if msg.reasoning:
+                    msg = msg.model_copy(update={"reasoning": []})
                 messages.append(msg)
         except Exception:
             continue
@@ -725,7 +731,10 @@ def _persistable_messages(messages: list[Message]) -> list[Message]:
     persistent: list[Message] = []
     for m in messages:
         if m.role == "user" or m.role == "assistant" and not m.tool_calls:
-            persistent.append(m.model_copy(update={"content": _strip_images(m.content)}))
+            persistent.append(m.model_copy(update={
+                "content": _strip_images(m.content),
+                "reasoning": [],  # only needed within tool chains, not across turns
+            }))
     return persistent
 
 

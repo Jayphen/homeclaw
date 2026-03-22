@@ -139,6 +139,9 @@
   let timezoneValue: string = $state("");
   let noteDetailLevel: string = $state("normal");
 
+  // Effective fast provider protocol — used to filter presets
+  let effectiveFastProvider = $derived(fastProvider || selectedProvider);
+
   // Member account management
   let memberPasswords: Record<string, string> = $state({});
   let memberSaveStatus: Record<string, "idle" | "saving" | "saved" | "error"> = $state({});
@@ -450,11 +453,10 @@
         <label for="fast-base-url">Fast model base URL</label>
         <input id="fast-base-url" type="url" bind:value={fastBaseUrl} placeholder="Falls back to main URL" />
         <div class="presets">
-          {#each [
-            ["MiniMax (Anthropic)", "https://api.minimax.io/anthropic"],
-            ["MiniMax (OpenAI)", "https://api.minimax.io/v1"],
-            ["OpenRouter", "https://openrouter.ai/api/v1"],
-          ] as [name, url]}
+          {#each effectiveFastProvider === "anthropic"
+            ? [["OpenRouter", "https://openrouter.ai/api"], ["MiniMax", "https://api.minimax.io/anthropic"]]
+            : [["OpenRouter", "https://openrouter.ai/api/v1"], ["MiniMax", "https://api.minimax.io/v1"], ["Groq", "https://api.groq.com/openai/v1"]]
+          as [name, url]}
             <button class="preset" class:active={fastBaseUrl === url} onclick={() => { fastBaseUrl = url; }}>
               {name}
             </button>
@@ -463,6 +465,7 @@
       </div>
       {/if}
 
+      {#if selectedProvider === "anthropic"}
       <div class="field">
         <label for="anthropic-key">Anthropic API key</label>
         <input id="anthropic-key" type="password" bind:value={anthropicKey}
@@ -474,6 +477,7 @@
         <input id="anthropic-base-url" type="url" bind:value={anthropicBaseUrl} placeholder="https://api.anthropic.com (default)" />
         <div class="presets">
           {#each [
+            ["OpenRouter", "https://openrouter.ai/api"],
             ["MiniMax", "https://api.minimax.io/anthropic"],
           ] as [name, url]}
             <button class="preset" class:active={anthropicBaseUrl === url} onclick={() => { anthropicBaseUrl = url; }}>
@@ -482,7 +486,9 @@
           {/each}
         </div>
       </div>
+      {/if}
 
+      {#if selectedProvider === "openai"}
       <div class="field">
         <label for="openai-key">OpenAI / OpenRouter API key</label>
         <input id="openai-key" type="password" bind:value={openaiKey}
@@ -506,6 +512,7 @@
           {/each}
         </div>
       </div>
+      {/if}
     </section>
 
     <section class="card">
