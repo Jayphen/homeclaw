@@ -186,6 +186,7 @@
 
         <div class="detail-grid">
           <!-- Info card -->
+          {#if selected.birthday || selected.last_contact || selected.member}
           <section class="card info-card">
             {#if selected.birthday}
               <div class="info-row">
@@ -206,6 +207,7 @@
               </div>
             {/if}
           </section>
+          {/if}
 
           <!-- Notes -->
           {#if selected.notes_md}
