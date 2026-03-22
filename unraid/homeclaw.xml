@@ -12,29 +12,29 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/jayphen/homeclaw/issues</Support>
   <Project>https://github.com/jayphen/homeclaw</Project>
-  <Overview>An AI assistant that knows your whole household — your home, your family, and the people in your lives.</Overview>
+  <Overview>An AI assistant that knows your whole household — your home, your family, and the people in your lives. Not a personal assistant (one person) and not a home automation tool (one building) — it understands the household as a coherent unit. After install, open the web UI to complete setup — API keys, Telegram, WhatsApp, and all other settings are configured there. A one-time setup token is printed to the container logs.</Overview>
   <Category>HomeAutomation: Tools:</Category>
   <WebUI>http://[IP]:[PORT:7399]</WebUI>
   <Icon>https://raw.githubusercontent.com/jayphen/homeclaw/main/docs/icon.png</Icon>
   <ExtraParams>--restart unless-stopped</ExtraParams>
 
-  <Config Name="Web UI Port" Target="8080" Default="7399" Mode="tcp" Description="Port for the web interface" Type="Port" Display="always" Required="true">7399</Config>
+  <Config Name="Web UI Port" Target="8080" Default="7399" Mode="tcp" Description="Port for the web interface. Open this in your browser after install to complete setup." Type="Port" Display="always" Required="true">7399</Config>
 
-  <Config Name="Workspaces" Target="/data/workspaces" Default="/mnt/user/appdata/homeclaw/workspaces" Mode="rw" Description="Persistent data — household memory, contacts, routines" Type="Path" Display="always" Required="true">/mnt/user/appdata/homeclaw/workspaces</Config>
+  <Config Name="Workspaces" Target="/data/workspaces" Default="/mnt/user/appdata/homeclaw/workspaces" Mode="rw" Description="Persistent data — household memory, contacts, notes, bookmarks, config. Back this up regularly." Type="Path" Display="always" Required="true">/mnt/user/appdata/homeclaw/workspaces</Config>
 
-  <Config Name="Docker Socket" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="ro" Description="Required for MCP sidecar plugin management" Type="Path" Display="advanced" Required="false">/var/run/docker.sock</Config>
+  <Config Name="Docker Socket" Target="/var/run/docker.sock" Default="/var/run/docker.sock" Mode="ro" Description="Required for MCP sidecar plugin management (optional)" Type="Path" Display="advanced" Required="false">/var/run/docker.sock</Config>
 
-  <Config Name="Anthropic API Key" Target="ANTHROPIC_API_KEY" Default="" Description="API key for Claude (set this OR OpenAI key)" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Anthropic API Key" Target="ANTHROPIC_API_KEY" Default="" Description="Can also be set via web UI at Settings" Type="Variable" Display="advanced" Required="false"></Config>
 
-  <Config Name="OpenAI API Key" Target="OPENAI_API_KEY" Default="" Description="API key for OpenAI-compatible provider" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="OpenAI API Key" Target="OPENAI_API_KEY" Default="" Description="For OpenAI or OpenRouter. Can also be set via web UI at Settings" Type="Variable" Display="advanced" Required="false"></Config>
 
-  <Config Name="OpenAI Base URL" Target="OPENAI_BASE_URL" Default="" Description="Custom base URL for OpenAI-compatible providers (Ollama, OpenRouter, etc.)" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="OpenAI Base URL" Target="OPENAI_BASE_URL" Default="" Description="Custom endpoint (OpenRouter, Ollama, etc.). Can also be set via web UI" Type="Variable" Display="advanced" Required="false"></Config>
 
-  <Config Name="Model" Target="MODEL" Default="claude-sonnet-4-6" Description="LLM model name" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Model" Target="MODEL" Default="claude-sonnet-4-6" Description="LLM model name. Can also be set via web UI" Type="Variable" Display="advanced" Required="false"></Config>
 
-  <Config Name="Telegram Bot Token" Target="TELEGRAM_TOKEN" Default="" Description="Telegram bot token (optional)" Type="Variable" Display="advanced" Required="false"></Config>
+  <Config Name="Telegram Bot Token" Target="TELEGRAM_TOKEN" Default="" Description="Can also be set via web UI at Settings" Type="Variable" Display="advanced" Required="false"></Config>
 
   <Config Name="Telegram Allowed Users" Target="TELEGRAM_ALLOWED_USERS" Default="" Description="Comma-separated Telegram user IDs (blank = unrestricted)" Type="Variable" Display="advanced" Required="false"></Config>
 
-  <Config Name="Web Password" Target="WEB_PASSWORD" Default="" Description="Password for the web UI (blank = no auth)" Type="Variable" Display="always" Required="false"></Config>
+  <Config Name="Web Password" Target="WEB_PASSWORD" Default="" Description="Set during first-run setup wizard in the web UI" Type="Variable" Display="advanced" Required="false"></Config>
 </Container>

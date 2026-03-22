@@ -4,99 +4,49 @@ An open source AI assistant for households. It knows your home, your family, and
 the people in your lives. Not a personal assistant (one person) and not a home
 automation tool (one building) — it understands the household as a coherent unit.
 
-## Prerequisites
+## homeclaw vs openclaw
 
-- **Python 3.12+**
-- **[uv](https://docs.astral.sh/uv/)** (recommended) or pip
-- An LLM API key — one of:
-  - `ANTHROPIC_API_KEY` (direct Anthropic)
-  - `OPENAI_API_KEY` + optional `OPENAI_BASE_URL` (OpenAI or OpenRouter)
+[openclaw](https://github.com/openclaw/openclaw) is a mature, widely-adopted
+personal AI assistant. homeclaw takes a different approach — it's built around
+the **household** as a unit, not a single person. If openclaw is your personal
+assistant, homeclaw is your family's.
 
-## Installation
+| | homeclaw | openclaw |
+|---|---|---|
+| **Focus** | Household (multi-person, shared context) | Personal (single user) |
+| **Data model** | Per-person workspaces + shared household knowledge | Per-session, single workspace |
+| **Memory** | Markdown files + semantic recall, scoped per person | Session-based |
+| **Contacts & relationships** | First-class — tracks people in your lives with interactions, reminders | Not built-in |
+| **Channels** | Telegram, WhatsApp, Web UI, REPL | 20+ (WhatsApp, Telegram, Slack, Discord, Signal, iMessage, etc.) |
+| **LLM providers** | Anthropic, OpenAI, OpenRouter, Ollama, any OpenAI-compatible | OpenAI (primary), multi-profile failover |
+| **Language** | Python 3.12 | TypeScript / Node.js |
+| **Plugin system** | Python plugins, Skill markdown, MCP sidecars | ClawHub skills platform |
+| **Scheduler** | ROUTINES.md — natural language cron for household tasks | Cron jobs, webhooks, Gmail Pub/Sub |
+| **Device nodes** | No | macOS, iOS, Android companion apps |
+| **Browser automation** | No (planned as MCP sidecar) | Built-in Chrome control |
+| **Voice** | No | Voice Wake, push-to-talk, ElevenLabs TTS |
+| **Deployment** | Docker, Railway, Unraid, Raspberry Pi | npm, Docker, Nix, WSL2 |
+| **Maturity** | Early development | Mature (329k+ stars, 22k+ commits) |
+| **License** | MIT | MIT |
 
-```bash
-git clone https://github.com/yourorg/homeclaw.git
-cd homeclaw
-uv sync
-```
+**Choose homeclaw if** you want an assistant that understands your household —
+multiple people, shared contacts, per-person memory and privacy, and routines
+that coordinate across the family.
 
-For development (adds pyright, ruff, pytest):
+**Choose openclaw if** you want a battle-tested personal assistant with broad
+platform support, device companions, voice control, and a large ecosystem.
 
-```bash
-uv sync --extra dev
-```
+## Getting started
 
-## Configuration
+You need an LLM API key — one of:
 
-Copy `.env.example` to `.env` and fill in your values:
+- `ANTHROPIC_API_KEY` (direct Anthropic)
+- `OPENAI_API_KEY` + optional `OPENAI_BASE_URL` (OpenAI or OpenRouter)
 
-```bash
-cp .env.example .env
-```
+### Docker (recommended)
 
-Key settings:
-
-```bash
-# LLM provider — pick one:
-ANTHROPIC_API_KEY=sk-ant-...
-# or use OpenRouter:
-OPENAI_API_KEY=sk-or-...
-OPENAI_BASE_URL=https://openrouter.ai/api/v1
-MODEL=anthropic/claude-sonnet-4-6
-
-# Model routing (defaults shown):
-CONVERSATION_MODEL=anthropic/claude-sonnet-4-6
-ROUTINE_MODEL=anthropic/claude-haiku-4-5-20251001
-
-# Optional — Telegram bot:
-TELEGRAM_TOKEN=123456:ABC-...
-# Optional — restrict bot to specific Telegram user IDs:
-TELEGRAM_ALLOWED_USERS=123456789,987654321
-
-# Optional — Home Assistant integration:
-HA_URL=http://homeassistant.local:8123
-HA_TOKEN=eyJ...
-
-# Optional — web UI password:
-WEB_PASSWORD=changeme
-```
-
-All config is loaded via pydantic-settings from environment variables or `.env`.
-
-## Running
-
-### Interactive chat (REPL)
-
-```bash
-# Chat as a household member
-homeclaw chat --person alice
-
-# Use a specific workspaces directory
-homeclaw chat --person alice --workspaces ./workspaces
-
-# Skip tool execution (LLM-only mode)
-homeclaw chat --person alice --no-tools
-
-# Preview the system prompt and tools without calling the LLM
-homeclaw chat --person alice --dry-run
-```
-
-### Telegram bot
-
-```bash
-# Requires TELEGRAM_TOKEN in .env
-homeclaw telegram
-```
-
-Users register via `/register <name>` in Telegram to link their account to a
-household member.
-
-### Docker
-
-The easiest way to run homeclaw in production. Images are published to GitHub
-Container Registry on every release (linux/amd64 + linux/arm64).
-
-**Quick start with `docker run`:**
+Images are published to GitHub Container Registry on every release
+(linux/amd64 + linux/arm64).
 
 ```bash
 docker run -d \
@@ -106,25 +56,17 @@ docker run -d \
   ghcr.io/jayphen/homeclaw:latest
 ```
 
-Open `http://localhost:8080` — the web UI will walk you through setup (API keys,
+Open `http://localhost:8080` — the web UI walks you through setup (API keys,
 password, Telegram, etc.). A one-time setup token is printed to the container
 logs: `docker logs homeclaw`.
 
-**With docker-compose (recommended):**
+**With docker-compose:**
 
 ```bash
 docker compose up -d
 ```
 
 This maps port 7399 → 8080 and bind-mounts `./workspaces` for persistent data.
-All configuration happens in the web UI — no `.env` file required.
-
-If you prefer env vars over the web UI, you can pass them via `.env` or `-e`
-flags. See the Configuration section above for available options. Additionally:
-
-| Variable | Description |
-|----------|-------------|
-| `HOMECLAW_CORS_ORIGINS` | Comma-separated allowed origins for production, e.g. `https://home.example.com` |
 
 **Volume:** Mount `/data/workspaces` to persist all household data (contacts,
 notes, memory, bookmarks, config). Back this up regularly.
@@ -136,21 +78,84 @@ docker build -t homeclaw .
 docker run -d -p 8080:8080 -v ./workspaces:/data/workspaces homeclaw
 ```
 
-### Development shortcuts
+### From source
+
+Requires **Python 3.12+** and **[uv](https://docs.astral.sh/uv/)** (or pip).
+
+```bash
+git clone https://github.com/Jayphen/homeclaw.git
+cd homeclaw
+uv sync
+```
+
+Start the web UI and configure everything there:
+
+```bash
+homeclaw serve
+```
+
+Open `http://localhost:8080` to complete setup.
+
+You can also use the CLI directly:
+
+```bash
+homeclaw chat --person alice     # Interactive REPL
+homeclaw telegram                # Start Telegram bot
+```
+
+## Configuration
+
+All configuration is managed through the **web UI** at Settings. This includes
+API keys, model selection, Telegram, WhatsApp, and Home Assistant setup.
+
+Settings are persisted to `workspaces/household/config.json` and loaded via
+pydantic-settings. Environment variables and `.env` files are supported as
+overrides — useful for Docker deployments or CI:
+
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | Anthropic API key |
+| `OPENAI_API_KEY` | OpenAI or OpenRouter API key |
+| `OPENAI_BASE_URL` | Custom endpoint (OpenRouter, Ollama, etc.) |
+| `MODEL` | Model name (e.g. `anthropic/claude-sonnet-4-6`) |
+| `TELEGRAM_TOKEN` | Telegram bot token |
+| `TELEGRAM_ALLOWED_USERS` | Comma-separated Telegram user IDs |
+| `HA_URL` | Home Assistant URL |
+| `HA_TOKEN` | Home Assistant long-lived access token |
+| `WEB_PASSWORD` | Web UI password |
+| `HOMECLAW_CORS_ORIGINS` | Allowed origins for production |
+
+### Telegram
+
+Users register via `/register <name>` in Telegram to link their account to a
+household member.
+
+### WhatsApp
+
+Connect as a linked device — scan the QR code at Settings > WhatsApp in the web
+UI, or check the container logs. No Meta Business API required.
+
+## Development
+
+```bash
+uv sync --extra dev               # Install dev dependencies
+make dev-setup                    # Create dev fixtures (sample household data)
+```
 
 ```bash
 make dev          # Chat as alice with dev fixtures
 make dev-bob      # Chat as bob with dev fixtures
 make dev-context  # Dry-run: print system prompt and tools
-make dev-setup    # Reset dev fixtures to a clean state
 make dev-serve    # Start API server against dev fixtures
 make dev-costs    # Show cumulative LLM cost from cost log
 ```
 
-To set up the dev fixtures for the first time:
+### Running tests
 
 ```bash
-make dev-setup    # Creates workspaces-dev/ with sample household data
+make test         # Unit tests (no LLM calls)
+make typecheck    # Pyright strict type checking
+make lint         # Ruff linting + formatting check
 ```
 
 ## Scheduler & routines
@@ -217,27 +222,35 @@ Three tiers of plugins, all conforming to the same Protocol:
 See `plugins/plants/` for a reference implementation covering tools, routines,
 and persistent storage.
 
-## Running tests
-
-```bash
-make test         # Unit tests (no LLM calls)
-make typecheck    # Pyright strict type checking
-make lint         # Ruff linting + formatting check
-```
-
-Or directly:
-
-```bash
-pytest tests/ -m "not integration"
-pyright
-ruff check homeclaw tests
-ruff format --check homeclaw tests
-```
-
 ## Status
 
-Early development. Working: core agent loop, context builder, built-in tools,
-scheduler, cost tracking, CLI REPL, Telegram bot, plugin system, web UI scaffold.
+v0.12 — usable for daily household use, actively developed. What's working:
+
+- **Agent loop** with 40+ built-in tools, cost-aware model routing, prompt
+  caching, interim responses during long tool chains, and reasoning round-trip
+- **Memory** — per-person markdown topics with semantic recall (memsearch),
+  context consolidation for long conversations
+- **Contacts** — full CRM with interactions, reminders, per-person private notes
+- **Bookmarks** — save, search, categorize, and annotate links
+- **Notes** — daily markdown notes per person and shared household notes
+- **Reminders** — one-shot and recurring, delivered via preferred channel
+- **Channels** — Telegram (with typing indicators, photo handling, group chats),
+  WhatsApp (linked device via neonize, QR/pair code auth, group chats), REPL
+- **Channel dispatcher** — outbound messages routed to each person's preferred
+  channel
+- **Scheduler** — ROUTINES.md with natural language schedules, missed routine
+  detection, manual trigger, per-routine cost tracking
+- **Skills** — AgentSkills SKILL.md format, progressive disclosure, .env per
+  skill, approval flow, install from GitHub/gist/URL, web UI with file
+  browser/editor
+- **Plugins** — Python plugins via importlib, marketplace index, install/uninstall
+- **Web UI** — dashboard, contacts, memory, notes, bookmarks, calendar, routines,
+  extensions, settings, setup wizard, log viewer, data export/import
+- **Auth** — per-member JWT sessions, admin role, bcrypt passwords
+- **Docker** — multi-arch images (amd64 + arm64), one-click setup via web UI
+
+Not yet built: MCP sidecars, Home Assistant integration, voice, browser
+automation, Railway/Pi deployment targets.
 
 ## License
 
