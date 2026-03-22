@@ -12,7 +12,6 @@ from homeclaw.api.app import app
 from homeclaw.api.deps import set_config, set_plugin_registry
 from homeclaw.config import HomeclawConfig
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -387,3 +386,131 @@ class TestUpdateSkillSettings:
         data = resp.json()
         assert data["skill_approval_required"] is True
         assert data["skill_allow_local_network"] is False
+
+
+# ---------------------------------------------------------------------------
+# GET /api/skills/list-remote — discover skills in a repo
+# ---------------------------------------------------------------------------
+
+
+class TestListRemoteSkills:
+    def test_rejects_non_github_url(self, client: TestClient) -> None:
+        resp = client.get("/api/skills/list-remote", params={"url": "https://example.com/foo"})
+        assert resp.status_code == 400
+        assert "Not a recognised" in resp.json()["detail"]
+
+    def test_lists_skills_in_repo(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Returns discovered skills from a GitHub repo."""
+        from homeclaw.plugins.skills import github
+
+        async def mock_list(url: str) -> list[dict[str, str]]:
+            return [{"path": "cooking"}, {"path": "weather"}]
+
+        monkeypatch.setattr(github, "list_repo_skills", mock_list)
+
+        resp = client.get(
+            "/api/skills/list-remote",
+            params={"url": "https://github.com/user/skills-repo"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["skills"]) == 2
+        paths = [s["path"] for s in data["skills"]]
+        assert "cooking" in paths
+        assert "weather" in paths
+
+
+# ---------------------------------------------------------------------------
+# POST /api/skills/install — multi-skill repo support
+# ---------------------------------------------------------------------------
+
+
+class TestInstallMultiSkill:
+    def test_returns_skill_list_when_no_root_skill(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Multi-skill repo without install_all returns available skills."""
+        import httpx
+
+        from homeclaw.plugins.skills import github
+
+        async def mock_get(self: httpx.AsyncClient, url: str, **kwargs: object) -> httpx.Response:
+            r = httpx.Response(404 if "SKILL.md" in str(url) else 200, json={})
+            r._request = httpx.Request("GET", "https://fake")  # noqa: SLF001
+            return r
+
+        monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
+
+        async def mock_list(url: str) -> list[dict[str, str]]:
+            return [{"path": "cooking"}, {"path": "weather"}]
+
+        monkeypatch.setattr(github, "list_repo_skills", mock_list)
+
+        resp = client.post(
+            "/api/skills/install",
+            json={"url": "https://github.com/user/skills-repo"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "multiple_skills"
+        assert len(data["skills"]) == 2
+
+    def test_install_all_installs_multiple(
+        self, client: TestClient, workspaces: Path, monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """install_all=true installs all discovered skills."""
+        import httpx
+
+        from homeclaw.plugins.skills import github
+
+        cooking_md = "---\nname: cooking\ndescription: Cook stuff\n---\nInstructions here"
+        weather_md = "---\nname: weather\ndescription: Weather info\n---\nInstructions here"
+        skill_contents = {
+            "cooking": cooking_md,
+            "weather": weather_md,
+        }
+
+        def _resp(status_code: int, **kwargs: Any) -> httpx.Response:
+            """Build an httpx.Response with a dummy request attached."""
+            r = httpx.Response(status_code, **kwargs)
+            r._request = httpx.Request("GET", "https://fake")  # noqa: SLF001
+            return r
+
+        async def mock_get(self: httpx.AsyncClient, url: str, **kwargs: object) -> httpx.Response:
+            url_str = str(url)
+            # Subpath SKILL.md → return content (check before root)
+            for name, content in skill_contents.items():
+                if f"/{name}/SKILL.md" in url_str:
+                    return _resp(200, text=content)
+            # Root SKILL.md (no skill subdir in path) → 404
+            if url_str.endswith("/SKILL.md"):
+                return _resp(404)
+            # GitHub contents API for download_skill_repo
+            return _resp(200, json=[])
+
+        monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
+
+        async def mock_list(url: str) -> list[dict[str, str]]:
+            return [{"path": "cooking"}, {"path": "weather"}]
+
+        monkeypatch.setattr(github, "list_repo_skills", mock_list)
+
+        resp = client.post(
+            "/api/skills/install",
+            json={
+                "url": "https://github.com/user/skills-repo",
+                "install_all": True,
+            },
+        )
+        assert resp.status_code == 200, resp.json()
+        data = resp.json()
+        assert data["status"] == "installed_multiple"
+        assert data["total"] == 2
+        assert len(data["installed"]) == 2
+        assert len(data["errors"]) == 0
+
+        # Verify skills were written to disk
+        assert (workspaces / "household" / "skills" / "cooking" / "SKILL.md").is_file()
+        assert (workspaces / "household" / "skills" / "weather" / "SKILL.md").is_file()

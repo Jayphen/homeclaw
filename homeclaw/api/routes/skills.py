@@ -177,11 +177,27 @@ async def delete_skill(owner: str, name: str) -> dict[str, Any]:
 class SkillInstallRequest(BaseModel):
     url: str
     scope: str = "household"
+    install_all: bool = False
 
 
-@router.post("/install", dependencies=[AdminDep])
-async def install_skill_from_url(body: SkillInstallRequest) -> dict[str, Any]:
-    """Install a skill from a GitHub repo, gist, or direct SKILL.md URL."""
+@router.get("/list-remote", dependencies=[AuthDep])
+async def list_remote_skills(url: str) -> dict[str, Any]:
+    """Discover skills available at a GitHub repo URL."""
+    from homeclaw.plugins.skills.github import list_repo_skills, parse_github_url
+
+    if parse_github_url(url.strip()) is None:
+        raise HTTPException(status_code=400, detail="Not a recognised GitHub URL")
+
+    skills = await list_repo_skills(url.strip())
+    return {"url": url.strip(), "skills": skills}
+
+
+async def _install_single_skill(
+    url: str,
+    scope: str,
+    workspaces: Path,
+) -> dict[str, Any]:
+    """Install a single skill from a URL that points at one SKILL.md."""
     import httpx
 
     from homeclaw.plugins.skills.github import (
@@ -191,45 +207,40 @@ async def install_skill_from_url(body: SkillInstallRequest) -> dict[str, Any]:
     )
     from homeclaw.plugins.skills.loader import load_skill, skill_md_to_definition
 
-    workspaces = get_config().workspaces.resolve()
-
-    # Normalize URL to a fetchable SKILL.md
-    original_url = body.url.strip()
+    original_url = url
     skill_md_url = raw_skill_md_url(original_url)
     is_github_repo = skill_md_url is not None
     if skill_md_url is None:
         skill_md_url = normalize_gist_url(original_url) or original_url
-    url = skill_md_url
 
     try:
         transport = httpx.AsyncHTTPTransport(retries=2)
         async with httpx.AsyncClient(timeout=30, transport=transport) as client:
-            resp = await client.get(url)
+            resp = await client.get(skill_md_url)
             resp.raise_for_status()
             content = resp.text
     except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch: HTTP {e.response.status_code}")
+        return {"error": f"Failed to fetch: HTTP {e.response.status_code}"}
     except httpx.RequestError as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch: {e}")
+        return {"error": f"Failed to fetch: {e}"}
 
     try:
         defn = skill_md_to_definition(content)
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=f"Invalid SKILL.md: {e}")
+        return {"error": f"Invalid SKILL.md: {e}"}
 
     from homeclaw.pathutil import safe_slug
 
     slug = safe_slug(defn.name)
-    owner = "household" if body.scope == "household" else body.scope
+    owner = "household" if scope == "household" else scope
     skill_dir = workspaces / owner / "skills" / slug
 
     if skill_dir.exists():
-        raise HTTPException(status_code=409, detail=f"Skill '{slug}' already exists")
+        return {"error": f"Skill '{slug}' already exists", "name": slug}
 
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "SKILL.md").write_text(content)
 
-    # Download additional files from GitHub repos (scripts, references, etc.)
     if is_github_repo:
         await download_skill_repo(original_url, skill_dir)
 
@@ -255,12 +266,84 @@ async def install_skill_from_url(body: SkillInstallRequest) -> dict[str, Any]:
         "status": "installed",
         "name": slug,
         "description": defn.description,
-        "scope": body.scope,
+        "scope": scope,
         "loaded": loaded,
     }
     if not deps["satisfied"]:
         result["deps"] = deps
     return result
+
+
+@router.post("/install", dependencies=[AdminDep])
+async def install_skill_from_url(body: SkillInstallRequest) -> dict[str, Any]:
+    """Install skill(s) from a GitHub repo, gist, or direct SKILL.md URL.
+
+    For multi-skill repos (no root SKILL.md), returns the list of available
+    skills unless ``install_all`` is true.
+    """
+    import httpx
+
+    from homeclaw.plugins.skills.github import (
+        list_repo_skills,
+        parse_github_url,
+        raw_skill_md_url,
+        skill_subpath_url,
+    )
+
+    workspaces = get_config().workspaces.resolve()
+    original_url = body.url.strip()
+    is_github_repo = parse_github_url(original_url) is not None
+
+    # Try fetching SKILL.md at the target path first
+    skill_md_url = raw_skill_md_url(original_url) if is_github_repo else None
+    has_root_skill = False
+    if skill_md_url is not None:
+        try:
+            transport = httpx.AsyncHTTPTransport(retries=2)
+            async with httpx.AsyncClient(timeout=30, transport=transport) as client:
+                resp = await client.get(skill_md_url)
+                has_root_skill = resp.status_code == 200
+        except httpx.RequestError:
+            pass
+
+    # Single-skill case: SKILL.md found at target, or not a GitHub repo
+    if has_root_skill or not is_github_repo:
+        result = await _install_single_skill(original_url, body.scope, workspaces)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+
+    # Multi-skill case: no root SKILL.md, discover subdirectories
+    available = await list_repo_skills(original_url)
+    if not available:
+        raise HTTPException(
+            status_code=404,
+            detail="No SKILL.md files found in this repository",
+        )
+
+    if not body.install_all:
+        return {
+            "status": "multiple_skills",
+            "url": original_url,
+            "skills": available,
+            "hint": "Set install_all=true to install all, or use a more specific URL",
+        }
+
+    # Install all discovered skills
+    results: list[dict[str, Any]] = []
+    for skill_info in available:
+        sub_url = skill_subpath_url(original_url, skill_info["path"])
+        result = await _install_single_skill(sub_url, body.scope, workspaces)
+        results.append(result)
+
+    installed = [r for r in results if r.get("status") == "installed"]
+    errors = [r for r in results if "error" in r]
+    return {
+        "status": "installed_multiple",
+        "installed": installed,
+        "errors": errors,
+        "total": len(results),
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -1585,38 +1585,22 @@ def register_builtin_tools(
 
     # --- Skill installation from URL ---
 
-    @_reg(
-        name="skill_install",
-        description=(
-            "Install a skill from a URL. Accepts GitHub repos, gists, "
-            "or any URL that serves a SKILL.md file. GitHub repos also "
-            "download scripts/, references/, and other supporting files."
-        ),
-    )
-    async def skill_install(
+    async def _install_single_skill(
         *,
-        person: Annotated[str, Desc("Household member name")],
-        url: Annotated[str, Desc(
-            "URL to install from — GitHub repo URL or "
-            "direct link to a SKILL.md file"
-        )],
-        scope: Annotated[SkillScope, Enum(["household", "private"]), Desc("Who can use this skill (default: household)")] = "household",
-        **_: Any,
+        person: str,
+        url: str,
+        skill_md_url: str,
+        is_github_repo: bool,
+        scope: str,
+        workspaces: Path,
+        plugin_registry: Any,
     ) -> dict[str, Any]:
+        """Install a single skill from a resolved SKILL.md URL."""
         import httpx
 
         from homeclaw.plugins.registry import PluginType
-        from homeclaw.plugins.skills.github import normalize_gist_url, raw_skill_md_url
         from homeclaw.plugins.skills.loader import load_skill, skill_md_to_definition
 
-        # Determine the SKILL.md download URL
-        skill_md_url = raw_skill_md_url(url)
-        is_github_repo = skill_md_url is not None
-        if skill_md_url is None:
-            # Try gist URL, otherwise use URL directly
-            skill_md_url = normalize_gist_url(url) or url
-
-        # Fetch the SKILL.md
         try:
             transport = httpx.AsyncHTTPTransport(retries=2)
             async with httpx.AsyncClient(timeout=30, transport=transport) as client:
@@ -1628,7 +1612,6 @@ def register_builtin_tools(
         except httpx.RequestError as e:
             return {"error": f"Failed to fetch SKILL.md: {e}"}
 
-        # Validate
         try:
             defn = skill_md_to_definition(content)
         except ValueError as e:
@@ -1638,7 +1621,6 @@ def register_builtin_tools(
         if not slug:
             return {"error": f"Invalid skill name in SKILL.md: '{defn.name}'"}
 
-        # Check approval flow
         pending = _needs_approval(person)
         owner = "household" if scope == "household" else person
         if pending:
@@ -1653,7 +1635,6 @@ def register_builtin_tools(
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "SKILL.md").write_text(content)
 
-        # Try to fetch additional files from GitHub repos
         fetched_extras: list[str] = []
         if is_github_repo:
             from homeclaw.plugins.skills.github import download_skill_repo
@@ -1668,7 +1649,6 @@ def register_builtin_tools(
                 "fetched_files": ["SKILL.md", *fetched_extras],
             }
 
-        # Hot-load
         loaded = False
         if plugin_registry is not None:
             try:
@@ -1697,13 +1677,102 @@ def register_builtin_tools(
             "fetched_files": ["SKILL.md", *fetched_extras],
         }
         if not deps["satisfied"]:
-            warnings: list[str] = []
+            dep_warnings: list[str] = []
             for b in deps["missing_bins"]:
-                warnings.append(f"Missing binary '{b['name']}': {b['hint']}")
-            for e in deps["missing_env"]:
-                warnings.append(f"Missing env var '{e}'")
-            result["warnings"] = warnings
+                dep_warnings.append(f"Missing binary '{b['name']}': {b['hint']}")
+            for ev in deps["missing_env"]:
+                dep_warnings.append(f"Missing env var '{ev}'")
+            result["warnings"] = dep_warnings
         return result
+
+    @_reg(
+        name="skill_install",
+        description=(
+            "Install a skill from a URL. Accepts GitHub repos (including "
+            "multi-skill repos), gists, or any URL that serves a SKILL.md. "
+            "For repos with multiple skills in subdirectories, returns the "
+            "list of available skills unless install_all is true."
+        ),
+    )
+    async def skill_install(
+        *,
+        person: Annotated[str, Desc("Household member name")],
+        url: Annotated[str, Desc(
+            "URL to install from — GitHub repo/subpath URL or "
+            "direct link to a SKILL.md file"
+        )],
+        scope: Annotated[SkillScope, Enum(["household", "private"]), Desc("Who can use this skill (default: household)")] = "household",
+        install_all: Annotated[bool, Desc("Install all skills from a multi-skill repo")] = False,
+        **_: Any,
+    ) -> dict[str, Any]:
+        import httpx
+
+        from homeclaw.plugins.skills.github import (
+            list_repo_skills,
+            normalize_gist_url,
+            parse_github_url,
+            raw_skill_md_url,
+            skill_subpath_url,
+        )
+
+        is_github_repo = parse_github_url(url) is not None
+
+        # Check if there's a SKILL.md at the target path
+        skill_md_url = raw_skill_md_url(url) if is_github_repo else None
+        has_root_skill = False
+        if skill_md_url is not None:
+            try:
+                transport = httpx.AsyncHTTPTransport(retries=2)
+                async with httpx.AsyncClient(timeout=30, transport=transport) as client:
+                    resp = await client.get(skill_md_url)
+                    has_root_skill = resp.status_code == 200
+            except httpx.RequestError:
+                pass
+
+        # Single-skill: SKILL.md found at target, or not a GitHub repo
+        if has_root_skill or not is_github_repo:
+            if not is_github_repo:
+                skill_md_url = normalize_gist_url(url) or url
+            return await _install_single_skill(
+                person=person, url=url, skill_md_url=skill_md_url or url,
+                is_github_repo=is_github_repo, scope=scope,
+                workspaces=workspaces, plugin_registry=plugin_registry,
+            )
+
+        # Multi-skill: discover subdirectories
+        available = await list_repo_skills(url)
+        if not available:
+            return {"error": "No SKILL.md files found in this repository"}
+
+        if not install_all:
+            return {
+                "status": "multiple_skills",
+                "url": url,
+                "skills": available,
+                "hint": "Set install_all=true to install all, or use a more specific URL",
+            }
+
+        # Install all discovered skills
+        results: list[dict[str, Any]] = []
+        for skill_info in available:
+            sub_url = skill_subpath_url(url, skill_info["path"])
+            sub_skill_md_url = raw_skill_md_url(sub_url)
+            r = await _install_single_skill(
+                person=person, url=sub_url,
+                skill_md_url=sub_skill_md_url or sub_url,
+                is_github_repo=True, scope=scope,
+                workspaces=workspaces, plugin_registry=plugin_registry,
+            )
+            results.append(r)
+
+        installed = [r for r in results if r.get("status") == "installed"]
+        errors = [r for r in results if "error" in r]
+        return {
+            "status": "installed_multiple",
+            "installed": installed,
+            "errors": errors,
+            "total": len(results),
+        }
 
     # --- Skill file editing ---
 
