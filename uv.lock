@@ -431,7 +431,7 @@ wheels = [
 
 [[package]]
 name = "homeclaw"
-version = "0.5.18"
+version = "0.9.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
