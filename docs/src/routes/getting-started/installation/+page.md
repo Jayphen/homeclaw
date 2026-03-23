@@ -4,7 +4,7 @@
 
 # Installation
 
-You need an LLM API key — either `ANTHROPIC_API_KEY` (Anthropic) or `OPENAI_API_KEY` (OpenAI / OpenRouter).
+You need an LLM API key. homeclaw supports **Anthropic** (`ANTHROPIC_API_KEY`) and any **OpenAI-compatible** API (`OPENAI_API_KEY` + `OPENAI_BASE_URL`) — including OpenAI, OpenRouter, and local providers. These can be configured via the web UI after install.
 
 ## Docker (recommended)
 

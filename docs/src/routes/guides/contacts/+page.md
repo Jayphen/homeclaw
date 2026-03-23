@@ -16,7 +16,7 @@ homeclaw includes a full contact management system — think of it as a househol
 
 ## Storage
 
-Contacts are stored as JSON in the workspaces directory. They're indexed by memsearch for semantic recall, so the agent can find relevant contacts during conversation.
+Contacts are stored as JSON in the workspaces directory and searched via dedicated tools (`contact_search`). Per-contact notes are stored as markdown and are indexed by memsearch for semantic recall.
 
 ## Tools
 

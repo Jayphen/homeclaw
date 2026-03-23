@@ -12,7 +12,7 @@ export const nav = [
     title: 'Guides',
     items: [
       { title: 'Channels', href: '/guides/channels' },
-      { title: 'Memory', href: '/guides/memory' },
+      { title: 'Knowledge', href: '/guides/memory' },
       { title: 'Contacts', href: '/guides/contacts' },
       { title: 'Scheduler & Routines', href: '/guides/scheduler' },
       { title: 'Plugins', href: '/guides/plugins' }

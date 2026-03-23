@@ -4,7 +4,7 @@
 
 # Configuration
 
-All configuration is managed through the **web UI** at Settings. This includes API keys, model selection, Telegram, WhatsApp, and Home Assistant setup.
+All configuration is managed through the **web UI** at Settings. This includes API keys, model selection, Telegram, and WhatsApp setup.
 
 Settings are persisted to `workspaces/household/config.json` and loaded via pydantic-settings.
 
@@ -20,26 +20,22 @@ Environment variables and `.env` files are supported as overrides — useful for
 | `MODEL` | Model name (e.g. `anthropic/claude-sonnet-4-6`) |
 | `TELEGRAM_TOKEN` | Telegram bot token |
 | `TELEGRAM_ALLOWED_USERS` | Comma-separated Telegram user IDs |
-| `HA_URL` | Home Assistant URL |
-| `HA_TOKEN` | Home Assistant long-lived access token |
 | `WEB_PASSWORD` | Web UI password |
 | `HOMECLAW_CORS_ORIGINS` | Allowed origins for production |
 
 ## LLM providers
 
-homeclaw supports multiple LLM providers through a provider-agnostic agent loop:
+homeclaw supports two provider types through a provider-agnostic agent loop:
 
-- **Anthropic** — set `ANTHROPIC_API_KEY`
-- **OpenAI** — set `OPENAI_API_KEY`
-- **OpenRouter** — set `OPENAI_API_KEY` and `OPENAI_BASE_URL=https://openrouter.ai/api/v1`
-- **Ollama** — set `OPENAI_BASE_URL=http://localhost:11434/v1`
-- **Any OpenAI-compatible API** — set `OPENAI_API_KEY` and `OPENAI_BASE_URL`
+- **Anthropic-compatible** — set `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_BASE_URL`). Works with Anthropic, MiniMax, and any Anthropic-compatible endpoint
+- **OpenAI-compatible** — set `OPENAI_API_KEY` and optionally `OPENAI_BASE_URL`. Works with OpenAI, OpenRouter, Ollama, LiteLLM, and any OpenAI-compatible endpoint
 
-## Cost-aware routing
+## Model routing
 
-homeclaw uses two model tiers:
+homeclaw uses three model tiers:
 
 - **Primary model** — used for conversations (more capable)
-- **Cheap model** — used for routines, tool-only calls, and background tasks
+- **Fast model** — used for routines, tool-only calls, and background tasks (cheaper)
+- **Vision model** — used for image inputs (photos sent via Telegram/WhatsApp). Can be a different provider than primary — e.g. use OpenAI for vision while using Anthropic for conversation
 
-This is configured in the web UI under Settings. The default setup uses a capable model for conversations and a cheaper one for automated tasks to keep costs low.
+Each tier can use a different provider, API key, and base URL. This is configured in the web UI under Settings.

@@ -6,6 +6,10 @@
 
 Channel adapters bridge messaging platforms to the homeclaw agent loop. Each adapter handles platform-specific concerns (auth, message formats, media) and presents a uniform interface to the agent.
 
+## Web UI
+
+The web UI provides a chat interface at `http://localhost:8080` — no additional setup required. Auth is handled via per-member JWT sessions.
+
 ## Telegram
 
 Uses `python-telegram-bot`. Requires `TELEGRAM_TOKEN`.
@@ -38,13 +42,7 @@ Features:
 2. Scan the QR code at Settings > WhatsApp (also available at `GET /api/setup/whatsapp/qr`)
 3. Optionally set `whatsapp_allowed_users` (comma-separated phone numbers)
 
-Install the WhatsApp extra:
-
-```bash
-pip install homeclaw[whatsapp]
-```
-
-Auth is stored in `workspaces/household/whatsapp.db`.
+WhatsApp dependencies are included automatically in the Docker image. For from-source installs, use `uv sync --extra whatsapp`. Auth is stored in `workspaces/household/whatsapp.db`.
 
 ## REPL
 
@@ -53,10 +51,6 @@ Terminal chat for development. No external dependencies.
 ```bash
 homeclaw chat --person alice
 ```
-
-## Web UI
-
-The web UI provides a chat interface at `http://localhost:8080`. Auth is handled via per-member JWT sessions.
 
 ## Channel dispatcher
 

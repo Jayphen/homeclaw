@@ -16,7 +16,7 @@ Full Python plugins loaded via importlib at startup.
 
 ## Tier 2: Skill plugins
 
-Lightweight markdown-based skills using the AgentSkills `SKILL.md` format.
+Lightweight markdown-based skills using the [AgentSkills](https://agentskills.io/specification) `SKILL.md` format.
 
 - Location: `workspaces/skills/`
 - Use the `http_call` tool for external API access
