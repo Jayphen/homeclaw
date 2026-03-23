@@ -71,7 +71,7 @@
   // Install
   let installUrl: string = $state("");
   let installing: boolean = $state(false);
-  let installResult: { status: string; name?: string; error?: string; deps?: { missing_bins: string[]; missing_env: string[] } } | null = $state(null);
+  let installResult: { status: string; name?: string; error?: string; deps?: { missing_bins: { name: string; hint: string }[]; missing_env: string[] } } | null = $state(null);
 
   // Plugins tab
   interface InstalledPlugin {

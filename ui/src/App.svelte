@@ -33,7 +33,7 @@
   };
 
   type AppState = "loading" | "setup" | "login" | "ready" | "error";
-  let state: AppState = $state("loading");
+  let appState: AppState = $state("loading");
   let loginPassword: string = $state("");
   let loginMember: string = $state("");
   let loginError: string | null = $state(null);
@@ -45,14 +45,14 @@
     try {
       const r = await fetch("/api/setup/status");
       if (!r.ok) {
-        state = "error";
+        appState = "error";
         setupError = `Server returned ${r.status}`;
         return;
       }
       const data = await r.json();
 
       if (!data.provider_configured || !data.has_password) {
-        state = "setup";
+        appState = "setup";
         return;
       }
 
@@ -62,16 +62,16 @@
       if (getToken()) {
         const check = await api("/api/settings");
         if (check.ok) {
-          state = "ready";
+          appState = "ready";
           return;
         }
         // Token invalid/expired — clear and fall through to login.
         clearToken();
       }
 
-      state = "login";
+      appState = "login";
     } catch (e) {
-      state = "error";
+      appState = "error";
       setupError = e instanceof Error ? e.message : "Could not reach server";
     }
   }
@@ -93,7 +93,7 @@
       if (r.ok) {
         const data = await r.json();
         setToken(data.token);
-        state = "ready";
+        appState = "ready";
       } else {
         loginError = "Wrong password.";
       }
@@ -104,7 +104,7 @@
   }
 
   function onSetupComplete() {
-    state = "ready";
+    appState = "ready";
   }
 
   $effect(() => {
@@ -121,19 +121,19 @@
   />
 </svelte:head>
 
-{#if state === "loading"}
+{#if appState === "loading"}
   <!-- Loading -->
-{:else if state === "error"}
+{:else if appState === "error"}
   <div class="login">
     <div class="login-card">
       <h1>homeclaw</h1>
       <div class="login-error">{setupError ?? "Could not connect to server"}</div>
-      <button class="retry-btn" onclick={() => { state = "loading"; checkSetup(); }}>Retry</button>
+      <button class="retry-btn" onclick={() => { appState = "loading"; checkSetup(); }}>Retry</button>
     </div>
   </div>
-{:else if state === "setup"}
+{:else if appState === "setup"}
   <Setup oncomplete={onSetupComplete} />
-{:else if state === "login"}
+{:else if appState === "login"}
   <div class="login">
     <div class="login-card">
       <h1>homeclaw</h1>
@@ -175,7 +175,7 @@
 
       <nav class="nav-group nav-bottom">
         <a href="#/settings">Settings</a>
-        <button class="sign-out" onclick={() => { clearToken(); state = "login"; }}>
+        <button class="sign-out" onclick={() => { clearToken(); appState = "login"; }}>
           Sign out
         </button>
       </nav>
