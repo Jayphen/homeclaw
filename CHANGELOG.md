@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.16.0](https://github.com/Jayphen/homeclaw/compare/v0.15.1...v0.16.0) (2026-03-23)
+
+
+### Features
+
+* add /api/health endpoint with Docker HEALTHCHECK ([65bdb4b](https://github.com/Jayphen/homeclaw/commit/65bdb4bbd832da4f54ef4becedd8e88480704d25))
+* add docs site with SvelteKit + mdsvex ([#74](https://github.com/Jayphen/homeclaw/issues/74)) ([c7652af](https://github.com/Jayphen/homeclaw/commit/c7652af4e7905b710a0a584adce48353f490d8b5))
+* add web_read provider settings to web UI ([af8820f](https://github.com/Jayphen/homeclaw/commit/af8820fa17782744e1c2adda457fc22ba0616a47))
+* enforce data isolation for read tools in DMs ([b7e3196](https://github.com/Jayphen/homeclaw/commit/b7e31961ae70a018fb86b4086de0356add506496))
+* show system health status in Settings &gt; General tab ([d18f73e](https://github.com/Jayphen/homeclaw/commit/d18f73e280f0aa09efc6453d0d802f3ab6ce1681))
+
+
+### Bug Fixes
+
+* eliminate state drift across config, tool schemas, and channel adapters ([45cd5df](https://github.com/Jayphen/homeclaw/commit/45cd5dfe38708dc38015a49aa94b40a25c0a8516))
+* improve interaction_log reliability in system prompt and contact list ([9fca850](https://github.com/Jayphen/homeclaw/commit/9fca850de8aa526fb654cb8bb6e229c36957c9a3))
+* resolve svelte-check errors in App.svelte and Skills.svelte ([39fd102](https://github.com/Jayphen/homeclaw/commit/39fd102c9f93ab9101419ff89b31cf70444bd039))
+* run svelte-kit sync before build to silence tsconfig warning ([c3a75a9](https://github.com/Jayphen/homeclaw/commit/c3a75a927d443e6ccda5d09818d03d61605ad84d))
+
 ## [0.15.1](https://github.com/Jayphen/homeclaw/compare/v0.15.0...v0.15.1) (2026-03-22)
 
 
