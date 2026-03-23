@@ -120,10 +120,28 @@ homeclaw/           # Main Python package
   api/              # FastAPI app + routes
   plugins/          # Registry, loaders, MCP client, marketplace
 ui/                 # Svelte web UI (built to ui/dist/)
+docs/               # Documentation site (SvelteKit, deployed to Cloudflare Pages)
 workspaces/         # All user data (bind-mounted in Docker)
 plugins/            # Built-in reference plugins (e.g., plants)
 tests/              # pytest test suite
 ```
+
+## Documentation site
+
+The docs site lives in `docs/` — a standalone SvelteKit project with mdsvex for markdown content,
+deployed to Cloudflare Pages.
+
+```bash
+cd docs && npm install && npm run dev    # local dev server
+cd docs && npm run build                 # static build to docs/build/
+```
+
+**Keep docs in sync with code changes.** When you add or modify a feature, tool, channel, plugin
+interface, or configuration option, update the corresponding docs page in `docs/src/routes/`. The
+docs site is the public-facing reference — it must reflect the current state of the codebase.
+
+Pages are markdown files (`+page.md`) processed by mdsvex. Navigation is defined in
+`docs/src/lib/nav.js` — add new pages there when creating new docs sections.
 
 ## Releasing
 
