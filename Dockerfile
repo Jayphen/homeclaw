@@ -29,6 +29,9 @@ COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 ENV HOMECLAW_UI_DIST=/app/ui/dist
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health')"
+
 VOLUME /data/workspaces
 EXPOSE 8080
 
