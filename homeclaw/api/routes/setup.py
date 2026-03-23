@@ -102,6 +102,9 @@ async def setup_status(request: Request) -> dict[str, Any]:
         "whatsapp_phone_number": config.whatsapp_phone_number,
         "whatsapp_allowed_users": config.whatsapp_allowed_users,
         "jina_api_key": _mask(config.jina_api_key),
+        "tavily_api_key": _mask(config.tavily_api_key),
+        "web_read_provider": config.web_read_provider,
+        "web_read_fallback": config.web_read_fallback,
         "ha_configured": config.ha_url is not None,
         "conversation_model": config.routing.conversation_model,
         "fast_model": config.routing.fast_model,
@@ -142,6 +145,9 @@ class SetupBody(BaseModel):
 
     # Web search
     jina_api_key: str | None = None
+    tavily_api_key: str | None = None
+    web_read_provider: str | None = None
+    web_read_fallback: str | None = None
 
     # Home Assistant
     ha_url: str | None = None
@@ -217,6 +223,12 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         config.ha_token = body.ha_token or None
     if body.jina_api_key is not None:
         config.jina_api_key = body.jina_api_key or None
+    if body.tavily_api_key is not None:
+        config.tavily_api_key = body.tavily_api_key or None
+    if body.web_read_provider is not None:
+        config.web_read_provider = body.web_read_provider or "jina"
+    if body.web_read_fallback is not None:
+        config.web_read_fallback = body.web_read_fallback or None
     if body.conversation_model is not None:
         config.routing.conversation_model = body.conversation_model
     if body.fast_model is not None:

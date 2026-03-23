@@ -31,6 +31,9 @@ export interface SetupStatus {
   whatsapp_phone_number?: string | null;
   whatsapp_allowed_users?: string | null;
   jina_api_key?: string | null;
+  tavily_api_key?: string | null;
+  web_read_provider?: string | null;
+  web_read_fallback?: string | null;
   ha_configured?: boolean;
   conversation_model?: string;
   fast_model?: string;

@@ -233,6 +233,9 @@
 
   // ---- Other config state ----
   let jinaKey: string = $state("");
+  let tavilyKey: string = $state("");
+  let webReadProvider: string = $state("jina");
+  let webReadFallback: string = $state("");
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
   let whatsappEnabled: boolean = $state(false);
@@ -277,12 +280,16 @@
     // General
     timezoneValue = s.timezone || "";
     noteDetailLevel = s.note_detail_level || "normal";
+    // Web read
+    webReadProvider = s.web_read_provider || "jina";
+    webReadFallback = s.web_read_fallback || "";
     // Clear secrets
     anthropicKey = "";
     openaiKey = "";
     fastApiKey = "";
     visionApiKey = "";
     jinaKey = "";
+    tavilyKey = "";
     telegramToken = "";
     simpleApiKey = "";
   }
@@ -437,6 +444,13 @@
 
     const body: Record<string, string | boolean | null> = {};
     if (jinaKey) body.jina_api_key = jinaKey;
+    if (tavilyKey) body.tavily_api_key = tavilyKey;
+    if (webReadProvider !== (setup?.web_read_provider || "jina")) {
+      body.web_read_provider = webReadProvider;
+    }
+    if (webReadFallback !== (setup?.web_read_fallback || "")) {
+      body.web_read_fallback = webReadFallback || null;
+    }
     if (telegramToken) body.telegram_token = telegramToken;
     if (telegramAllowedUsers !== (setup?.telegram_allowed_users || "")) {
       body.telegram_allowed_users = telegramAllowedUsers || null;
@@ -789,12 +803,35 @@
     <!-- ============ CHANNELS TAB ============ -->
     {:else if activeTab === "channels"}
       <section class="card">
-        <h2>Web search</h2>
+        <h2>Web search &amp; read</h2>
         <div class="field">
           <label for="jina-key">Jina API key</label>
           <input id="jina-key" type="password" bind:value={jinaKey}
             placeholder={setup.jina_api_key ? `Current: ${setup.jina_api_key}` : "Not set"} />
-          <small class="field-hint">Powers web_read and web_search tools. Get a key at <a href="https://jina.ai" target="_blank" rel="noopener">jina.ai</a>.</small>
+          <small class="field-hint">Powers web_search and web_read (Jina provider). Get a key at <a href="https://jina.ai" target="_blank" rel="noopener">jina.ai</a>.</small>
+        </div>
+        <div class="field">
+          <label for="tavily-key">Tavily API key</label>
+          <input id="tavily-key" type="password" bind:value={tavilyKey}
+            placeholder={setup.tavily_api_key ? `Current: ${setup.tavily_api_key}` : "Not set"} />
+          <small class="field-hint">Alternative web_read provider. Get a key at <a href="https://tavily.com" target="_blank" rel="noopener">tavily.com</a>.</small>
+        </div>
+        <div class="field">
+          <label for="web-read-provider">web_read provider</label>
+          <select id="web-read-provider" bind:value={webReadProvider}>
+            <option value="jina">Jina</option>
+            <option value="tavily">Tavily</option>
+          </select>
+          <small class="field-hint">Primary provider for fetching web page content.</small>
+        </div>
+        <div class="field">
+          <label for="web-read-fallback">web_read fallback</label>
+          <select id="web-read-fallback" bind:value={webReadFallback}>
+            <option value="">None</option>
+            <option value="jina">Jina</option>
+            <option value="tavily">Tavily</option>
+          </select>
+          <small class="field-hint">Used when the primary provider fails or returns low-quality content.</small>
         </div>
       </section>
 
