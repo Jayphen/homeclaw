@@ -213,3 +213,140 @@ async def test_group_chat_allows_cross_person_notes(
     # In group chat, bob's workspace should get the note
     bob_notes = dev_workspaces / "bob" / "notes"
     assert any(bob_notes.glob("*.md")), "Group chat should allow writing to bob"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_dm_enforces_person_on_memory_read(
+    mock_provider: AsyncMock, dev_workspaces: Path
+) -> None:
+    """In a DM, memory_read should force person to the authenticated caller."""
+    # Seed bob's memory so there's something to read
+    bob_mem = dev_workspaces / "bob" / "memory"
+    bob_mem.mkdir(parents=True, exist_ok=True)
+    (bob_mem / "secrets.md").write_text("# secrets\n\n- Bob's secret info\n")
+
+    mock_provider.complete.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCall(
+                    id="tc1",
+                    name="memory_read",
+                    # LLM tries to read bob's memory but caller is alice
+                    arguments={"person": "bob", "topic": "secrets"},
+                ),
+            ],
+            stop_reason="tool_use",
+        ),
+        LLMResponse(
+            content="Nothing found.",
+            tool_calls=[],
+            stop_reason="end_turn",
+        ),
+    ]
+
+    callback = MagicMock()
+    loop = _make_loop(mock_provider, dev_workspaces, on_tool_call=callback)
+    await loop.run("Read bob's secrets", person="alice")
+
+    # The tool should have been called with person="alice", not "bob"
+    callback.assert_called_once_with("memory_read", {"person": "alice", "topic": "secrets"})
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_dm_enforces_person_on_note_get(
+    mock_provider: AsyncMock, dev_workspaces: Path
+) -> None:
+    """In a DM, note_get should force person to the authenticated caller."""
+    mock_provider.complete.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCall(
+                    id="tc1",
+                    name="note_get",
+                    arguments={"person": "bob"},
+                ),
+            ],
+            stop_reason="tool_use",
+        ),
+        LLMResponse(
+            content="No notes.",
+            tool_calls=[],
+            stop_reason="end_turn",
+        ),
+    ]
+
+    callback = MagicMock()
+    loop = _make_loop(mock_provider, dev_workspaces, on_tool_call=callback)
+    await loop.run("Show me bob's notes", person="alice")
+
+    callback.assert_called_once_with("note_get", {"person": "alice"})
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_dm_allows_household_memory_read(
+    mock_provider: AsyncMock, dev_workspaces: Path
+) -> None:
+    """In a DM, memory_read for 'household' should be allowed through."""
+    mock_provider.complete.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCall(
+                    id="tc1",
+                    name="memory_read",
+                    arguments={"person": "household"},
+                ),
+            ],
+            stop_reason="tool_use",
+        ),
+        LLMResponse(
+            content="Household topics listed.",
+            tool_calls=[],
+            stop_reason="end_turn",
+        ),
+    ]
+
+    callback = MagicMock()
+    loop = _make_loop(mock_provider, dev_workspaces, on_tool_call=callback)
+    await loop.run("What does the household know?", person="alice")
+
+    # "household" should pass through, not be overridden to "alice"
+    callback.assert_called_once_with("memory_read", {"person": "household"})
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_group_chat_allows_cross_person_reads(
+    mock_provider: AsyncMock, dev_workspaces: Path
+) -> None:
+    """In a group chat, read tools should allow reading any person."""
+    mock_provider.complete.side_effect = [
+        LLMResponse(
+            content="",
+            tool_calls=[
+                ToolCall(
+                    id="tc1",
+                    name="memory_read",
+                    arguments={"person": "bob"},
+                ),
+            ],
+            stop_reason="tool_use",
+        ),
+        LLMResponse(
+            content="Bob's memory.",
+            tool_calls=[],
+            stop_reason="end_turn",
+        ),
+    ]
+
+    callback = MagicMock()
+    loop = _make_loop(mock_provider, dev_workspaces, on_tool_call=callback)
+    await loop.run("[alice] What does bob remember?", person="alice", channel="group-123")
+
+    # In group chat, cross-person reads should be allowed
+    callback.assert_called_once_with("memory_read", {"person": "bob"})

@@ -151,6 +151,21 @@ _PERSONAL_WRITE_TOOLS = frozenset({
     "decision_log",
 })
 
+# Tools that read from a person's workspace. In DMs, the `person` argument
+# is forced to the authenticated caller so the LLM can't read another
+# member's private notes, memory, or reminders. "household" is allowed
+# through for shared data.
+_PERSONAL_READ_TOOLS = frozenset({
+    "memory_read",
+    "note_get",
+    "reminder_list",
+    "decision_list",
+    "skill_list",
+    "read_skill",
+    "skill_edit_file",
+    "run_skill_script",
+})
+
 # Tools that write shared/household data. In DMs, the first attempt is
 # blocked so the LLM asks the user to confirm. The block fires once per
 # tool name per run() call — after the user confirms, the retry goes through.
@@ -758,6 +773,17 @@ class AgentLoop:
                 if requested != person and requested != HOUSEHOLD_WORKSPACE:
                     logger.info(
                         "Tool %s: overriding person %r → %r (DM enforcement)",
+                        tc.name, requested, person,
+                    )
+                    args["person"] = person
+
+            # In DMs, force personal-read tools to the authenticated caller.
+            # "household" is allowed through for shared data reads.
+            if is_dm and tc.name in _PERSONAL_READ_TOOLS and "person" in args:
+                requested = args["person"]
+                if requested != person and requested != HOUSEHOLD_WORKSPACE:
+                    logger.info(
+                        "Tool %s: overriding person %r → %r (DM read enforcement)",
                         tc.name, requested, person,
                     )
                     args["person"] = person
