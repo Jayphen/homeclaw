@@ -6,6 +6,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.api.deps import (
     MemberDep,
     get_config,
@@ -26,6 +27,9 @@ async def notes_index(
     workspaces = get_config().workspaces.resolve()
     all_members = list_member_workspaces(workspaces)
     members = visible_members(member, all_members)
+    # Always include household — it's visible to all members
+    if HOUSEHOLD_WORKSPACE not in members:
+        members = [*members, HOUSEHOLD_WORKSPACE]
     notes: list[dict[str, Any]] = []
 
     for person in members:

@@ -21,6 +21,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query
 
+from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.api.deps import MemberDep, get_config, list_member_workspaces, visible_members
 from homeclaw.contacts.store import list_contacts
 
@@ -218,6 +219,8 @@ async def activity_feed(
     workspaces = config.workspaces.resolve()
     all_members = list_member_workspaces(workspaces)
     members = visible_members(member, all_members)
+    if HOUSEHOLD_WORKSPACE not in members:
+        members = [*members, HOUSEHOLD_WORKSPACE]
     since = datetime.now(UTC) - timedelta(days=days)
 
     # Gather events from all sources

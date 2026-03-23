@@ -6,6 +6,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter
 
+from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.api.deps import MemberDep, get_config, list_member_workspaces, visible_members
 from homeclaw.contacts.store import list_contacts
 from homeclaw.reminders.store import load_reminders
@@ -129,6 +130,8 @@ async def dashboard(
     ws_str = str(workspaces)
     all_members = list_member_workspaces(workspaces)
     members = visible_members(member, all_members)
+    if HOUSEHOLD_WORKSPACE not in members:
+        members = [*members, HOUSEHOLD_WORKSPACE]
     today = date.today().isoformat()
 
     return {
