@@ -22,14 +22,15 @@ from homeclaw.api.deps import (
     require_auth,
     verify_setup_token,
 )
-
-logger = logging.getLogger(__name__)
 from homeclaw.api.deps import (
     get_whatsapp_connected as _get_whatsapp_connected,
 )
 from homeclaw.api.deps import (
     get_whatsapp_qr as _get_whatsapp_qr,
 )
+from homeclaw.config import NoteDetailLevel, ProviderMode, ProviderType, WebReadProvider
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/setup", tags=["setup"])
 
@@ -79,39 +80,31 @@ async def setup_status(request: Request) -> dict[str, Any]:
         except HTTPException:
             return base
 
+    # Auto-expose saveable config fields — keys ending in _key are masked.
+    _SECRET_SUFFIXES = ("_api_key", "_token")
+    from homeclaw.config import _SAVEABLE_FIELDS
+
+    for field_name in sorted(_SAVEABLE_FIELDS):
+        val = getattr(config, field_name, None)
+        if any(field_name.endswith(s) for s in _SECRET_SUFFIXES):
+            val = _mask(val)
+        # Skip internal-only fields
+        if field_name in ("web_password", "member_passwords", "jwt_secret"):
+            continue
+        base[field_name] = val
+
+    # Derived/computed fields that aren't direct config attributes
     base.update({
         "members": members,
         "members_with_passwords": members_with_passwords,
         "admin_members": config.admin_members,
-        "provider": config.provider,
-        "model": config.model,
-        "anthropic_api_key": _mask(config.anthropic_api_key),
-        "anthropic_base_url": config.anthropic_base_url,
-        "openai_api_key": _mask(config.openai_api_key),
-        "openai_base_url": config.openai_base_url,
-        "fast_provider": config.fast_provider,
-        "fast_api_key": _mask(config.fast_api_key),
-        "fast_base_url": config.fast_base_url,
-        "vision_provider": config.vision_provider,
-        "vision_api_key": _mask(config.vision_api_key),
-        "vision_base_url": config.vision_base_url,
         "telegram_configured": config.telegram_token is not None,
-        "telegram_allowed_users": config.telegram_allowed_users,
         "whatsapp_configured": config.whatsapp_enabled,
         "whatsapp_connected": _get_whatsapp_connected(),
-        "whatsapp_phone_number": config.whatsapp_phone_number,
-        "whatsapp_allowed_users": config.whatsapp_allowed_users,
-        "jina_api_key": _mask(config.jina_api_key),
-        "tavily_api_key": _mask(config.tavily_api_key),
-        "web_read_provider": config.web_read_provider,
-        "web_read_fallback": config.web_read_fallback,
         "ha_configured": config.ha_url is not None,
         "conversation_model": config.routing.conversation_model,
         "fast_model": config.routing.fast_model,
         "vision_model": config.routing.vision_model,
-        "timezone": config.timezone,
-        "note_detail_level": config.note_detail_level,
-        "provider_mode": config.provider_mode,
     })
     return base
 
@@ -119,20 +112,20 @@ async def setup_status(request: Request) -> dict[str, Any]:
 class SetupBody(BaseModel):
     setup_token: str | None = None
 
-    # LLM provider
-    provider: str | None = None
+    # LLM provider — uses the same Literal types as HomeclawConfig.
+    provider: ProviderType | None = None
     anthropic_api_key: str | None = None
     anthropic_base_url: str | None = None
     openai_api_key: str | None = None
     openai_base_url: str | None = None
-    fast_provider: str | None = None
+    fast_provider: ProviderType | None = None
     fast_api_key: str | None = None
     fast_base_url: str | None = None
-    vision_provider: str | None = None
+    vision_provider: ProviderType | None = None
     vision_api_key: str | None = None
     vision_base_url: str | None = None
     model: str | None = None
-    provider_mode: str | None = None
+    provider_mode: ProviderMode | None = None
 
     # Telegram
     telegram_token: str | None = None
@@ -146,8 +139,8 @@ class SetupBody(BaseModel):
     # Web search
     jina_api_key: str | None = None
     tavily_api_key: str | None = None
-    web_read_provider: str | None = None
-    web_read_fallback: str | None = None
+    web_read_provider: WebReadProvider | None = None
+    web_read_fallback: WebReadProvider | None = None
 
     # Home Assistant
     ha_url: str | None = None
@@ -162,7 +155,7 @@ class SetupBody(BaseModel):
     timezone: str | None = None
 
     # Note-taking
-    note_detail_level: str | None = None
+    note_detail_level: NoteDetailLevel | None = None
 
     # Auth
     web_password: str | None = None

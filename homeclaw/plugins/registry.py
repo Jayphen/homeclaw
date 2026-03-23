@@ -56,6 +56,33 @@ class PluginRegistry:
         self._plugins: dict[str, Plugin] = {}
         self._entries: dict[str, PluginEntry] = {}
 
+    def _register_tools(self, plugin: Plugin, entry: PluginEntry) -> None:
+        """Register a plugin's tools into the agent's tool registry.
+
+        Shared by register() and enable() to avoid duplicating the
+        namespacing and handler-binding logic.
+        """
+        name = plugin.name
+        tools = plugin.tools()
+        entry.tool_names.clear()
+        for tool_def in tools:
+            namespaced = f"{name}__{tool_def.name}"
+            namespaced_def = ToolDefinition(
+                name=namespaced,
+                description=f"[{name}] {tool_def.description}",
+                parameters=tool_def.parameters,
+            )
+
+            async def _handler(
+                _plugin: Plugin = plugin,
+                _tool_name: str = tool_def.name,
+                **kwargs: Any,
+            ) -> dict[str, Any]:
+                return await _plugin.handle_tool(_tool_name, kwargs)
+
+            self._tool_registry.register(namespaced_def, _handler)
+            entry.tool_names.append(namespaced)
+
     def register(self, plugin: Plugin, plugin_type: PluginType) -> PluginEntry:
         """Register a plugin and expose its tools to the agent loop."""
         name = plugin.name
@@ -72,25 +99,7 @@ class PluginRegistry:
 
         # Register tools
         try:
-            tools = plugin.tools()
-            for tool_def in tools:
-                # Namespace tool names to avoid collisions: plugin_name__tool_name
-                namespaced = f"{name}__{tool_def.name}"
-                namespaced_def = ToolDefinition(
-                    name=namespaced,
-                    description=f"[{name}] {tool_def.description}",
-                    parameters=tool_def.parameters,
-                )
-
-                async def _handler(
-                    _plugin: Plugin = plugin,
-                    _tool_name: str = tool_def.name,
-                    **kwargs: Any,
-                ) -> dict[str, Any]:
-                    return await _plugin.handle_tool(_tool_name, kwargs)
-
-                self._tool_registry.register(namespaced_def, _handler)
-                entry.tool_names.append(namespaced)
+            self._register_tools(plugin, entry)
         except Exception as e:
             entry.status = PluginStatus.ERROR
             entry.error = str(e)
@@ -198,27 +207,9 @@ class PluginRegistry:
         if entry.status != PluginStatus.DISABLED:
             return False
 
-        # Re-register tools
+        # Re-register tools using the shared helper
         try:
-            tools = plugin.tools()
-            entry.tool_names.clear()
-            for tool_def in tools:
-                namespaced = f"{name}__{tool_def.name}"
-                namespaced_def = ToolDefinition(
-                    name=namespaced,
-                    description=f"[{name}] {tool_def.description}",
-                    parameters=tool_def.parameters,
-                )
-
-                async def _handler(
-                    _plugin: Plugin = plugin,
-                    _tool_name: str = tool_def.name,
-                    **kwargs: Any,
-                ) -> dict[str, Any]:
-                    return await _plugin.handle_tool(_tool_name, kwargs)
-
-                self._tool_registry.register(namespaced_def, _handler)
-                entry.tool_names.append(namespaced)
+            self._register_tools(plugin, entry)
             entry.status = PluginStatus.ACTIVE
             entry.error = None
         except Exception as e:

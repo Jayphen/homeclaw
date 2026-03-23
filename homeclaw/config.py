@@ -4,13 +4,20 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from homeclaw.agent.context import ContextConfig
 from homeclaw.agent.routing import RoutingConfig
+
+# Constrained string types for config fields with fixed vocabularies.
+ProviderType = Literal["anthropic", "openai"]
+WebReadProvider = Literal["jina", "tavily"]
+ProviderMode = Literal["simple", "advanced"]
+NoteDetailLevel = Literal["minimal", "normal", "detailed"]
+EmbeddingProvider = Literal["local", "openai"]
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +90,8 @@ class _JsonFileSource(PydanticBaseSettingsSource):
 
 
 class HomeclawConfig(BaseSettings):
-    # Explicit provider selection — "anthropic" or "openai"
-    provider: str | None = None
+    # Explicit provider selection
+    provider: ProviderType | None = None
 
     # LLM provider keys
     anthropic_api_key: str | None = None
@@ -95,19 +102,19 @@ class HomeclawConfig(BaseSettings):
     # Fast model provider overrides — when set, the fast model uses a separate
     # provider instance (e.g. MiniMax via OpenAI protocol while conversation
     # uses OpenRouter).  Falls back to the main provider when unset.
-    fast_provider: str | None = None  # "anthropic" or "openai"; defaults to main provider
+    fast_provider: ProviderType | None = None  # defaults to main provider
     fast_api_key: str | None = None
     fast_base_url: str | None = None
 
     # Vision provider overrides — when set, image-bearing messages are routed
     # to this provider instead of the main one (e.g. use Anthropic for vision
     # while MiniMax handles text).  Falls back to the main provider when unset.
-    vision_provider: str | None = None  # "anthropic" or "openai"; defaults to main provider
+    vision_provider: ProviderType | None = None  # defaults to main provider
     vision_api_key: str | None = None
     vision_base_url: str | None = None
 
-    # UI mode for provider settings — "simple" or "advanced"
-    provider_mode: str | None = None
+    # UI mode for provider settings
+    provider_mode: ProviderMode | None = None
 
     # Model name — set to match your provider
     model: str = "claude-sonnet-4-6"
@@ -153,8 +160,8 @@ class HomeclawConfig(BaseSettings):
     # Web search & reading
     jina_api_key: str | None = None
     tavily_api_key: str | None = None
-    web_read_provider: str = "jina"  # "jina" or "tavily"
-    web_read_fallback: str | None = None  # optional secondary provider
+    web_read_provider: WebReadProvider = "jina"
+    web_read_fallback: WebReadProvider | None = None
 
     # Home Assistant (optional)
     ha_url: str | None = None
@@ -167,15 +174,15 @@ class HomeclawConfig(BaseSettings):
     admin_members: list[str] = []  # Members with admin privileges
     jwt_secret: str = ""  # Auto-generated on first login; signs session tokens
 
-    # Embedding provider for semantic memory ("local" or "openai")
-    embedding_provider: str | None = None
+    # Embedding provider for semantic memory
+    embedding_provider: EmbeddingProvider | None = None
 
     # Skills
     skill_approval_required: bool = True  # Non-admins need admin approval to create skills
     skill_allow_local_network: bool = False  # Allow skill http_call to reach LAN services
 
-    # Note-taking detail level: "minimal", "normal", or "detailed"
-    note_detail_level: str = "normal"
+    # Note-taking detail level
+    note_detail_level: NoteDetailLevel = "normal"
 
     # Marketplace
     marketplace_url: str | None = None

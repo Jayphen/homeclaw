@@ -1,3 +1,10 @@
+/** Constrained types mirroring Python Literal definitions. */
+export type ProviderType = "anthropic" | "openai";
+export type WebReadProvider = "jina" | "tavily";
+export type ProviderMode = "simple" | "advanced";
+export type NoteDetailLevel = "minimal" | "normal" | "detailed";
+export type InteractionType = "call" | "message" | "meetup" | "other";
+
 /** Setup status returned by GET /api/setup/status.
  *
  * Base fields are always present (even unauthenticated).
@@ -12,16 +19,16 @@ export interface SetupStatus {
   has_member_accounts?: boolean;
 
   // Present after auth
-  provider?: string | null;
+  provider?: ProviderType | null;
   model?: string;
   anthropic_api_key?: string | null;
   anthropic_base_url?: string | null;
   openai_api_key?: string | null;
   openai_base_url?: string | null;
-  fast_provider?: string | null;
+  fast_provider?: ProviderType | null;
   fast_api_key?: string | null;
   fast_base_url?: string | null;
-  vision_provider?: string | null;
+  vision_provider?: ProviderType | null;
   vision_api_key?: string | null;
   vision_base_url?: string | null;
   telegram_configured?: boolean;
@@ -32,15 +39,15 @@ export interface SetupStatus {
   whatsapp_allowed_users?: string | null;
   jina_api_key?: string | null;
   tavily_api_key?: string | null;
-  web_read_provider?: string | null;
-  web_read_fallback?: string | null;
+  web_read_provider?: WebReadProvider | null;
+  web_read_fallback?: WebReadProvider | null;
   ha_configured?: boolean;
   conversation_model?: string;
   fast_model?: string;
   vision_model?: string;
-  provider_mode?: string | null;
+  provider_mode?: ProviderMode | null;
   timezone?: string | null;
-  note_detail_level?: string;
+  note_detail_level?: NoteDetailLevel;
   members?: string[];
   members_with_passwords?: string[];
   admin_members?: string[];

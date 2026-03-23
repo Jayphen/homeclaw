@@ -90,6 +90,18 @@ _PYTHON_TO_JSON: dict[type, str] = {
 }
 
 
+def _literal_enum_values(annotation: Any) -> list[Any] | None:
+    """Extract enum values from a Literal type or type alias to Literal.
+
+    Returns the list of values if the annotation is Literal[...], else None.
+    """
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+    if origin is Literal and args:
+        return list(args)
+    return None
+
+
 def _type_to_schema(annotation: Any) -> tuple[dict[str, Any], bool]:
     """Convert a type annotation to a JSON schema fragment.
 
@@ -107,10 +119,9 @@ def _type_to_schema(annotation: Any) -> tuple[dict[str, Any], bool]:
         # Multi-type union without None — fall back to string
         return {"type": "string"}, False
 
-    # Literal["a", "b", "c"]
-    if origin is Literal:
-        values = list(args)
-        # Infer type from first value
+    # Literal["a", "b", "c"] — also catches type aliases like SkillScope
+    values = _literal_enum_values(annotation)
+    if values is not None:
         if values and isinstance(values[0], str):
             return {"type": "string", "enum": values}, False
         if values and isinstance(values[0], int):
@@ -199,7 +210,11 @@ def _build_schema(
         base_type, desc, enum_vals = _extract_annotations(raw_hint)
         schema, is_optional = _type_to_schema(base_type)
 
-        # Apply Enum override
+        # Apply explicit Enum override; if absent, auto-extract from Literal
+        if enum_vals is None:
+            enum_vals_auto = _literal_enum_values(base_type)
+            if enum_vals_auto is not None and "enum" not in schema:
+                schema["enum"] = enum_vals_auto
         if enum_vals is not None:
             schema["enum"] = enum_vals
 

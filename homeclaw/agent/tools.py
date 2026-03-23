@@ -9,7 +9,7 @@ from typing import Annotated, Any, Literal
 
 from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.agent.providers.base import ToolDefinition
-from homeclaw.agent.tool_decorator import Desc, Enum
+from homeclaw.agent.tool_decorator import Desc
 from homeclaw.agent.tool_decorator import tool as _tool
 from homeclaw.bookmarks.models import Bookmark
 from homeclaw.bookmarks.store import (
@@ -1197,7 +1197,7 @@ def register_builtin_tools(
         person: Annotated[str, Desc("Household member creating the skill")],
         name: Annotated[str, Desc("Skill name (slug-style, e.g. 'weather', 'my_calendar')")],
         description: Annotated[str, Desc("Short description of what the skill does")],
-        scope: Annotated[SkillScope, Enum(["household", "private"]), Desc(
+        scope: Annotated[SkillScope, Desc(
             "Who can use this skill and see its data. "
             "'household' = shared with all members; "
             "'private' = only accessible to this person."
@@ -1483,7 +1483,7 @@ def register_builtin_tools(
         person: Annotated[str, Desc("Household member requesting the migration")],
         name: Annotated[str, Desc("Skill name to migrate")],
         current_owner: Annotated[str, Desc("Current owner: 'household' or a person's name")],
-        to_scope: Annotated[SkillScope, Enum(["household", "private"]), Desc("Target scope")],
+        to_scope: Annotated[SkillScope, Desc("Target scope")],
         to_person: Annotated[str | None, Desc("Required when to_scope is 'private' — which person to move the skill to")] = None,
         **_: Any,
     ) -> dict[str, Any]:
@@ -1787,7 +1787,7 @@ def register_builtin_tools(
             "URL to install from — GitHub repo/subpath URL or "
             "direct link to a SKILL.md file"
         )],
-        scope: Annotated[SkillScope, Enum(["household", "private"]), Desc("Who can use this skill (default: household)")] = "household",
+        scope: Annotated[SkillScope, Desc("Who can use this skill (default: household)")] = "household",
         install_all: Annotated[bool, Desc("Install all skills from a multi-skill repo")] = False,
         **_: Any,
     ) -> dict[str, Any]:
@@ -2103,7 +2103,7 @@ def register_builtin_tools(
         *,
         person: Annotated[str, Desc("Who made or reported this decision")],
         decision: Annotated[str, Desc("The decision that was made")],
-        scope: Annotated[DecisionScope, Enum(["household", "personal"]), Desc(
+        scope: Annotated[DecisionScope, Desc(
             "Whether this applies to the whole household or just this person (default: household)"
         )] = "household",
         **_: Any,
@@ -2129,7 +2129,7 @@ def register_builtin_tools(
     )
     async def decision_list(
         *,
-        scope: Annotated[DecisionScope, Enum(["household", "personal"]), Desc("Which decisions to list (default: household)")] = "household",
+        scope: Annotated[DecisionScope, Desc("Which decisions to list (default: household)")] = "household",
         person: Annotated[str, Desc("Person name (required for personal scope)")] = "",
         **_: Any,
     ) -> dict[str, Any]:

@@ -32,6 +32,26 @@ class WhatsAppState(StrEnum):
     DISCONNECTED = "disconnected"
     STOPPED = "stopped"
 
+
+# Valid state transitions — prevents impossible state changes and race conditions.
+_VALID_TRANSITIONS: dict[WhatsAppState, frozenset[WhatsAppState]] = {
+    WhatsAppState.IDLE: frozenset({WhatsAppState.CONNECTING, WhatsAppState.STOPPED}),
+    WhatsAppState.CONNECTING: frozenset({
+        WhatsAppState.AWAITING_QR, WhatsAppState.CONNECTED,
+        WhatsAppState.DISCONNECTED, WhatsAppState.STOPPED,
+    }),
+    WhatsAppState.AWAITING_QR: frozenset({
+        WhatsAppState.CONNECTED, WhatsAppState.DISCONNECTED, WhatsAppState.STOPPED,
+    }),
+    WhatsAppState.CONNECTED: frozenset({
+        WhatsAppState.DISCONNECTED, WhatsAppState.STOPPED,
+    }),
+    WhatsAppState.DISCONNECTED: frozenset({
+        WhatsAppState.CONNECTING, WhatsAppState.CONNECTED, WhatsAppState.STOPPED,
+    }),
+    WhatsAppState.STOPPED: frozenset(),
+}
+
 logger = logging.getLogger(__name__)
 
 # Maps phone numbers to household member names.
@@ -156,6 +176,7 @@ class WhatsAppChannel:
         self._dispatcher = dispatcher
 
         self._state = WhatsAppState.IDLE
+        self._state_lock = asyncio.Lock()
         self._last_qr: bytes | None = None  # Raw QR data for web UI
         self._known_groups: set[str] = _load_known_groups(workspaces)
         # Track which user IDs are LIDs (server="lid") vs phone numbers
@@ -175,7 +196,7 @@ class WhatsAppChannel:
         @self._client.event.qr
         async def _on_qr(_: Any, qr_data: bytes) -> None:
             self._last_qr = qr_data
-            self._state = WhatsAppState.AWAITING_QR
+            await self._transition(WhatsAppState.AWAITING_QR)
             logger.info("WhatsApp QR code received — scan it or view at /api/whatsapp/qr")
 
         # Pair-code auth: if a phone number is configured, register the
@@ -201,6 +222,19 @@ class WhatsAppChannel:
                         code,
                     )
 
+    async def _transition(self, new_state: WhatsAppState) -> bool:
+        """Atomically transition to a new state if the transition is valid."""
+        async with self._state_lock:
+            allowed = _VALID_TRANSITIONS.get(self._state, frozenset())
+            if new_state not in allowed:
+                logger.debug(
+                    "Ignoring invalid WhatsApp state transition %s → %s",
+                    self._state, new_state,
+                )
+                return False
+            self._state = new_state
+            return True
+
     @property
     def state(self) -> WhatsAppState:
         """Current connection state."""
@@ -221,12 +255,12 @@ class WhatsAppChannel:
     def _register_handlers(self) -> None:
         @self._client.event(self._ConnectedEv)
         async def _on_connected(_: Any, __: Any) -> None:
-            self._state = WhatsAppState.CONNECTED
+            await self._transition(WhatsAppState.CONNECTED)
             logger.info("WhatsApp connected")
 
         @self._client.event(self._DisconnectedEv)
         async def _on_disconnected(_: Any, __: Any) -> None:
-            self._state = WhatsAppState.DISCONNECTED
+            await self._transition(WhatsAppState.DISCONNECTED)
             logger.warning("WhatsApp disconnected — will reconnect automatically")
 
         @self._client.event(self._PairStatusEv)
@@ -581,7 +615,7 @@ class WhatsAppChannel:
 
     async def start(self) -> None:
         """Connect to WhatsApp. Non-blocking — QR code shown in logs on first run."""
-        self._state = WhatsAppState.CONNECTING
+        await self._transition(WhatsAppState.CONNECTING)
         self._connect_task = asyncio.create_task(self._run_connect())
         self._register_with_dispatcher()
         logger.info(
@@ -599,7 +633,7 @@ class WhatsAppChannel:
 
     async def stop(self) -> None:
         """Disconnect from WhatsApp."""
-        self._state = WhatsAppState.STOPPED
+        await self._transition(WhatsAppState.STOPPED)
         try:
             await self._client.stop()
         except Exception:
