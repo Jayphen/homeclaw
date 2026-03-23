@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.1](https://github.com/Jayphen/homeclaw/compare/v0.16.0...v0.16.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* include household knowledge in all web UI endpoints ([278d0ad](https://github.com/Jayphen/homeclaw/commit/278d0adf0bc2b816ad229dad9b553c4e2c49af3a))
+* keep uv.lock in sync with release-please version bumps ([58f2f7b](https://github.com/Jayphen/homeclaw/commit/58f2f7bfdc426a39c46b59a151c054cfb21f1588))
+
 ## [0.16.0](https://github.com/Jayphen/homeclaw/compare/v0.15.1...v0.16.0) (2026-03-23)
 
 
