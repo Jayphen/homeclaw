@@ -5,8 +5,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
 
-from homeclaw import HOUSEHOLD_WORKSPACE
-from homeclaw.api.deps import MemberDep, get_config, list_member_workspaces, visible_members
+from homeclaw.api.deps import MemberDep, get_config, visible_members_with_household
 from homeclaw.contacts.store import list_contacts
 from homeclaw.reminders.store import load_reminders
 
@@ -134,10 +133,7 @@ async def calendar_month(
         month = datetime.now().strftime("%Y-%m")
 
     start, end = _parse_month(month)
-    all_members = list_member_workspaces(workspaces)
-    members = visible_members(member, all_members)
-    if HOUSEHOLD_WORKSPACE not in members:
-        members = [*members, HOUSEHOLD_WORKSPACE]
+    members = visible_members_with_household(workspaces, member)
 
     events: list[dict[str, Any]] = []
     events.extend(_collect_notes(ws_str, members, start, end))

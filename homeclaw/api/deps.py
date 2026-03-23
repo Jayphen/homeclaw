@@ -351,6 +351,17 @@ def visible_members(member: str | None, all_members: list[str]) -> list[str]:
     return [member] if member in all_members else []
 
 
+def visible_members_with_household(
+    workspaces: Path, member: str | None,
+) -> list[str]:
+    """Return visible members plus the household workspace."""
+    all_members = list_member_workspaces(workspaces)
+    members = visible_members(member, all_members)
+    if HOUSEHOLD_WORKSPACE not in members:
+        members = [*members, HOUSEHOLD_WORKSPACE]
+    return members
+
+
 AuthDep = Depends(require_auth)
 AdminDep = Depends(require_admin)
 MemberDep = Depends(get_current_member)

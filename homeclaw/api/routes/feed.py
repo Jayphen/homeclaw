@@ -21,8 +21,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Query
 
-from homeclaw import HOUSEHOLD_WORKSPACE
-from homeclaw.api.deps import MemberDep, get_config, list_member_workspaces, visible_members
+from homeclaw.api.deps import MemberDep, get_config, visible_members_with_household
 from homeclaw.contacts.store import list_contacts
 
 router = APIRouter(prefix="/api/feed", tags=["feed"])
@@ -217,10 +216,7 @@ async def activity_feed(
     """Unified activity feed — most recent household events."""
     config = get_config()
     workspaces = config.workspaces.resolve()
-    all_members = list_member_workspaces(workspaces)
-    members = visible_members(member, all_members)
-    if HOUSEHOLD_WORKSPACE not in members:
-        members = [*members, HOUSEHOLD_WORKSPACE]
+    members = visible_members_with_household(workspaces, member)
     since = datetime.now(UTC) - timedelta(days=days)
 
     # Gather events from all sources

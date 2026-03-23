@@ -5,14 +5,12 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
 
-from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.api.deps import (
     MemberDep,
     get_config,
-    list_member_workspaces,
     require_person_access,
     validate_person,
-    visible_members,
+    visible_members_with_household,
 )
 from homeclaw.memory.markdown import memory_list_topics, memory_read_topic, memory_save_topic
 from homeclaw.memory.semantic import SemanticMemory
@@ -27,11 +25,7 @@ async def memory_list(
 ) -> dict[str, Any]:
     config = get_config()
     workspaces = config.workspaces.resolve()
-    all_members = list_member_workspaces(workspaces)
-    members = visible_members(member, all_members)
-    # Always include household — it's visible to all members
-    if HOUSEHOLD_WORKSPACE not in members:
-        members = [*members, HOUSEHOLD_WORKSPACE]
+    members = visible_members_with_household(workspaces, member)
     result: list[dict[str, Any]] = []
     for person in members:
         topics = memory_list_topics(workspaces, person)
