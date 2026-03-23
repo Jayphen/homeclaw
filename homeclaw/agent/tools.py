@@ -124,7 +124,8 @@ def register_builtin_tools(
         contacts = list_contacts(workspaces)
         return {
             "contacts": [
-                {"id": c.id, "name": c.name, "relationship": c.relationship}
+                {"id": c.id, "name": c.name, "relationship": c.relationship,
+                 "nicknames": c.nicknames}
                 for c in contacts
             ]
         }
