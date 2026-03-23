@@ -12,6 +12,7 @@
     <a href="/" class="logo">
       <span class="logo-text">homeclaw</span>
       <span class="badge">docs</span>
+      <span class="version">v{__HOMECLAW_VERSION__}</span>
     </a>
   </div>
   <div class="right">
@@ -78,6 +79,12 @@
     border-radius: 4px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
+  }
+
+  .version {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    font-weight: 400;
   }
 
   .right {
