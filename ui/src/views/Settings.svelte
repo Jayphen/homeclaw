@@ -19,6 +19,35 @@
   let channelsSaveTimeout: ReturnType<typeof setTimeout> | null = null;
   let generalSaveTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  // ---- Health state ----
+  interface HealthData {
+    status: string;
+    uptime_seconds: number;
+    process: { rss_mb: number };
+    semantic_memory: { enabled: boolean; index_size_mb?: number };
+    channels: { telegram?: boolean; whatsapp?: boolean };
+  }
+  let health: HealthData | null = $state(null);
+  let healthLoading: boolean = $state(false);
+
+  async function fetchHealth() {
+    healthLoading = true;
+    try {
+      const r = await api("/api/health");
+      if (r.ok) health = await r.json();
+    } catch {}
+    healthLoading = false;
+  }
+
+  function formatUptime(seconds: number): string {
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
+
   // ---- Data operation state ----
   let dataState: "idle" | "exporting" | "importing" = $state("idle");
   let dataResult: string | null = $state(null);
@@ -602,7 +631,7 @@
     <nav class="settings-nav">
       <button class:active={activeTab === "provider"} onclick={() => { activeTab = "provider"; }}>Provider</button>
       <button class:active={activeTab === "channels"} onclick={() => { activeTab = "channels"; }}>Channels</button>
-      <button class:active={activeTab === "general"} onclick={() => { activeTab = "general"; }}>General</button>
+      <button class:active={activeTab === "general"} onclick={() => { activeTab = "general"; fetchHealth(); }}>General</button>
       {#if setup.members && setup.members.length > 0}
         <button class:active={activeTab === "members"} onclick={() => { activeTab = "members"; }}>Members</button>
       {/if}
@@ -904,6 +933,61 @@
 
     <!-- ============ GENERAL TAB ============ -->
     {:else if activeTab === "general"}
+      <section class="card">
+        <h2>System status</h2>
+        {#if healthLoading && !health}
+          <p class="field-hint">Loading...</p>
+        {:else if health}
+          <div class="health-grid">
+            <div class="health-item">
+              <span class="health-label">Status</span>
+              <span class="health-value">
+                <span class="health-dot" class:health-ok={health.status === "ok"}></span>
+                {health.status}
+              </span>
+            </div>
+            <div class="health-item">
+              <span class="health-label">Uptime</span>
+              <span class="health-value">{formatUptime(health.uptime_seconds)}</span>
+            </div>
+            <div class="health-item">
+              <span class="health-label">Memory</span>
+              <span class="health-value">{health.process.rss_mb} MB</span>
+            </div>
+            <div class="health-item">
+              <span class="health-label">Semantic search</span>
+              <span class="health-value">
+                <span class="health-dot" class:health-ok={health.semantic_memory.enabled}></span>
+                {health.semantic_memory.enabled ? "active" : "off"}
+                {#if health.semantic_memory.index_size_mb != null}
+                  <span class="health-detail">({health.semantic_memory.index_size_mb} MB)</span>
+                {/if}
+              </span>
+            </div>
+            {#if health.channels.telegram != null}
+              <div class="health-item">
+                <span class="health-label">Telegram</span>
+                <span class="health-value">
+                  <span class="health-dot" class:health-ok={health.channels.telegram}></span>
+                  {health.channels.telegram ? "configured" : "off"}
+                </span>
+              </div>
+            {/if}
+            {#if health.channels.whatsapp != null}
+              <div class="health-item">
+                <span class="health-label">WhatsApp</span>
+                <span class="health-value">
+                  <span class="health-dot" class:health-ok={health.channels.whatsapp}></span>
+                  {health.channels.whatsapp ? "connected" : "off"}
+                </span>
+              </div>
+            {/if}
+          </div>
+        {:else}
+          <p class="field-hint">Could not load system status.</p>
+        {/if}
+      </section>
+
       <section class="card">
         <h2>Timezone</h2>
         <div class="field">
@@ -1871,5 +1955,53 @@
     font-size: 0.75rem;
     color: var(--text-muted, #999);
     margin-top: 0.5rem;
+  }
+
+  /* ---- System health ---- */
+  .health-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem 1.5rem;
+  }
+
+  .health-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .health-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .health-value {
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .health-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .health-dot.health-ok {
+    background: var(--sage);
+  }
+
+  .health-detail {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-weight: 400;
   }
 </style>
