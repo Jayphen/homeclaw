@@ -6,7 +6,7 @@ import pytest
 
 from homeclaw.agent.providers.base import ToolDefinition
 from homeclaw.agent.tools import ToolRegistry
-from homeclaw.plugins.interface import Plugin, RoutineDefinition
+from homeclaw.plugins.interface import Plugin, RoutineDefinition, WebProviderDefinition
 from homeclaw.plugins.registry import PluginRegistry, PluginStatus, PluginType
 
 
@@ -182,3 +182,46 @@ def test_multiple_plugin_types() -> None:
     types = {e.plugin_type for e in entries}
     assert types == {PluginType.PYTHON, PluginType.SKILL, PluginType.MCP}
     assert reg.plugin_count == 3
+
+
+class FakeSearchProvider:
+    async def search(self, query: str) -> dict[str, Any]:
+        return {"query": query, "results": [], "provider": "fake-search"}
+
+
+class FakeReadProvider:
+    async def read(self, url: str) -> dict[str, Any]:
+        return {"url": url, "content": "fake", "provider": "fake-read"}
+
+
+class FakePluginWithWebProviders(FakePlugin):
+    def web_providers(self) -> list[WebProviderDefinition]:
+        return [
+            WebProviderDefinition(name="fake-search", instance=FakeSearchProvider()),
+            WebProviderDefinition(name="fake-read", instance=FakeReadProvider()),
+        ]
+
+
+def test_web_providers_registered() -> None:
+    from homeclaw.web import web_providers
+
+    tool_reg = ToolRegistry()
+    reg = PluginRegistry(tool_registry=tool_reg)
+
+    plugin = FakePluginWithWebProviders("web_plugin")
+    reg.register(plugin, PluginType.PYTHON)
+
+    assert web_providers.get_search("fake-search") is not None
+    assert web_providers.get_read("fake-read") is not None
+    assert "fake-search" in web_providers.search_providers()
+    assert "fake-read" in web_providers.read_providers()
+
+
+def test_plugin_without_web_providers_ok() -> None:
+    """Plugins without web_providers() should still register fine."""
+    tool_reg = ToolRegistry()
+    reg = PluginRegistry(tool_registry=tool_reg)
+
+    plugin = FakePlugin("plain")
+    entry = reg.register(plugin, PluginType.PYTHON)
+    assert entry.status == PluginStatus.ACTIVE

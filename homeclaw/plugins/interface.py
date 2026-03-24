@@ -13,6 +13,19 @@ class RoutineDefinition(BaseModel):
     description: str
 
 
+class WebProviderDefinition(BaseModel):
+    """Declares a web search/read provider from a plugin.
+
+    The ``instance`` must satisfy :class:`~homeclaw.web.protocol.WebSearchProvider`
+    and/or :class:`~homeclaw.web.protocol.WebReadProvider`.
+    """
+
+    name: str  # provider name for config (e.g. "searxng", "brave")
+    instance: Any  # the provider object — must implement search() and/or read()
+
+    model_config = {"arbitrary_types_allowed": True}
+
+
 @runtime_checkable
 class Plugin(Protocol):
     name: str
@@ -21,3 +34,6 @@ class Plugin(Protocol):
     def tools(self) -> list[ToolDefinition]: ...
     async def handle_tool(self, name: str, args: dict[str, Any]) -> dict[str, Any]: ...
     def routines(self) -> list[RoutineDefinition]: ...
+
+    # Optional: plugins may define web_providers() to register custom
+    # search/read providers.  Not required — checked with hasattr().

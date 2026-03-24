@@ -56,6 +56,32 @@ class PluginRegistry:
         self._plugins: dict[str, Plugin] = {}
         self._entries: dict[str, PluginEntry] = {}
 
+    @staticmethod
+    def _register_web_providers(plugin: Plugin) -> int:
+        """Register a plugin's web search/read providers with the global registry."""
+        from homeclaw.web import web_providers
+        from homeclaw.web.protocol import WebReadProvider, WebSearchProvider
+
+        defs = plugin.web_providers()  # type: ignore[attr-defined]
+        count = 0
+        for wp in defs:
+            instance = wp.instance
+            is_search = isinstance(instance, WebSearchProvider)
+            is_read = isinstance(instance, WebReadProvider)
+            if is_search:
+                web_providers.register_search(wp.name, instance)
+            if is_read:
+                web_providers.register_read(wp.name, instance)
+            if is_search or is_read:
+                count += 1
+            else:
+                logger.warning(
+                    "Plugin '%s' web provider '%s' implements neither "
+                    "WebSearchProvider nor WebReadProvider — skipped",
+                    plugin.name, wp.name,
+                )
+        return count
+
     def _register_tools(self, plugin: Plugin, entry: PluginEntry) -> None:
         """Register a plugin's tools into the agent's tool registry.
 
@@ -111,15 +137,23 @@ class PluginRegistry:
         except Exception:
             logger.exception("Failed to get routines for plugin '%s'", name)
 
+        # Register web providers (optional — not all plugins define this)
+        web_provider_count = 0
+        if hasattr(plugin, "web_providers"):
+            try:
+                web_provider_count = self._register_web_providers(plugin)
+            except Exception:
+                logger.exception("Failed to register web providers for plugin '%s'", name)
+
         self._plugins[name] = plugin
         self._entries[name] = entry
 
+        parts = [f"{len(entry.tool_names)} tools", f"{entry.routine_count} routines"]
+        if web_provider_count:
+            parts.append(f"{web_provider_count} web providers")
         logger.info(
-            "Registered plugin '%s' (%s): %d tools, %d routines",
-            name,
-            plugin_type.value,
-            len(entry.tool_names),
-            entry.routine_count,
+            "Registered plugin '%s' (%s): %s",
+            name, plugin_type.value, ", ".join(parts),
         )
         return entry
 
