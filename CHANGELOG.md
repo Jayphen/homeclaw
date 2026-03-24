@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.20.0](https://github.com/Jayphen/homeclaw/compare/v0.19.0...v0.20.0) (2026-03-24)
+
+
+### Features
+
+* **ui:** add .env editor for plugins ([#91](https://github.com/Jayphen/homeclaw/issues/91)) ([5e8f084](https://github.com/Jayphen/homeclaw/commit/5e8f0847adcd78864a734f86f0887af272860e1b))
+
+
+### Bug Fixes
+
+* **ci:** allow Claude to read files during code review ([#92](https://github.com/Jayphen/homeclaw/issues/92)) ([9c6335f](https://github.com/Jayphen/homeclaw/commit/9c6335f0dba88cd96eb08859e87c894b1937518b))
+
 ## [0.19.0](https://github.com/Jayphen/homeclaw/compare/v0.18.0...v0.19.0) (2026-03-24)
 
 
