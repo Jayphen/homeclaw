@@ -33,10 +33,17 @@ Contacts and bookmarks can have **notes attached** — per-contact interaction n
 - **Privacy**: recall is scoped per-person — a member only sees their own workspace + household
 - **Source of truth**: markdown files on disk. The vector DB is a derived index that can be rebuilt
 
+## Self-documentation
+
+homeclaw can index its own documentation pages so it can answer questions about its features, tools, and configuration. The docs at `docs/src/routes/` are included in the memsearch index automatically when present on disk.
+
+Set `DOCS_PATH` (or `docs_path` in config.json) to point to a custom location. In Docker, the docs are bundled into the image at `/app/docs/src/routes/`.
+
 ## Privacy model
 
 Each person's knowledge is private by default. The agent only retrieves:
 - The authenticated person's own workspace content
 - Household-shared content under `workspaces/household/`
+- homeclaw's own documentation (visible to all users)
 
 Cross-person data is never surfaced unless explicitly shared to the household workspace.

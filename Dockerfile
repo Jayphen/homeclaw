@@ -25,6 +25,7 @@ COPY homeclaw/ homeclaw/
 RUN pip install --no-cache-dir --no-deps .
 
 COPY --from=ui-build /build/dist/ ui/dist/
+COPY docs/src/routes/ docs/src/routes/
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 ENV HOMECLAW_UI_DIST=/app/ui/dist
