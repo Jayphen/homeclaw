@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.19.0](https://github.com/Jayphen/homeclaw/compare/v0.18.0...v0.19.0) (2026-03-24)
+
+
+### Features
+
+* **ui:** separate Skills and Plugins into distinct nav items ([#85](https://github.com/Jayphen/homeclaw/issues/85)) ([40a5f27](https://github.com/Jayphen/homeclaw/commit/40a5f27c8de2132a2ede5cb976adca1990a78f54))
+
+
+### Bug Fixes
+
+* **ci:** grant pull-requests write permission to Claude code review ([#90](https://github.com/Jayphen/homeclaw/issues/90)) ([85e6c5f](https://github.com/Jayphen/homeclaw/commit/85e6c5fca5c38ab0c073c9d758bc407554eff35e))
+* deliver routine output via scheduler instead of relying on LLM ([#88](https://github.com/Jayphen/homeclaw/issues/88)) ([03e4b0e](https://github.com/Jayphen/homeclaw/commit/03e4b0e9985c27f8a497a8031dae0a8858ea7d8e))
+* don't advance consolidation pointer on parse failure ([#89](https://github.com/Jayphen/homeclaw/issues/89)) ([bba4b7e](https://github.com/Jayphen/homeclaw/commit/bba4b7e29590f243636beecc211b69e17e3ace48))
+
 ## [0.18.0](https://github.com/Jayphen/homeclaw/compare/v0.17.0...v0.18.0) (2026-03-24)
 
 
