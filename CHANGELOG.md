@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0](https://github.com/Jayphen/homeclaw/compare/v0.17.0...v0.18.0) (2026-03-24)
+
+
+### Features
+
+* add Brave, Exa, SearXNG, and Firecrawl web provider plugins ([#82](https://github.com/Jayphen/homeclaw/issues/82)) ([6204a8a](https://github.com/Jayphen/homeclaw/commit/6204a8ae7c37a93ce0a8d7b5ba35f9d17011e1d1))
+
 ## [0.17.0](https://github.com/Jayphen/homeclaw/compare/v0.16.1...v0.17.0) (2026-03-24)
 
 
