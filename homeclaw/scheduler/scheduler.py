@@ -30,10 +30,15 @@ class Scheduler:
     """Manages scheduled routines backed by APScheduler."""
 
     def __init__(
-        self, loop: AgentLoop, workspaces: Path, timezone: str | None = None
+        self,
+        loop: AgentLoop,
+        workspaces: Path,
+        timezone: str | None = None,
+        dispatcher: Any = None,
     ) -> None:
         self._loop = loop
         self._workspaces = workspaces
+        self._dispatcher = dispatcher
         self._tz = ZoneInfo(timezone) if timezone else None
         scheduler_kwargs: dict[str, Any] = {}
         if self._tz is not None:
@@ -76,7 +81,12 @@ class Scheduler:
         results_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
 
     def _make_routine_func(self, job_id: str, description: str) -> Any:
-        """Create the async callable for a routine job."""
+        """Create the async callable for a routine job.
+
+        The routine executes the LLM agent, then the *scheduler* delivers the
+        result via the channel dispatcher.  The LLM no longer needs to call
+        ``message_send`` itself — it just produces the output text.
+        """
         loop = self._loop
         scheduler = self
 
@@ -90,6 +100,16 @@ class Scheduler:
                 )
                 scheduler._save_last_run(job_id, result)
                 logger.info("Routine completed: %s (response length: %d)", description, len(result))
+
+                # Deliver result via channel dispatcher
+                if result and result.strip() and scheduler._dispatcher:
+                    try:
+                        await scheduler._dispatcher.send_group(
+                            "", f"📋 *{description}*\n\n{result}",
+                        )
+                    except Exception:
+                        logger.exception("Failed to deliver routine result: %s", description)
+
                 return result
             except Exception:
                 logger.exception("Routine failed: %s", description)

@@ -130,11 +130,8 @@ _ROUTINE_PREAMBLE = (
     "MUST use the web_search and web_read tools — do NOT try to answer from "
     "memory or training data. Make multiple searches if the routine covers "
     "several topics. Summarize the real results concisely.\n\n"
-    "IMPORTANT: You MUST deliver your results by calling the message_send tool. "
-    "Use message_send with group=true to send to the household group chat, or "
-    "message_send with person=<name> for individual members. If you do not call "
-    "message_send, nobody will see your results. Do NOT just produce a text "
-    "response — you must actively send it.\n\n"
+    "Your text response will be delivered automatically — just produce the "
+    "output, do NOT call message_send yourself.\n\n"
 )
 
 # Tools that write to a person's workspace. In DMs, the `person` argument
@@ -175,6 +172,9 @@ _PERSONAL_READ_TOOLS = frozenset({
 # blocked so the LLM asks the user to confirm. The block fires once per
 # tool name per run() call — after the user confirms, the retry goes through.
 # Each predicate returns True when the call targets household data.
+# Tools blocked during routine execution — the scheduler handles delivery.
+_ROUTINE_BLOCKED_TOOLS = frozenset({"message_send", "image_send"})
+
 _HOUSEHOLD_WRITE_TOOLS: dict[str, Callable[[dict[str, Any]], bool]] = {
     # contact_note: blocked when person is absent (default → household)
     "contact_note": lambda args: "person" not in args or args.get("person") is None,
@@ -680,6 +680,7 @@ class AgentLoop:
             tool_names_used.extend(tc.name for tc in response.tool_calls)
             tool_results = await self._dispatch_tools(
                 response.tool_calls, person=person, channel=channel,
+                call_type=call_type,
             )
             for tc, result in zip(response.tool_calls, tool_results):
                 history.append(
@@ -760,10 +761,16 @@ class AgentLoop:
         tool_calls: list[ToolCall],
         person: str,
         channel: str | None,
+        call_type: CallType = CallType.CONVERSATION,
     ) -> list[dict[str, Any]]:
         is_dm = channel is None
         results: list[dict[str, Any]] = []
         for tc in tool_calls:
+            # Routines deliver output via the scheduler — block direct messaging
+            # to prevent double-sends.
+            if call_type == CallType.ROUTINE and tc.name in _ROUTINE_BLOCKED_TOOLS:
+                results.append({"status": "skipped", "reason": "Routine output is delivered automatically by the scheduler."})
+                continue
             args = dict(tc.arguments)
 
             # Normalize person names to lowercase to prevent duplicate workspaces.

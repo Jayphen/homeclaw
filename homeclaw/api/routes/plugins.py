@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from pydantic import BaseModel
+
 from homeclaw.api.deps import AdminDep, AuthDep, get_config, get_plugin_registry
-from homeclaw.plugins.loader import disable_plugin, enable_plugin
+from homeclaw.plugins.loader import disable_plugin, enable_plugin, load_plugin
 from homeclaw.plugins.marketplace.index import MarketplaceClient
 from homeclaw.plugins.marketplace.installer import (
     InstallError,
@@ -168,6 +171,156 @@ async def uninstall_marketplace_plugin(name: str) -> dict[str, Any]:
         )
 
     return {"status": "uninstalled", "name": name}
+
+
+class PluginInstallRequest(BaseModel):
+    url: str
+    enable: bool = True
+    install_all: bool = False
+
+
+@router.post("/install", dependencies=[AdminDep])
+async def install_plugin_from_url(body: PluginInstallRequest) -> dict[str, Any]:
+    """Install a Python plugin from a GitHub repository URL.
+
+    For repos with multiple plugins (no root ``plugin.py``), returns the list
+    of available plugins unless ``install_all`` is true.
+    """
+    import httpx
+
+    from homeclaw.plugins.github import list_repo_plugins
+    from homeclaw.plugins.skills.github import parse_github_url
+
+    registry = get_plugin_registry()
+    if registry is None:
+        raise HTTPException(status_code=503, detail="Plugin system not ready")
+
+    config = get_config()
+    plugins_dir = config.workspaces.resolve() / "plugins"
+    plugins_dir.mkdir(parents=True, exist_ok=True)
+
+    original_url = body.url.strip()
+    info = parse_github_url(original_url)
+    if info is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Only GitHub repository URLs are supported",
+        )
+
+    user, repo, branch, subpath = info
+
+    # Check if root plugin.py exists at the target path
+    raw_check = (
+        f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/"
+        f"{(subpath + '/') if subpath else ''}plugin.py"
+    )
+    has_root_plugin = False
+    try:
+        transport = httpx.AsyncHTTPTransport(retries=2)
+        async with httpx.AsyncClient(timeout=30, transport=transport) as client:
+            resp = await client.head(raw_check)
+            has_root_plugin = resp.status_code == 200
+    except httpx.RequestError:
+        pass
+
+    if has_root_plugin:
+        # Single plugin — derive name from subpath or repo name
+        name = subpath.rsplit("/", 1)[-1] if subpath else repo
+        result = await _install_single_plugin(
+            original_url, name, plugins_dir, registry, enable=body.enable,
+        )
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+
+    # Multi-plugin case — discover subdirectories with plugin.py
+    available = await list_repo_plugins(original_url)
+    if not available:
+        raise HTTPException(
+            status_code=404,
+            detail="No plugin.py files found in this repository",
+        )
+
+    if not body.install_all:
+        return {
+            "status": "multiple_plugins",
+            "url": original_url,
+            "plugins": available,
+            "hint": "Set install_all=true to install all, or use a more specific URL",
+        }
+
+    # Install all discovered plugins
+    from homeclaw.plugins.skills.github import skill_subpath_url
+
+    results: list[dict[str, Any]] = []
+    for plugin_info in available:
+        sub_url = skill_subpath_url(original_url, plugin_info["path"])
+        name = plugin_info["path"].rsplit("/", 1)[-1]
+        result = await _install_single_plugin(
+            sub_url, name, plugins_dir, registry, enable=body.enable,
+        )
+        results.append(result)
+
+    installed = [r for r in results if r.get("status") == "installed"]
+    errors = [r for r in results if "error" in r]
+    return {
+        "status": "installed_multiple",
+        "installed": installed,
+        "errors": errors,
+        "total": len(results),
+    }
+
+
+async def _install_single_plugin(
+    url: str,
+    name: str,
+    plugins_dir: Path,
+    registry: Any,
+    *,
+    enable: bool = True,
+) -> dict[str, Any]:
+    """Download, load, and register a single plugin from a GitHub URL."""
+    import shutil
+
+    from homeclaw.plugins.github import download_plugin_repo, extract_env_hints
+    from homeclaw.plugins.loader import PluginLoadError
+
+    plugin_dir = plugins_dir / name
+    if plugin_dir.exists():
+        return {"error": f"Plugin '{name}' already exists"}
+
+    try:
+        plugin_dir.mkdir(parents=True)
+        fetched = await download_plugin_repo(url, plugin_dir)
+
+        if not (plugin_dir / "plugin.py").is_file():
+            shutil.rmtree(plugin_dir, ignore_errors=True)
+            return {"error": f"No plugin.py found for '{name}'"}
+
+        # Hot-load
+        plugin = load_plugin(plugins_dir, name)
+        entry = registry.register(plugin, PluginType.PYTHON)
+        if enable:
+            enable_plugin(plugins_dir, registry, name)
+
+        env_hints = extract_env_hints(plugin_dir)
+
+        result: dict[str, Any] = {
+            "status": "installed",
+            "name": name,
+            "description": getattr(plugin, "description", ""),
+            "files": fetched,
+        }
+        if env_hints:
+            result["env_hints"] = env_hints
+        return result
+
+    except PluginLoadError as exc:
+        shutil.rmtree(plugin_dir, ignore_errors=True)
+        return {"error": f"Plugin '{name}' downloaded but failed to load: {exc}"}
+    except Exception as exc:
+        shutil.rmtree(plugin_dir, ignore_errors=True)
+        return {"error": f"Failed to install plugin '{name}': {exc}"}
 
 
 @router.get("/{name}", dependencies=[AuthDep])
