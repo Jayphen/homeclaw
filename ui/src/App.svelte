@@ -7,6 +7,7 @@
   import Knowledge from "./views/Knowledge.svelte";
   import Contacts from "./views/Contacts.svelte";
   import Skills from "./views/Skills.svelte";
+  import Plugins from "./views/Plugins.svelte";
   import Routines from "./views/Routines.svelte";
   import Settings from "./views/Settings.svelte";
   import Setup from "./views/Setup.svelte";
@@ -27,8 +28,7 @@
     "/skills": Skills,
     "/skills/:owner/:name": Skills,
     "/skills/:owner/:name/*file": Skills,
-    "/plugins": Skills,
-    "/extensions": Skills,
+    "/plugins": Plugins,
     "/settings": Settings,
   };
 
@@ -168,7 +168,8 @@
 
       <nav class="nav-group">
         <span class="nav-label">Extend</span>
-        <a href="#/skills">Extensions</a>
+        <a href="#/skills">Skills</a>
+        <a href="#/plugins">Plugins</a>
       </nav>
 
       <div class="sidebar-spacer"></div>
