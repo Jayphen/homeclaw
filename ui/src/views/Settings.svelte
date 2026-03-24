@@ -7,7 +7,7 @@
   let error: string | null = $state(null);
 
   // ---- Tab navigation ----
-  type SettingsTab = "provider" | "channels" | "general" | "members" | "data";
+  type SettingsTab = "provider" | "channels" | "general" | "members" | "data" | "tool-log";
   let activeTab: SettingsTab = $state("provider");
 
   // ---- Per-section save state ----
@@ -101,6 +101,47 @@
       return e.message.toLowerCase().includes(q) || e.logger.toLowerCase().includes(q);
     })
   );
+
+  // ---- Tool log state ----
+  interface ToolLogEntry {
+    ts: string;
+    tool: string;
+    summary: string;
+    person: string;
+    args: Record<string, string>;
+  }
+  let toolLogEntries: ToolLogEntry[] = $state([]);
+  let toolLogTools: string[] = $state([]);
+  let toolLogPersons: string[] = $state([]);
+  let toolLogFilterTool: string = $state("");
+  let toolLogFilterPerson: string = $state("");
+  let toolLogDays: number = $state(7);
+  let toolLogLoading: boolean = $state(false);
+  let toolLogExpanded: Set<number> = $state(new Set());
+
+  async function fetchToolLog() {
+    toolLogLoading = true;
+    try {
+      const params = new URLSearchParams({ days: String(toolLogDays), limit: "200" });
+      if (toolLogFilterTool) params.set("tool", toolLogFilterTool);
+      if (toolLogFilterPerson) params.set("person", toolLogFilterPerson);
+      const r = await api(`/api/settings/tool-log?${params}`);
+      if (r.ok) {
+        const data = await r.json();
+        toolLogEntries = data.entries;
+        toolLogTools = data.tools;
+        toolLogPersons = data.persons;
+      }
+    } catch {}
+    toolLogLoading = false;
+  }
+
+  function toggleToolLogRow(idx: number) {
+    const next = new Set(toolLogExpanded);
+    if (next.has(idx)) next.delete(idx);
+    else next.add(idx);
+    toolLogExpanded = next;
+  }
 
   function buildLogParams(): URLSearchParams {
     const params = new URLSearchParams();
@@ -646,6 +687,7 @@
         <button class:active={activeTab === "members"} onclick={() => { activeTab = "members"; }}>Members</button>
       {/if}
       <button class:active={activeTab === "data"} onclick={() => { activeTab = "data"; }}>Data</button>
+      <button class:active={activeTab === "tool-log"} onclick={() => { activeTab = "tool-log"; fetchToolLog(); }}>Tool Log</button>
     </nav>
 
     <!-- ============ PROVIDER TAB ============ -->
@@ -1207,6 +1249,69 @@
               {/each}
             {/if}
           </div>
+        {/if}
+      </section>
+    {:else if activeTab === "tool-log"}
+      <section class="card">
+        <h2>Tool call log</h2>
+        <p class="data-desc">Every tool call the agent makes, with full arguments. Use this to debug unexpected behavior like misrouted memory saves.</p>
+
+        <div class="tl-controls">
+          <select bind:value={toolLogDays} onchange={fetchToolLog}>
+            <option value={1}>Last 24h</option>
+            <option value={3}>Last 3 days</option>
+            <option value={7}>Last 7 days</option>
+            <option value={30}>Last 30 days</option>
+          </select>
+          <select bind:value={toolLogFilterTool} onchange={fetchToolLog}>
+            <option value="">All tools</option>
+            {#each toolLogTools as t}
+              <option value={t}>{t}</option>
+            {/each}
+          </select>
+          <select bind:value={toolLogFilterPerson} onchange={fetchToolLog}>
+            <option value="">All people</option>
+            {#each toolLogPersons as p}
+              <option value={p}>{p}</option>
+            {/each}
+          </select>
+          <button class="btn secondary" onclick={fetchToolLog} disabled={toolLogLoading}>
+            {toolLogLoading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+
+        {#if toolLogEntries.length === 0}
+          <p class="log-empty">{toolLogLoading ? "Loading..." : "No tool calls found."}</p>
+        {:else}
+          <div class="tl-list">
+            {#each toolLogEntries as entry, idx}
+              <div class="tl-row" class:tl-household={entry.args.person === "household"}>
+                <button class="tl-header" onclick={() => toggleToolLogRow(idx)}>
+                  <span class="tl-arrow" class:open={toolLogExpanded.has(idx)}>&#9654;</span>
+                  <span class="tl-tool">{entry.tool}</span>
+                  <span class="tl-summary">{entry.summary}</span>
+                  <span class="tl-person">{entry.person}</span>
+                  <span class="tl-time">{new Date(entry.ts).toLocaleString()}</span>
+                </button>
+                {#if toolLogExpanded.has(idx)}
+                  <div class="tl-args">
+                    <table>
+                      <thead><tr><th>Param</th><th>Value</th></tr></thead>
+                      <tbody>
+                        {#each Object.entries(entry.args) as [key, val]}
+                          <tr>
+                            <td class="tl-arg-key">{key}</td>
+                            <td class="tl-arg-val">{val}</td>
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
+          <p class="tl-total">{toolLogEntries.length} entries</p>
         {/if}
       </section>
     {/if}
@@ -2034,5 +2139,142 @@
     font-size: 0.78rem;
     color: var(--text-muted);
     font-weight: 400;
+  }
+
+  /* ---- Tool Log ---- */
+  .tl-controls {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .tl-controls select {
+    font-size: 0.82rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .tl-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .tl-row {
+    border-bottom: 1px solid var(--surface-low);
+  }
+
+  .tl-row.tl-household {
+    border-left: 3px solid var(--sage);
+  }
+
+  .tl-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    font-size: 0.82rem;
+    color: var(--text);
+  }
+
+  .tl-header:hover {
+    background: var(--surface-low);
+  }
+
+  .tl-arrow {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+
+  .tl-arrow.open {
+    transform: rotate(90deg);
+  }
+
+  .tl-tool {
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: var(--terracotta);
+    min-width: 8rem;
+    flex-shrink: 0;
+  }
+
+  .tl-summary {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tl-person {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: capitalize;
+    flex-shrink: 0;
+  }
+
+  .tl-time {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .tl-args {
+    padding: 0.5rem 0.6rem 0.75rem 2rem;
+    background: var(--surface-low);
+  }
+
+  .tl-args table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+  }
+
+  .tl-args th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    padding: 0.2rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tl-args td {
+    padding: 0.25rem 0.5rem;
+    vertical-align: top;
+  }
+
+  .tl-arg-key {
+    font-weight: 600;
+    color: var(--sage);
+    white-space: nowrap;
+    width: 6rem;
+  }
+
+  .tl-arg-val {
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .tl-total {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 0.75rem;
+    text-align: right;
   }
 </style>

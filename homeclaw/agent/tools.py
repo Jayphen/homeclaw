@@ -234,14 +234,16 @@ def register_builtin_tools(
     @_reg(
         name="memory_save",
         description=(
-            "Save a piece of knowledge about a household member. Appends to "
-            "a topic file — never overwrites. Pick a short topic name "
-            "(e.g. 'food', 'health', 'routines', 'work')."
+            "Save a piece of knowledge. Appends to a topic file — never "
+            "overwrites. Pick a short topic name (e.g. 'food', 'health', "
+            "'routines', 'work'). Set person to a member's name for personal "
+            "facts, or 'household' for shared info like house codes, wifi "
+            "passwords, shared rules, or anything that applies to the whole home."
         ),
     )
     async def memory_save(
         *,
-        person: Annotated[str, Desc("Household member name")],
+        person: Annotated[str, Desc("Member name, or 'household' for shared info")],
         topic: Annotated[str, Desc("Topic name (e.g. 'food', 'health', 'family')")],
         content: Annotated[str, Desc("The fact or knowledge to remember")],
         **_: Any,
@@ -271,24 +273,6 @@ def register_builtin_tools(
             return {"person": person, "topic": topic, "content": text}
         topics = memory_list_topics(workspaces, person)
         return {"person": person, "topics": topics}
-
-    @_reg(
-        name="household_share",
-        description=(
-            "Share knowledge with the entire household. Use when a member "
-            "explicitly asks to share something with everyone."
-        ),
-    )
-    async def household_share(
-        *,
-        topic: Annotated[str, Desc("Topic name (e.g. 'house-rules', 'wifi', 'emergency')")],
-        content: Annotated[str, Desc("The information to share")],
-        **_: Any,
-    ) -> dict[str, Any]:
-        if err := _check_content_length(content):
-            return err
-        path = memory_save_topic(workspaces, HOUSEHOLD_WORKSPACE, topic, content)
-        return {"status": "shared", "topic": topic, "path": str(path)}
 
     # --- Note tools ---
 

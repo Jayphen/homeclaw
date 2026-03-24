@@ -57,7 +57,7 @@ _REASONING_TOOLS = frozenset({"web_read", "web_search"})
 
 # Tools that do simple writes — Haiku is fine for the follow-up summary.
 _SIMPLE_WRITE_TOOLS = frozenset({
-    "memory_save", "memory_read", "household_share", "note_save",
+    "memory_save", "memory_read", "note_save",
     "reminder_add", "reminder_complete", "reminder_delete",
     "bookmark_save", "decision_log", "interaction_log",
 })

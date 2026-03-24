@@ -200,3 +200,81 @@ class TestToolUseEvents:
 
         events = _tool_use_events(tmp_path, now - timedelta(hours=1))
         assert len(events) == 1
+
+
+# ---------------------------------------------------------------------------
+# _read_tool_log (admin tool log endpoint helper)
+# ---------------------------------------------------------------------------
+
+
+class TestReadToolLog:
+    """Tests for the settings API _read_tool_log function."""
+
+    @staticmethod
+    def _write_log(path: Path, entries: list[dict[str, Any]]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            for e in entries:
+                f.write(json.dumps(e) + "\n")
+
+    def test_reads_entries_with_args(self, tmp_path: Path) -> None:
+        from homeclaw.api.routes.settings import _read_tool_log
+
+        now = datetime.now(UTC)
+        log_path = tmp_path / "tool_use.jsonl"
+        self._write_log(log_path, [
+            {
+                "ts": now.isoformat(), "tool": "memory_save",
+                "summary": "Saved food", "person": "alice",
+                "args": {"person": "alice", "topic": "food", "content": "likes pasta"},
+            },
+        ])
+        entries = _read_tool_log(log_path, days=1)
+        assert len(entries) == 1
+        assert entries[0]["args"]["person"] == "alice"
+        assert entries[0]["args"]["topic"] == "food"
+
+    def test_filters_by_tool(self, tmp_path: Path) -> None:
+        from homeclaw.api.routes.settings import _read_tool_log
+
+        now = datetime.now(UTC)
+        log_path = tmp_path / "tool_use.jsonl"
+        self._write_log(log_path, [
+            {"ts": now.isoformat(), "tool": "memory_save", "summary": "A", "person": "alice", "args": {}},
+            {"ts": now.isoformat(), "tool": "note_save", "summary": "B", "person": "alice", "args": {}},
+        ])
+        entries = _read_tool_log(log_path, days=1, tool="memory_save")
+        assert len(entries) == 1
+        assert entries[0]["tool"] == "memory_save"
+
+    def test_filters_by_person(self, tmp_path: Path) -> None:
+        from homeclaw.api.routes.settings import _read_tool_log
+
+        now = datetime.now(UTC)
+        log_path = tmp_path / "tool_use.jsonl"
+        self._write_log(log_path, [
+            {"ts": now.isoformat(), "tool": "memory_save", "summary": "A", "person": "alice", "args": {}},
+            {"ts": now.isoformat(), "tool": "memory_save", "summary": "B", "person": "bob", "args": {}},
+        ])
+        entries = _read_tool_log(log_path, days=1, person="bob")
+        assert len(entries) == 1
+        assert entries[0]["person"] == "bob"
+
+    def test_returns_empty_for_missing_file(self, tmp_path: Path) -> None:
+        from homeclaw.api.routes.settings import _read_tool_log
+
+        entries = _read_tool_log(tmp_path / "nope.jsonl", days=1)
+        assert entries == []
+
+    def test_filters_old_entries(self, tmp_path: Path) -> None:
+        from homeclaw.api.routes.settings import _read_tool_log
+
+        now = datetime.now(UTC)
+        log_path = tmp_path / "tool_use.jsonl"
+        self._write_log(log_path, [
+            {"ts": now.isoformat(), "tool": "memory_save", "summary": "Recent", "person": "a", "args": {}},
+            {"ts": (now - timedelta(days=30)).isoformat(), "tool": "note_save", "summary": "Old", "person": "a", "args": {}},
+        ])
+        entries = _read_tool_log(log_path, days=7)
+        assert len(entries) == 1
+        assert entries[0]["summary"] == "Recent"
