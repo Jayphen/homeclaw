@@ -130,11 +130,8 @@ _ROUTINE_PREAMBLE = (
     "MUST use the web_search and web_read tools — do NOT try to answer from "
     "memory or training data. Make multiple searches if the routine covers "
     "several topics. Summarize the real results concisely.\n\n"
-    "IMPORTANT: You MUST deliver your results by calling the message_send tool. "
-    "Use message_send with group=true to send to the household group chat, or "
-    "message_send with person=<name> for individual members. If you do not call "
-    "message_send, nobody will see your results. Do NOT just produce a text "
-    "response — you must actively send it.\n\n"
+    "Your text response will be delivered automatically — just produce the "
+    "output, do NOT call message_send yourself.\n\n"
 )
 
 # Tools that write to a person's workspace. In DMs, the `person` argument

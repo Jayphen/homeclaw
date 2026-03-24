@@ -206,6 +206,7 @@ class HomeclawApp:
             loop=self.loop,
             workspaces=self.workspaces,
             timezone=self.config.timezone,
+            dispatcher=self.dispatcher,
         )
         self._scheduler.load_routines_md()
         set_scheduler(self._scheduler)
