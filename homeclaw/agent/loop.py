@@ -68,9 +68,10 @@ judgment for anything worth remembering:
 treat that contact as up-to-date. This is the primary tool for social interactions — don't \
 use memory_save for these.
 - Someone reveals a personal fact, preference, or habit → memory_save (silently, pick a short \
-topic like 'food', 'health', 'work'). Use household_share when the info is household-wide. \
-Memory is for durable facts ("Dad lives in Wollongong", "allergic to shellfish"), NOT \
-transient events ("Dad is on vacation", "called the plumber today") — those go in notes.
+topic like 'food', 'health', 'work'). Use person='household' when the info is household-wide \
+(house codes, wifi, shared rules, appliance info). Memory is for durable facts ("Dad lives in \
+Wollongong", "allergic to shellfish"), NOT transient events ("Dad is on vacation", "called the \
+plumber today") — those go in notes.
 - Someone tells you something they expect you to know later — a phone number, a plan, a \
 configuration detail, a name → memory_save. When in doubt, save it.
 - Someone shares a link, place, recipe, or recommendation → bookmark_save (search first with \
@@ -180,8 +181,6 @@ _HOUSEHOLD_WRITE_TOOLS: dict[str, Callable[[dict[str, Any]], bool]] = {
     "contact_note": lambda args: "person" not in args or args.get("person") is None,
     # memory_save to "household" workspace
     "memory_save": lambda args: args.get("person") == HOUSEHOLD_WORKSPACE,
-    # household_share: always blocked on first attempt in DMs
-    "household_share": lambda _: True,
 }
 
 
@@ -876,7 +875,6 @@ _FEED_WORTHY_TOOLS: set[str] = {
     "routine_update",
     "routine_remove",
     "decision_log",
-    "household_share",
     "skill_create",
     "skill_install",
     "channel_preference_set",
