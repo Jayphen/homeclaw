@@ -102,6 +102,14 @@ class HomeclawApp:
         self.workspaces = (workspaces or self.config.workspaces).resolve()
         _ensure_default_files(self.workspaces)
 
+        # Register built-in web providers (jina, tavily) with API keys from config.
+        from homeclaw.web.providers import register_builtins
+
+        register_builtins(
+            jina_api_key=self.config.jina_api_key,
+            tavily_api_key=self.config.tavily_api_key,
+        )
+
         provider = create_provider(self.config)
         fast_provider = create_fast_provider(self.config)
         vision_provider = create_vision_provider(self.config)
