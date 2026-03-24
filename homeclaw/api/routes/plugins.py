@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -371,15 +372,12 @@ async def disable_plugin_route(name: str) -> dict[str, Any]:
     return {"status": "disabled", "plugin": _entry_to_dict(entry)}
 
 
-@router.get("/{name}/env", dependencies=[AdminDep])
-async def get_plugin_env(name: str) -> dict[str, Any]:
-    """Read a plugin's .env file as key-value pairs."""
-    plugin_dir = _plugins_dir() / name
-    if not plugin_dir.is_dir():
-        raise HTTPException(status_code=404, detail="Plugin not found")
+_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-    env_file = plugin_dir / ".env"
-    entries: list[dict[str, str]] = []
+
+def _read_env_file(env_file: Path) -> list[tuple[str, str]]:
+    """Parse a .env file into (key, value) pairs, preserving order."""
+    entries: list[tuple[str, str]] = []
     if env_file.is_file():
         for line in env_file.read_text().splitlines():
             stripped = line.strip()
@@ -388,9 +386,25 @@ async def get_plugin_env(name: str) -> dict[str, Any]:
             if "=" not in stripped:
                 continue
             key, _, value = stripped.partition("=")
-            entries.append({"key": key.strip(), "value": value.strip()})
+            entries.append((key.strip(), value.strip()))
+    return entries
 
-    # Also include env hints so the UI can show placeholders for missing vars
+
+@router.get("/{name}/env", dependencies=[AdminDep])
+async def get_plugin_env(name: str) -> dict[str, Any]:
+    """Read a plugin's .env keys and whether they have values set.
+
+    Never returns actual secret values — only ``"set": true/false``
+    for each key.
+    """
+    plugin_dir = _plugins_dir() / name
+    if not plugin_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Plugin not found")
+
+    env_file = plugin_dir / ".env"
+    raw = _read_env_file(env_file)
+    entries = [{"key": k, "is_set": bool(v)} for k, v in raw]
+
     from homeclaw.plugins.github import extract_env_hints
 
     hints = extract_env_hints(plugin_dir)
@@ -398,25 +412,57 @@ async def get_plugin_env(name: str) -> dict[str, Any]:
     return {"name": name, "entries": entries, "env_hints": hints}
 
 
+class PluginEnvEntry(BaseModel):
+    key: str
+    value: str | None = None
+
+
 class PluginEnvUpdate(BaseModel):
-    entries: list[dict[str, str]]
+    entries: list[PluginEnvEntry]
 
 
 @router.put("/{name}/env", dependencies=[AdminDep])
 async def update_plugin_env(name: str, body: PluginEnvUpdate) -> dict[str, Any]:
-    """Write a plugin's .env file from key-value pairs."""
+    """Update a plugin's .env file.
+
+    Merges with existing values: only keys with a non-null ``value``
+    are written.  Keys with ``value=null`` are preserved from the
+    existing file.  Keys with ``value=""`` are explicitly cleared.
+    Keys not present in the request are removed.
+    """
     plugin_dir = _plugins_dir() / name
     if not plugin_dir.is_dir():
         raise HTTPException(status_code=404, detail="Plugin not found")
 
+    # Validate keys
+    for entry in body.entries:
+        key = entry.key.strip()
+        if not key:
+            continue
+        if not _ENV_KEY_RE.match(key):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid key: {key!r}. Keys must be alphanumeric with underscores.",
+            )
+
+    # Read existing values for merge
+    env_file = plugin_dir / ".env"
+    existing = dict(_read_env_file(env_file))
+
+    # Build new file: value=null means keep existing, value="" means clear
     lines: list[str] = []
     for entry in body.entries:
-        key = entry.get("key", "").strip()
-        value = entry.get("value", "").strip()
-        if key:
-            lines.append(f"{key}={value}")
+        key = entry.key.strip()
+        if not key:
+            continue
+        if entry.value is None:
+            # Preserve existing value
+            value = existing.get(key, "")
+        else:
+            # Sanitize: strip control characters and newlines
+            value = re.sub(r"[\x00-\x1f\x7f]", "", entry.value)
+        lines.append(f"{key}={value}")
 
-    env_file = plugin_dir / ".env"
     env_file.write_text("\n".join(lines) + ("\n" if lines else ""))
 
     return {"status": "saved", "name": name, "count": len(lines)}

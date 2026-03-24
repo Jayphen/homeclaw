@@ -30,8 +30,9 @@
   let actionError: string | null = $state(null);
 
   // Env editor
+  interface EnvEntry { key: string; value: string; isSet: boolean; dirty: boolean }
   let expandedEnv: Set<string> = $state(new Set());
-  let envData: Record<string, { entries: { key: string; value: string }[]; hints: string[] }> = $state({});
+  let envData: Record<string, { entries: EnvEntry[]; hints: string[] }> = $state({});
   let envSaving: Set<string> = $state(new Set());
   let envSaved: Set<string> = $state(new Set());
 
@@ -108,14 +109,15 @@
       const r = await api(`/api/plugins/${name}/env`);
       if (!r.ok) return;
       const data = await r.json();
-      const entries = data.entries as { key: string; value: string }[];
+      const raw = data.entries as { key: string; is_set: boolean }[];
       const hints = (data.env_hints ?? []) as string[];
+      const entries: EnvEntry[] = raw.map(e => ({ key: e.key, value: "", isSet: e.is_set, dirty: false }));
       // Add rows for hinted vars not already present
-      const existing = new Set(entries.map((e: { key: string }) => e.key));
+      const existing = new Set(entries.map(e => e.key));
       for (const h of hints) {
-        if (!existing.has(h)) entries.push({ key: h, value: "" });
+        if (!existing.has(h)) entries.push({ key: h, value: "", isSet: false, dirty: false });
       }
-      if (entries.length === 0) entries.push({ key: "", value: "" });
+      if (entries.length === 0) entries.push({ key: "", value: "", isSet: false, dirty: false });
       envData = { ...envData, [name]: { entries, hints } };
     } catch {}
   }
@@ -125,16 +127,27 @@
     if (!data) return;
     envSaving = new Set([...envSaving, name]);
     try {
-      const filtered = data.entries.filter(e => e.key.trim());
+      // Send value=null for unchanged entries so backend preserves existing secrets
+      const payload = data.entries
+        .filter(e => e.key.trim())
+        .map(e => ({ key: e.key, value: e.dirty ? e.value : null }));
       const r = await api(`/api/plugins/${name}/env`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entries: filtered }),
+        body: JSON.stringify({ entries: payload }),
       });
       if (!r.ok) {
         const b = await r.json().catch(() => ({}));
         actionError = b.detail ?? `Failed to save .env for ${name}`;
       } else {
+        // Mark all entries as saved (isSet, not dirty) and clear typed values
+        const updated = data.entries.map(e => ({
+          ...e,
+          isSet: e.dirty ? !!e.value : e.isSet,
+          dirty: false,
+          value: "",
+        }));
+        envData = { ...envData, [name]: { ...data, entries: updated } };
         envSaved = new Set([...envSaved, name]);
         setTimeout(() => {
           const next = new Set(envSaved); next.delete(name); envSaved = next;
@@ -149,21 +162,21 @@
   function addEnvRow(name: string) {
     const data = envData[name];
     if (!data) return;
-    envData = { ...envData, [name]: { ...data, entries: [...data.entries, { key: "", value: "" }] } };
+    envData = { ...envData, [name]: { ...data, entries: [...data.entries, { key: "", value: "", isSet: false, dirty: true }] } };
   }
 
   function removeEnvRow(name: string, idx: number) {
     const data = envData[name];
     if (!data) return;
     const entries = data.entries.filter((_, i) => i !== idx);
-    if (entries.length === 0) entries.push({ key: "", value: "" });
+    if (entries.length === 0) entries.push({ key: "", value: "", isSet: false, dirty: true });
     envData = { ...envData, [name]: { ...data, entries } };
   }
 
   function updateEnvEntry(name: string, idx: number, field: "key" | "value", val: string) {
     const data = envData[name];
     if (!data) return;
-    const entries = data.entries.map((e, i) => i === idx ? { ...e, [field]: val } : e);
+    const entries = data.entries.map((e, i) => i === idx ? { ...e, [field]: val, dirty: true } : e);
     envData = { ...envData, [name]: { ...data, entries } };
   }
 
@@ -347,9 +360,9 @@
                       <span class="env-eq">=</span>
                       <input
                         class="env-val"
-                        type="text"
+                        type="password"
                         value={entry.value}
-                        placeholder="value"
+                        placeholder={entry.isSet && !entry.dirty ? "configured" : ""}
                         oninput={(e) => updateEnvEntry(plugin.name, idx, "value", e.currentTarget.value)}
                       />
                       <button class="env-remove" onclick={() => removeEnvRow(plugin.name, idx)} title="Remove">&times;</button>
