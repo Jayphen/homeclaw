@@ -1,7 +1,7 @@
 <script lang="ts">
   import { api } from "$lib/api";
   import { renderMarkdown } from "$lib/markdown";
-  import { formatDateTime as formatArchiveDate } from "$lib/time";
+  import { formatDateTime } from "$lib/time";
   import MarkdownEditor from "$lib/MarkdownEditor.svelte";
   import CodeEditor from "$lib/CodeEditor.svelte";
 
@@ -73,17 +73,7 @@
   let installing: boolean = $state(false);
   let installResult: { status: string; name?: string; error?: string; deps?: { missing_bins: { name: string; hint: string }[]; missing_env: string[] } } | null = $state(null);
 
-  // Plugins tab
-  interface InstalledPlugin {
-    name: string;
-    type: string;
-    status: string;
-    description: string;
-    tools: string[];
-    routine_count: number;
-    error: string | null;
-  }
-
+  // Archives
   interface SkillArchive {
     id: string;
     name: string;
@@ -93,24 +83,11 @@
     files: string[];
   }
 
-  type IndexTab = "skills" | "plugins";
-  let indexTab: IndexTab = $state("skills");
-  let plugins: InstalledPlugin[] = $state([]);
   let archives: SkillArchive[] = $state([]);
-  let pluginsLoading: boolean = $state(false);
-  let expandedTools: Set<string> = $state(new Set());
   let expandedArchiveFiles: Set<string> = $state(new Set());
   let confirmingArchiveDelete: string | null = $state(null);
   let deletingArchive: Set<string> = $state(new Set());
   let restoringArchive: Set<string> = $state(new Set());
-  let togglingPlugin: Set<string> = $state(new Set());
-  let pluginActionError: string | null = $state(null);
-
-  function toggleToolList(name: string) {
-    const next = new Set(expandedTools);
-    if (next.has(name)) next.delete(name); else next.add(name);
-    expandedTools = next;
-  }
 
   function toggleArchiveFileList(id: string) {
     const next = new Set(expandedArchiveFiles);
@@ -118,67 +95,32 @@
     expandedArchiveFiles = next;
   }
 
-  function stripNamespace(toolName: string): string {
-    const idx = toolName.indexOf("__");
-    return idx >= 0 ? toolName.slice(idx + 2) : toolName;
-  }
-
-  async function fetchPlugins() {
-    pluginsLoading = true;
-    pluginActionError = null;
+  async function fetchArchives() {
     try {
-      const [pluginsRes, archivesRes] = await Promise.all([
-        api("/api/plugins"),
-        api("/api/skills/archives"),
-      ]);
-      if (pluginsRes.ok) {
-        const data = await pluginsRes.json();
-        plugins = data.plugins;
-      }
-      if (archivesRes.ok) {
-        const data = await archivesRes.json();
-        archives = data.archives;
-      }
-    } catch (e: any) {
-      pluginActionError = e.message;
-    } finally {
-      pluginsLoading = false;
-    }
-  }
-
-  async function togglePlugin(plugin: InstalledPlugin) {
-    togglingPlugin = new Set([...togglingPlugin, plugin.name]);
-    pluginActionError = null;
-    const action = plugin.status === "active" ? "disable" : "enable";
-    try {
-      const r = await api(`/api/plugins/${plugin.name}/${action}`, { method: "POST" });
-      if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail ?? `${r.status}`); }
-      const data = await r.json();
-      plugins = plugins.map(p => p.name === plugin.name ? data.plugin : p);
-    } catch (e: any) { pluginActionError = `Failed to ${action} "${plugin.name}": ${e.message}`; }
-    const next = new Set(togglingPlugin); next.delete(plugin.name); togglingPlugin = next;
+      const r = await api("/api/skills/archives");
+      if (r.ok) archives = (await r.json()).archives;
+    } catch {}
   }
 
   async function deleteArchive(archive: SkillArchive) {
     deletingArchive = new Set([...deletingArchive, archive.id]);
     confirmingArchiveDelete = null;
-    pluginActionError = null;
     try {
       const r = await api(`/api/skills/archives/${archive.owner}/${archive.id}`, { method: "DELETE" });
       if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail ?? `${r.status}`); }
       archives = archives.filter(a => a.id !== archive.id);
-    } catch (e: any) { pluginActionError = `Failed to delete "${archive.name}": ${e.message}`; }
+    } catch (e: any) { error = `Failed to delete "${archive.name}": ${e.message}`; }
     const next = new Set(deletingArchive); next.delete(archive.id); deletingArchive = next;
   }
 
   async function restoreArchive(archive: SkillArchive) {
     restoringArchive = new Set([...restoringArchive, archive.id]);
-    pluginActionError = null;
     try {
       const r = await api(`/api/skills/archives/${archive.owner}/${archive.id}/restore`, { method: "POST" });
       if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail ?? `${r.status}`); }
       archives = archives.filter(a => a.id !== archive.id);
-    } catch (e: any) { pluginActionError = `Failed to restore "${archive.name}": ${e.message}`; }
+      fetchIndex();
+    } catch (e: any) { error = `Failed to restore "${archive.name}": ${e.message}`; }
     const next = new Set(restoringArchive); next.delete(archive.id); restoringArchive = next;
   }
 
@@ -365,7 +307,7 @@
     } else {
       fetchIndex();
       fetchSettings();
-      fetchPlugins();
+      fetchArchives();
     }
   });
 
@@ -554,238 +496,154 @@
     {/if}
   {:else}
     <!-- Index -->
-    <h1 class="page-title">Extensions</h1>
+    <h1 class="page-title">Skills</h1>
 
-    <!-- Tab bar -->
-    <div class="tab-bar">
-      <button class="tab" class:active={indexTab === "skills"} onclick={() => (indexTab = "skills")}>
-        Skills {#if skills.length > 0}<span class="tab-count">{skills.length}</span>{/if}
-      </button>
-      <button class="tab" class:active={indexTab === "plugins"} onclick={() => (indexTab = "plugins")}>
-        Plugins {#if plugins.length > 0}<span class="tab-count">{plugins.length}</span>{/if}
-      </button>
-    </div>
-
-    {#if indexTab === "skills"}
-      {#if settingsLoaded}
-        <section class="settings-panel">
-          <h2>Settings</h2>
-          <label class="toggle-row">
-            <span class="toggle-label">
-              <strong>Require admin approval</strong>
-              <small>Non-admins need approval before skills go live</small>
-            </span>
-            <input
-              type="checkbox"
-              class="toggle"
-              checked={approvalRequired}
-              disabled={savingSettings}
-              onchange={(e) => saveSettings("skill_approval_required", e.currentTarget.checked)}
-            />
-          </label>
-          <label class="toggle-row">
-            <span class="toggle-label">
-              <strong>Allow local network</strong>
-              <small>Let skills reach LAN services (Home Assistant, etc.)</small>
-            </span>
-            <input
-              type="checkbox"
-              class="toggle"
-              checked={allowLocalNetwork}
-              disabled={savingSettings}
-              onchange={(e) => saveSettings("skill_allow_local_network", e.currentTarget.checked)}
-            />
-          </label>
-        </section>
-      {/if}
-
-      <section class="install-panel">
-        <h2>Install from URL</h2>
-        <form class="install-form" onsubmit={(e) => { e.preventDefault(); installFromUrl(); }}>
+    {#if settingsLoaded}
+      <section class="settings-panel">
+        <h2>Settings</h2>
+        <label class="toggle-row">
+          <span class="toggle-label">
+            <strong>Require admin approval</strong>
+            <small>Non-admins need approval before skills go live</small>
+          </span>
           <input
-            type="url"
-            class="install-input"
-            bind:value={installUrl}
-            placeholder="https://github.com/user/skill-name or direct SKILL.md URL"
-            disabled={installing}
+            type="checkbox"
+            class="toggle"
+            checked={approvalRequired}
+            disabled={savingSettings}
+            onchange={(e) => saveSettings("skill_approval_required", e.currentTarget.checked)}
           />
-          <button class="btn btn-primary" type="submit" disabled={installing || !installUrl.trim()}>
-            {installing ? "Installing…" : "Install"}
-          </button>
-        </form>
-        {#if installResult}
-          {#if installResult.status === "installed"}
-            <p class="install-success">Installed <strong>{installResult.name}</strong></p>
-            {#if installResult.deps}
-              <div class="dep-warnings">
-                {#each installResult.deps.missing_bins as bin}
-                  <div class="dep-item"><code>{bin.name}</code> <span class="dep-hint">{bin.hint}</span></div>
-                {/each}
-                {#each installResult.deps.missing_env as env}
-                  <div class="dep-item"><code>{env}</code> <span class="dep-hint">Set in your environment or .env file</span></div>
-                {/each}
-              </div>
-            {/if}
-          {:else}
-            <p class="install-error">{installResult.error}</p>
-          {/if}
-        {/if}
+        </label>
+        <label class="toggle-row">
+          <span class="toggle-label">
+            <strong>Allow local network</strong>
+            <small>Let skills reach LAN services (Home Assistant, etc.)</small>
+          </span>
+          <input
+            type="checkbox"
+            class="toggle"
+            checked={allowLocalNetwork}
+            disabled={savingSettings}
+            onchange={(e) => saveSettings("skill_allow_local_network", e.currentTarget.checked)}
+          />
+        </label>
       </section>
+    {/if}
 
-      {#if skills.length === 0}
-        <div class="empty">
-          <p>No skills yet.</p>
-          <small>Chat with homeclaw to create skills for your household.</small>
-        </div>
-      {:else}
-        {#each [...groupedByOwner.entries()] as [owner, ownerSkills], gi}
-          <section class="owner-section">
-            <h2>{owner} <span class="skill-count">{ownerSkills.length}</span></h2>
-            <div class="skill-list">
-              {#each ownerSkills as skill, i}
-                <a
-                  class="skill-card"
-                  href="#/skills/{skill.owner}/{skill.name}"
-                >
-                  <div class="skill-card-header">
-                    <span class="skill-card-name">{skill.name}</span>
-                    <span class="skill-card-files">{skill.file_count} files</span>
-                  </div>
-                  {#if skill.parse_error}
-                    <div class="skill-card-error">{skill.parse_error}</div>
-                  {:else}
-                    <div class="skill-card-desc">{skill.description}</div>
-                  {/if}
-                  {#if skill.allowed_domains.length > 0}
-                    <div class="skill-card-domains">
-                      {#each skill.allowed_domains as domain}
-                        <span class="domain-tag-sm">{domain}</span>
-                      {/each}
-                    </div>
-                  {/if}
-                </a>
+    <section class="install-panel">
+      <h2>Install from URL</h2>
+      <form class="install-form" onsubmit={(e) => { e.preventDefault(); installFromUrl(); }}>
+        <input
+          type="url"
+          class="install-input"
+          bind:value={installUrl}
+          placeholder="https://github.com/user/skill-name or direct SKILL.md URL"
+          disabled={installing}
+        />
+        <button class="btn btn-primary" type="submit" disabled={installing || !installUrl.trim()}>
+          {installing ? "Installing…" : "Install"}
+        </button>
+      </form>
+      {#if installResult}
+        {#if installResult.status === "installed"}
+          <p class="install-success">Installed <strong>{installResult.name}</strong></p>
+          {#if installResult.deps}
+            <div class="dep-warnings">
+              {#each installResult.deps.missing_bins as bin}
+                <div class="dep-item"><code>{bin.name}</code> <span class="dep-hint">{bin.hint}</span></div>
               {/each}
-            </div>
-          </section>
-        {/each}
-      {/if}
-    {:else}
-      <!-- Plugins tab -->
-      {#if pluginActionError}
-        <div class="action-error">{pluginActionError}</div>
-      {/if}
-
-      {#if pluginsLoading}
-        <div class="loading">
-          <div class="loading-dot"></div>
-          <div class="loading-dot"></div>
-          <div class="loading-dot"></div>
-        </div>
-      {:else}
-        <section class="plugins-section">
-          <h2>Installed plugins</h2>
-          {#if plugins.length === 0}
-            <div class="empty">
-              <p>No plugins installed</p>
-              <small>Plugins added via chat or the marketplace will appear here.</small>
-            </div>
-          {:else}
-            <div class="plugin-list">
-              {#each plugins as plugin}
-                <div class="plugin-card">
-                  <div class="plugin-title-row">
-                    <div class="plugin-identity">
-                      <span class="plugin-name">{plugin.name}</span>
-                      <span class="type-badge" class:type-python={plugin.type === "python"} class:type-skill={plugin.type === "skill"} class:type-mcp={plugin.type === "mcp"}>
-                        {plugin.type}
-                      </span>
-                      <span class="status-dot" class:status-active={plugin.status === "active"} class:status-error={plugin.status === "error"} class:status-disabled={plugin.status === "disabled"}></span>
-                    </div>
-                    {#if plugin.type === "python"}
-                      <button
-                        class="btn toggle-btn"
-                        class:active={plugin.status === "active"}
-                        disabled={togglingPlugin.has(plugin.name)}
-                        onclick={() => togglePlugin(plugin)}
-                      >
-                        {#if togglingPlugin.has(plugin.name)}...{:else if plugin.status === "active"}Enabled{:else}Disabled{/if}
-                      </button>
-                    {/if}
-                  </div>
-                  {#if plugin.description}
-                    <p class="plugin-desc">{plugin.description}</p>
-                  {/if}
-                  <div class="plugin-meta">
-                    {#if plugin.tools.length > 0}
-                      <button class="meta-toggle" onclick={() => toggleToolList(plugin.name)}>
-                        {plugin.tools.length} {plugin.tools.length === 1 ? "tool" : "tools"}
-                        <span class="toggle-arrow" class:open={expandedTools.has(plugin.name)}>&#9662;</span>
-                      </button>
-                    {:else}
-                      <span class="meta-item">No tools</span>
-                    {/if}
-                    {#if plugin.routine_count > 0}
-                      <span class="meta-item">{plugin.routine_count} {plugin.routine_count === 1 ? "routine" : "routines"}</span>
-                    {/if}
-                    {#if plugin.error}
-                      <span class="meta-error">{plugin.error}</span>
-                    {/if}
-                  </div>
-                  {#if expandedTools.has(plugin.name)}
-                    <ul class="tool-list">
-                      {#each plugin.tools as tool}<li class="tool-item">{stripNamespace(tool)}</li>{/each}
-                    </ul>
-                  {/if}
-                </div>
+              {#each installResult.deps.missing_env as env}
+                <div class="dep-item"><code>{env}</code> <span class="dep-hint">Set in your environment or .env file</span></div>
               {/each}
             </div>
           {/if}
-        </section>
-
-        {#if archives.length > 0}
-          <section class="plugins-section">
-            <h2>Skill archives</h2>
-            <div class="archive-list">
-              {#each archives as archive}
-                <div class="archive-card">
-                  <div class="archive-title-row">
-                    <div class="archive-identity">
-                      <span class="archive-name">{archive.name}</span>
-                      <span class="scope-badge" class:scope-household={archive.owner === "household"}>
-                        {archive.owner}
-                      </span>
-                    </div>
-                    <div class="archive-actions">
-                      {#if confirmingArchiveDelete === archive.id}
-                        <span class="confirm-text">Delete permanently?</span>
-                        <button class="btn btn-danger-sm" disabled={deletingArchive.has(archive.id)} onclick={() => deleteArchive(archive)}>Yes</button>
-                        <button class="btn btn-ghost-sm" onclick={() => (confirmingArchiveDelete = null)}>Cancel</button>
-                      {:else}
-                        <button class="btn btn-ghost-sm" disabled={restoringArchive.has(archive.id)} onclick={() => restoreArchive(archive)}>
-                          {restoringArchive.has(archive.id) ? "Restoring..." : "Restore"}
-                        </button>
-                        <button class="btn btn-danger-outline-sm" disabled={deletingArchive.has(archive.id)} onclick={() => (confirmingArchiveDelete = archive.id)}>Delete</button>
-                      {/if}
-                    </div>
-                  </div>
-                  <div class="archive-meta">
-                    <span class="meta-item">Archived {formatArchiveDate(archive.archived_at)}</span>
-                    <button class="meta-toggle" onclick={() => toggleArchiveFileList(archive.id)}>
-                      {archive.file_count} {archive.file_count === 1 ? "file" : "files"}
-                      <span class="toggle-arrow" class:open={expandedArchiveFiles.has(archive.id)}>&#9662;</span>
-                    </button>
-                  </div>
-                  {#if expandedArchiveFiles.has(archive.id)}
-                    <ul class="tool-list">
-                      {#each archive.files as file}<li class="tool-item">{file}</li>{/each}
-                    </ul>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          </section>
+        {:else}
+          <p class="install-error">{installResult.error}</p>
         {/if}
       {/if}
+    </section>
+
+    {#if skills.length === 0}
+      <div class="empty">
+        <p>No skills yet.</p>
+        <small>Chat with homeclaw to create skills for your household.</small>
+      </div>
+    {:else}
+      {#each [...groupedByOwner.entries()] as [owner, ownerSkills], gi}
+        <section class="owner-section">
+          <h2>{owner} <span class="skill-count">{ownerSkills.length}</span></h2>
+          <div class="skill-list">
+            {#each ownerSkills as skill, i}
+              <a
+                class="skill-card"
+                href="#/skills/{skill.owner}/{skill.name}"
+              >
+                <div class="skill-card-header">
+                  <span class="skill-card-name">{skill.name}</span>
+                  <span class="skill-card-files">{skill.file_count} files</span>
+                </div>
+                {#if skill.parse_error}
+                  <div class="skill-card-error">{skill.parse_error}</div>
+                {:else}
+                  <div class="skill-card-desc">{skill.description}</div>
+                {/if}
+                {#if skill.allowed_domains.length > 0}
+                  <div class="skill-card-domains">
+                    {#each skill.allowed_domains as domain}
+                      <span class="domain-tag-sm">{domain}</span>
+                    {/each}
+                  </div>
+                {/if}
+              </a>
+            {/each}
+          </div>
+        </section>
+      {/each}
+    {/if}
+
+    {#if archives.length > 0}
+      <section class="archive-section">
+        <h2>Archived skills</h2>
+        <p class="section-desc">Skills removed via chat are archived here. Restore them to bring them back, or delete permanently.</p>
+        <div class="archive-list">
+          {#each archives as archive}
+            <div class="archive-card">
+              <div class="archive-title-row">
+                <div class="archive-identity">
+                  <span class="archive-name">{archive.name}</span>
+                  <span class="scope-badge" class:scope-household={archive.owner === "household"}>
+                    {archive.owner}
+                  </span>
+                </div>
+                <div class="archive-actions">
+                  {#if confirmingArchiveDelete === archive.id}
+                    <span class="confirm-text">Delete permanently?</span>
+                    <button class="btn btn-danger-sm" disabled={deletingArchive.has(archive.id)} onclick={() => deleteArchive(archive)}>Yes</button>
+                    <button class="btn btn-ghost-sm" onclick={() => (confirmingArchiveDelete = null)}>Cancel</button>
+                  {:else}
+                    <button class="btn btn-ghost-sm" disabled={restoringArchive.has(archive.id)} onclick={() => restoreArchive(archive)}>
+                      {restoringArchive.has(archive.id) ? "Restoring..." : "Restore"}
+                    </button>
+                    <button class="btn btn-danger-outline-sm" disabled={deletingArchive.has(archive.id)} onclick={() => (confirmingArchiveDelete = archive.id)}>Delete</button>
+                  {/if}
+                </div>
+              </div>
+              <div class="archive-meta">
+                <span class="meta-item">Archived {formatDateTime(archive.archived_at)}</span>
+                <button class="meta-toggle" onclick={() => toggleArchiveFileList(archive.id)}>
+                  {archive.file_count} {archive.file_count === 1 ? "file" : "files"}
+                  <span class="toggle-arrow" class:open={expandedArchiveFiles.has(archive.id)}>&#9662;</span>
+                </button>
+              </div>
+              {#if expandedArchiveFiles.has(archive.id)}
+                <ul class="archive-file-list">
+                  {#each archive.files as file}<li class="archive-file-item">{file}</li>{/each}
+                </ul>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      </section>
     {/if}
   {/if}
 </div>
@@ -1048,67 +906,31 @@
     margin-bottom: 0.75rem; font-size: 0.82rem; color: #8a6d3b;
   }
 
-  /* ---- Tabs ---- */
-  .tab-bar {
-    display: flex; gap: 0.25rem; margin-bottom: 1.25rem;
-    border-bottom: 1px solid var(--border); padding-bottom: 0;
-  }
-  .tab {
-    padding: 0.5rem 1rem; border: none; background: none;
-    font-family: var(--font-sans); font-size: 0.85rem; font-weight: 500;
-    color: var(--text-muted); cursor: pointer; position: relative;
-    transition: color 0.15s; display: flex; align-items: center; gap: 0.4rem;
-  }
-  .tab:hover { color: var(--text); }
-  .tab.active { color: var(--text); }
-  .tab.active::after {
-    content: ""; position: absolute; bottom: -1px; left: 0; right: 0;
-    height: 2px; background: var(--primary); border-radius: 1px;
-  }
-  .tab-count {
-    font-size: 0.7rem; font-weight: 600; color: var(--text-muted);
-    background: var(--surface-low); padding: 0.05rem 0.35rem; border-radius: var(--radius-sm);
-  }
-
-  /* ---- Plugins tab ---- */
-  .plugins-section { margin-bottom: 2rem; }
-  .plugins-section h2 {
+  /* ---- Skill archives ---- */
+  .archive-section { margin-bottom: 2rem; }
+  .archive-section h2 {
     font-family: var(--font-serif); font-weight: 600; font-size: 1.1rem;
-    margin: 0 0 0.75rem; color: var(--text);
+    margin: 0 0 0.3rem; color: var(--text);
   }
-  .action-error { background: #fef2f0; border-radius: var(--radius); padding: 0.6rem 0.9rem; font-size: 0.83rem; color: var(--secondary); margin-bottom: 1rem; }
-  .plugin-list, .archive-list { display: flex; flex-direction: column; gap: 0.5rem; }
-  .plugin-card, .archive-card {
+  .section-desc { font-size: 0.82rem; color: var(--text-muted); margin: 0 0 0.75rem; line-height: 1.5; }
+  .archive-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .archive-card {
     background: var(--surface); border-radius: var(--radius);
     padding: 0.85rem 1.1rem; transition: background 0.15s;
   }
-  .plugin-card:hover, .archive-card:hover { background: var(--surface-low); }
-  .plugin-title-row, .archive-title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
-  .plugin-identity, .archive-identity { display: flex; align-items: center; gap: 0.5rem; }
-  .plugin-name, .archive-name { font-weight: 600; font-size: 0.92rem; color: var(--text); }
-  .type-badge { font-size: 0.65rem; font-weight: 600; padding: 0.1rem 0.4rem; border-radius: var(--radius-sm); text-transform: uppercase; letter-spacing: 0.04em; background: var(--surface-low); color: var(--text-muted); }
-  .type-python { background: #e8eef4; color: #4a7fb5; }
-  .type-skill { background: var(--surface-low); color: var(--sage); }
-  .type-mcp { background: #f3eef6; color: #8b6aae; }
-  .status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-  .status-active { background: var(--sage); }
-  .status-error { background: var(--secondary); }
-  .status-disabled { background: var(--text-muted); }
-  .plugin-desc { font-size: 0.82rem; color: var(--text-muted); margin: 0.3rem 0 0; line-height: 1.45; }
-  .plugin-meta, .archive-meta { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.4rem; flex-wrap: wrap; }
+  .archive-card:hover { background: var(--surface-low); }
+  .archive-title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+  .archive-identity { display: flex; align-items: center; gap: 0.5rem; }
+  .archive-name { font-weight: 600; font-size: 0.92rem; color: var(--text); }
+  .scope-badge { font-size: 0.68rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: var(--radius-sm); background: var(--surface-low); color: var(--text-muted); }
+  .scope-household { color: var(--sage); }
+  .archive-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+  .archive-meta { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.4rem; flex-wrap: wrap; }
   .meta-item { font-size: 0.75rem; color: var(--text-muted); }
-  .meta-error { font-size: 0.75rem; color: var(--secondary); }
   .meta-toggle { background: none; border: none; padding: 0; font-family: var(--font-sans); font-size: 0.75rem; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 0.2rem; transition: color 0.15s; }
   .meta-toggle:hover { color: var(--text); }
   .toggle-arrow { display: inline-block; transition: transform 0.2s ease; font-size: 0.7rem; }
   .toggle-arrow.open { transform: rotate(180deg); }
-  .toggle-btn { font-size: 0.72rem; padding: 0.2rem 0.55rem; border-radius: var(--radius-pill); background: var(--surface-low); color: var(--text-muted); border: none; transition: background 0.15s, color 0.15s; }
-  .toggle-btn.active { color: var(--primary); }
-  .tool-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: var(--surface-low); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 0.15rem; }
-  .tool-item { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }
-  .scope-badge { font-size: 0.68rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: var(--radius-sm); background: var(--surface-low); color: var(--text-muted); }
-  .scope-household { color: var(--sage); }
-  .archive-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
   .confirm-text { font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
   .btn-ghost-sm { background: transparent; color: var(--text-muted); font-size: 0.75rem; padding: 0.25rem 0.6rem; border: none; border-radius: var(--radius-pill); cursor: pointer; }
   .btn-ghost-sm:not(:disabled):hover { background: var(--surface-low); color: var(--text); }
@@ -1116,6 +938,8 @@
   .btn-danger-outline-sm:not(:disabled):hover { background: #fef2f0; }
   .btn-danger-sm { background: var(--secondary); color: #fff; font-size: 0.75rem; padding: 0.25rem 0.65rem; border: none; border-radius: var(--radius-pill); cursor: pointer; }
   .btn-danger-sm:not(:disabled):hover { filter: brightness(1.1); }
+  .archive-file-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: var(--surface-low); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 0.15rem; }
+  .archive-file-item { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }
 
   @media (max-width: 640px) {
     .file-article { padding: 1rem 1.25rem; }
