@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.0](https://github.com/Jayphen/homeclaw/compare/v0.20.0...v0.21.0) (2026-03-24)
+
+
+### Features
+
+* add delivery targeting for routines ([#95](https://github.com/Jayphen/homeclaw/issues/95)) ([d0801b6](https://github.com/Jayphen/homeclaw/commit/d0801b6f2e396841015bd27430961ed15f8da8d2))
+* merge household_share into memory_save and add admin tool log ([#97](https://github.com/Jayphen/homeclaw/issues/97)) ([9b88fa4](https://github.com/Jayphen/homeclaw/commit/9b88fa454929cdc23fa14ff49757baddc5776562))
+
 ## [0.20.0](https://github.com/Jayphen/homeclaw/compare/v0.19.0...v0.20.0) (2026-03-24)
 
 
