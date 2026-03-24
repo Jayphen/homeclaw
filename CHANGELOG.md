@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.1](https://github.com/Jayphen/homeclaw/compare/v0.21.0...v0.21.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* handle http_call headers passed as JSON string instead of dict ([#98](https://github.com/Jayphen/homeclaw/issues/98)) ([53e3f6e](https://github.com/Jayphen/homeclaw/commit/53e3f6e8d6ab98fcc71ee537c40ddd7548976a71))
+
 ## [0.21.0](https://github.com/Jayphen/homeclaw/compare/v0.20.0...v0.21.0) (2026-03-24)
 
 
