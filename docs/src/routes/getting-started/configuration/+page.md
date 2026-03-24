@@ -44,10 +44,29 @@ Each tier can use a different provider, API key, and base URL. This is configure
 
 ## Web providers
 
-homeclaw uses pluggable providers for web search (`web_search` tool) and page fetching (`web_read` tool). Two providers ship built-in:
+homeclaw uses pluggable providers for web search (`web_search` tool) and page fetching (`web_read` tool). Two providers are built-in (Jina and Tavily), and four more ship as plugins:
 
-- **Jina** (`jina`) — search via `s.jina.ai`, read via `r.jina.ai`. Requires `JINA_API_KEY`.
-- **Tavily** (`tavily`) — search and extract via `api.tavily.com`. Requires `TAVILY_API_KEY`.
+### Built-in providers
+
+| Provider | Search | Read | Config key |
+|----------|--------|------|-----------|
+| **Jina** (`jina`) | `s.jina.ai` | `r.jina.ai` | `JINA_API_KEY` |
+| **Tavily** (`tavily`) | `api.tavily.com/search` | `api.tavily.com/extract` | `TAVILY_API_KEY` |
+
+### Plugin providers
+
+These ship with homeclaw in `plugins/` and are enabled via the Plugins UI. Each reads its configuration from a `.env` file in the plugin directory or from system environment variables.
+
+| Provider | Search | Read | Env var | Plugin |
+|----------|--------|------|---------|--------|
+| **Brave** (`brave`) | `api.search.brave.com` | — | `BRAVE_API_KEY` | `plugins/brave` |
+| **Exa** (`exa`) | `api.exa.ai/search` | `api.exa.ai/contents` | `EXA_API_KEY` | `plugins/exa` |
+| **SearXNG** (`searxng`) | Self-hosted instance | — | `SEARXNG_BASE_URL` | `plugins/searxng` |
+| **Firecrawl** (`firecrawl`) | `api.firecrawl.dev/v2/search` | `api.firecrawl.dev/v2/scrape` | `FIRECRAWL_API_KEY` | `plugins/firecrawl` |
+
+Brave and SearXNG are **search-only** — pair them with a read provider like Jina or Firecrawl.
+
+SearXNG is free and self-hosted — run it alongside homeclaw on Unraid (Docker: `searxng/searxng`). Set `SEARXNG_BASE_URL` to its address (e.g. `http://searxng:8080`). Ensure JSON format is enabled in the SearXNG `settings.yml`.
 
 Each capability (search, read) has a **primary** and optional **fallback** provider. If the primary fails or runs out of credits (HTTP 402/429), the fallback is tried automatically.
 

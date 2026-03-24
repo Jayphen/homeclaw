@@ -16,6 +16,10 @@ class BuiltinProvider(StrEnum):
 
     JINA = "jina"
     TAVILY = "tavily"
+    BRAVE = "brave"
+    EXA = "exa"
+    SEARXNG = "searxng"
+    FIRECRAWL = "firecrawl"
 
 
 @runtime_checkable
