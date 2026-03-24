@@ -73,16 +73,16 @@ class TestConsolidateChunk:
         provider.complete.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_invalid_json_fallback(self) -> None:
-        """Mock LLM returns invalid JSON → fallback summary with empty entries."""
+    async def test_invalid_json_returns_error(self) -> None:
+        """Mock LLM returns invalid JSON → error dict returned for retry."""
         provider = _mock_provider("This is not valid JSON at all")
 
         messages = _make_messages([("hello", "hi there")])
 
         result = await consolidate_chunk(messages, "alice", provider)
 
-        assert result["memory_entries"] == []
-        assert "This is not valid JSON" in result["summary"]
+        assert "error" in result
+        assert "Invalid JSON" in result["error"]
 
     @pytest.mark.asyncio
     async def test_llm_raises_exception(self) -> None:
@@ -98,17 +98,15 @@ class TestConsolidateChunk:
         assert "API timeout" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_non_dict_json_fallback(self) -> None:
-        """Mock LLM returns valid JSON but not a dict → fallback."""
+    async def test_non_dict_json_returns_error(self) -> None:
+        """Mock LLM returns valid JSON but not a dict → error for retry."""
         provider = _mock_provider(json.dumps(["not", "a", "dict"]))
 
         messages = _make_messages([("test", "response")])
 
         result = await consolidate_chunk(messages, "alice", provider)
 
-        # Should fall back since it's not a dict
-        assert result["memory_entries"] == []
-        assert isinstance(result["summary"], str)
+        assert "error" in result
 
     @pytest.mark.asyncio
     async def test_empty_messages_list(self) -> None:

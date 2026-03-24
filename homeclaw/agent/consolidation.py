@@ -70,11 +70,7 @@ async def consolidate_chunk(
         return result
     except (json.JSONDecodeError, ValueError) as exc:
         logger.warning("Consolidation response not valid JSON: %s", exc)
-        # Return the raw text as summary fallback
-        return {
-            "memory_entries": [],
-            "summary": response.content[:500] if response.content else "",
-        }
+        return {"error": f"Invalid JSON from LLM: {exc}"}
 
 
 async def save_consolidated_memories(

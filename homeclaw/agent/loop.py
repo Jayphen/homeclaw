@@ -487,18 +487,19 @@ class AgentLoop:
         result = await consolidate_chunk(chunk, person, consolidation_provider)
 
         if "error" in result:
-            logger.warning("Consolidation failed for '%s': %s", history_key, result["error"])
-            # Fallback: advance pointer anyway to prevent unbounded growth
-            _advance_consolidation_pointer(self._workspaces, history_key, last_consolidated + chunk_end)
-            return
+            logger.warning("Consolidation failed for '%s': %s — will retry next cycle", history_key, result["error"])
+            return  # Don't advance pointer — retry next cycle
 
         # Save extracted memories
         entries = result.get("memory_entries", [])
-        if entries:
-            saved = await save_consolidated_memories(entries, person, self._workspaces)
-            logger.info("Consolidated %d messages → %d memory entries for '%s'", len(chunk), saved, history_key)
+        if not entries:
+            logger.info("Consolidation returned no memory entries for '%s' — will retry", history_key)
+            return  # Don't advance pointer — LLM likely returned bad JSON
 
-        # Advance the pointer
+        saved = await save_consolidated_memories(entries, person, self._workspaces)
+        logger.info("Consolidated %d messages → %d memory entries for '%s'", len(chunk), saved, history_key)
+
+        # Only advance the pointer after successfully extracting memories
         _advance_consolidation_pointer(self._workspaces, history_key, last_consolidated + chunk_end)
 
     async def run(
