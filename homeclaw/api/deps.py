@@ -322,10 +322,12 @@ async def require_admin(request: Request) -> None:
 
 
 def validate_person(person: str, workspaces: Path) -> None:
-    """Validate that *person* is a known member workspace.
+    """Validate that *person* is a known member or household workspace.
 
     Prevents path traversal via crafted ``person`` URL parameters.
     """
+    if person == HOUSEHOLD_WORKSPACE:
+        return
     members = list_member_workspaces(workspaces)
     if person not in members:
         raise HTTPException(status_code=404, detail=f"Unknown member: {person}")
@@ -335,9 +337,9 @@ def require_person_access(member: str | None, person: str) -> None:
     """Raise 403 if *member* cannot access *person*'s data.
 
     Admins (member=None) can access everything.
-    Members can only access their own workspace.
+    Members can access their own workspace and the household workspace.
     """
-    if member is not None and member != person:
+    if member is not None and member != person and person != HOUSEHOLD_WORKSPACE:
         raise HTTPException(
             status_code=403,
             detail=f"Access denied to {person}'s data",

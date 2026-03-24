@@ -29,6 +29,13 @@
   let toggling: Set<string> = $state(new Set());
   let actionError: string | null = $state(null);
 
+  // Env editor
+  interface EnvEntry { key: string; value: string; isSet: boolean; dirty: boolean }
+  let expandedEnv: Set<string> = $state(new Set());
+  let envData: Record<string, { entries: EnvEntry[]; hints: string[] }> = $state({});
+  let envSaving: Set<string> = $state(new Set());
+  let envSaved: Set<string> = $state(new Set());
+
   // Install from URL
   let installUrl: string = $state("");
   let installing: boolean = $state(false);
@@ -83,6 +90,94 @@
       plugins = plugins.map(p => p.name === plugin.name ? data.plugin : p);
     } catch (e: any) { actionError = `Failed to ${action} "${plugin.name}": ${e.message}`; }
     const next = new Set(toggling); next.delete(plugin.name); toggling = next;
+  }
+
+  async function toggleEnv(name: string) {
+    const next = new Set(expandedEnv);
+    if (next.has(name)) {
+      next.delete(name);
+      expandedEnv = next;
+      return;
+    }
+    next.add(name);
+    expandedEnv = next;
+    if (!envData[name]) await fetchEnv(name);
+  }
+
+  async function fetchEnv(name: string) {
+    try {
+      const r = await api(`/api/plugins/${name}/env`);
+      if (!r.ok) return;
+      const data = await r.json();
+      const raw = data.entries as { key: string; is_set: boolean }[];
+      const hints = (data.env_hints ?? []) as string[];
+      const entries: EnvEntry[] = raw.map(e => ({ key: e.key, value: "", isSet: e.is_set, dirty: false }));
+      // Add rows for hinted vars not already present
+      const existing = new Set(entries.map(e => e.key));
+      for (const h of hints) {
+        if (!existing.has(h)) entries.push({ key: h, value: "", isSet: false, dirty: false });
+      }
+      if (entries.length === 0) entries.push({ key: "", value: "", isSet: false, dirty: false });
+      envData = { ...envData, [name]: { entries, hints } };
+    } catch {}
+  }
+
+  async function saveEnv(name: string) {
+    const data = envData[name];
+    if (!data) return;
+    envSaving = new Set([...envSaving, name]);
+    try {
+      // Send value=null for unchanged entries so backend preserves existing secrets
+      const payload = data.entries
+        .filter(e => e.key.trim())
+        .map(e => ({ key: e.key, value: e.dirty ? e.value : null }));
+      const r = await api(`/api/plugins/${name}/env`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: payload }),
+      });
+      if (!r.ok) {
+        const b = await r.json().catch(() => ({}));
+        actionError = b.detail ?? `Failed to save .env for ${name}`;
+      } else {
+        // Mark all entries as saved (isSet, not dirty) and clear typed values
+        const updated = data.entries.map(e => ({
+          ...e,
+          isSet: e.dirty ? !!e.value : e.isSet,
+          dirty: false,
+          value: "",
+        }));
+        envData = { ...envData, [name]: { ...data, entries: updated } };
+        envSaved = new Set([...envSaved, name]);
+        setTimeout(() => {
+          const next = new Set(envSaved); next.delete(name); envSaved = next;
+        }, 2000);
+      }
+    } catch (e: any) {
+      actionError = e.message;
+    }
+    const next = new Set(envSaving); next.delete(name); envSaving = next;
+  }
+
+  function addEnvRow(name: string) {
+    const data = envData[name];
+    if (!data) return;
+    envData = { ...envData, [name]: { ...data, entries: [...data.entries, { key: "", value: "", isSet: false, dirty: true }] } };
+  }
+
+  function removeEnvRow(name: string, idx: number) {
+    const data = envData[name];
+    if (!data) return;
+    const entries = data.entries.filter((_, i) => i !== idx);
+    if (entries.length === 0) entries.push({ key: "", value: "", isSet: false, dirty: true });
+    envData = { ...envData, [name]: { ...data, entries } };
+  }
+
+  function updateEnvEntry(name: string, idx: number, field: "key" | "value", val: string) {
+    const data = envData[name];
+    if (!data) return;
+    const entries = data.entries.map((e, i) => i === idx ? { ...e, [field]: val, dirty: true } : e);
+    envData = { ...envData, [name]: { ...data, entries } };
   }
 
   async function installFromUrl(installAll = false) {
@@ -235,11 +330,56 @@
               {#if plugin.error}
                 <span class="meta-error">{plugin.error}</span>
               {/if}
+              {#if plugin.type === "python"}
+                <button class="meta-toggle" onclick={() => toggleEnv(plugin.name)}>
+                  {expandedEnv.has(plugin.name) ? "Hide .env" : "Configure"}
+                </button>
+              {/if}
             </div>
             {#if expandedTools.has(plugin.name)}
               <ul class="tool-list">
                 {#each plugin.tools as tool}<li class="tool-item">{stripNamespace(tool)}</li>{/each}
               </ul>
+            {/if}
+            {#if plugin.type === "python"}
+              {#if expandedEnv.has(plugin.name) && envData[plugin.name]}
+                <div class="env-editor">
+                  <div class="env-header">
+                    <span class="env-title">.env</span>
+                    <button class="btn-link" onclick={() => toggleEnv(plugin.name)}>Close</button>
+                  </div>
+                  {#each envData[plugin.name].entries as entry, idx}
+                    <div class="env-row">
+                      <input
+                        class="env-key"
+                        type="text"
+                        value={entry.key}
+                        placeholder="KEY"
+                        oninput={(e) => updateEnvEntry(plugin.name, idx, "key", e.currentTarget.value)}
+                      />
+                      <span class="env-eq">=</span>
+                      <input
+                        class="env-val"
+                        type="password"
+                        value={entry.value}
+                        placeholder={entry.isSet && !entry.dirty ? "configured" : ""}
+                        oninput={(e) => updateEnvEntry(plugin.name, idx, "value", e.currentTarget.value)}
+                      />
+                      <button class="env-remove" onclick={() => removeEnvRow(plugin.name, idx)} title="Remove">&times;</button>
+                    </div>
+                  {/each}
+                  <div class="env-actions">
+                    <button class="btn-link" onclick={() => addEnvRow(plugin.name)}>+ Add variable</button>
+                    <button
+                      class="btn btn-primary btn-sm"
+                      onclick={() => saveEnv(plugin.name)}
+                      disabled={envSaving.has(plugin.name)}
+                    >
+                      {#if envSaving.has(plugin.name)}Saving...{:else if envSaved.has(plugin.name)}Saved{:else}Save{/if}
+                    </button>
+                  </div>
+                </div>
+              {/if}
             {/if}
           </div>
         {/each}
@@ -350,6 +490,49 @@
 
   .tool-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: var(--surface-low); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 0.15rem; }
   .tool-item { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }
+
+  /* Env editor */
+  .env-editor {
+    margin-top: 0.6rem; padding: 0.65rem 0.75rem;
+    background: var(--surface-low); border-radius: var(--radius-md);
+  }
+  .env-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+  .env-title {
+    font-family: monospace; font-size: 0.78rem; font-weight: 600; color: var(--text-muted);
+  }
+  .env-row {
+    display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.35rem;
+  }
+  .env-key {
+    width: 40%; padding: 0.3rem 0.5rem; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-family: monospace; font-size: 0.78rem;
+    background: var(--bg); color: var(--text);
+  }
+  .env-key:focus, .env-val:focus { outline: none; border-color: var(--primary); }
+  .env-eq { color: var(--text-muted); font-family: monospace; font-size: 0.82rem; flex-shrink: 0; }
+  .env-val {
+    flex: 1; padding: 0.3rem 0.5rem; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-family: monospace; font-size: 0.78rem;
+    background: var(--bg); color: var(--text);
+  }
+  .env-remove {
+    background: none; border: none; color: var(--text-muted); font-size: 1rem;
+    cursor: pointer; padding: 0 0.25rem; line-height: 1; flex-shrink: 0;
+  }
+  .env-remove:hover { color: var(--secondary); }
+  .env-actions {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 0.35rem;
+  }
+  .btn-link {
+    background: none; border: none; color: var(--text-muted); font-size: 0.75rem;
+    cursor: pointer; padding: 0; font-family: var(--font-sans);
+  }
+  .btn-link:hover { color: var(--text); }
+  .btn-sm { padding: 0.25rem 0.65rem; font-size: 0.75rem; }
 
   .btn { border: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-weight: 500; cursor: pointer; transition: filter 0.15s, opacity 0.15s; white-space: nowrap; }
   .btn:disabled { opacity: 0.45; cursor: default; }
