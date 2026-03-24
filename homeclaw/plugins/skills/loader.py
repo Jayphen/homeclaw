@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -459,10 +460,18 @@ class SkillPlugin:
             url = _substitute_env(raw_url, env)
             resolved_headers: dict[str, str] | None = None
             if raw_headers:
-                resolved_headers = {
-                    k: _substitute_env(v, env)
-                    for k, v in raw_headers.items()
-                }
+                # LLMs sometimes pass headers as a JSON string instead of a
+                # dict object — parse it back so .items() works correctly.
+                if isinstance(raw_headers, str):
+                    try:
+                        raw_headers = json.loads(raw_headers)
+                    except (json.JSONDecodeError, TypeError):
+                        raw_headers = None
+                if isinstance(raw_headers, dict):
+                    resolved_headers = {
+                        k: _substitute_env(str(v), env)
+                        for k, v in raw_headers.items()
+                    }
             body = _substitute_env(raw_body, env) if raw_body else raw_body
             # Resolve env vars in allowed-domains so authors can use
             # ${HOST} placeholders in the frontmatter.
