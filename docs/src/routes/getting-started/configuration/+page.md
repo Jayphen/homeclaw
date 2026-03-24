@@ -60,17 +60,6 @@ Each capability (search, read) has a **primary** and optional **fallback** provi
 
 ### Custom providers
 
-You can register additional providers by implementing the `WebSearchProvider` or `WebReadProvider` protocol and registering with the global registry:
+Custom web providers are added via [Python plugins](/guides/plugins#custom-web-providers). A plugin implements the `WebSearchProvider` or `WebReadProvider` protocol and declares providers via `web_providers()`. See the [Plugins guide](/guides/plugins#custom-web-providers) for a full example.
 
-```python
-from homeclaw.web import web_providers
-
-class MySearxProvider:
-    async def search(self, query: str) -> dict:
-        # Return {"query": ..., "results": [...], "provider": "searx"}
-        ...
-
-web_providers.register_search("searx", MySearxProvider())
-```
-
-Then set `web_search_provider: "searx"` in config. The Settings UI dynamically lists all registered providers.
+Then set `web_search_provider: "your-provider"` in config. The Settings UI dynamically lists all registered providers.
