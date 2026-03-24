@@ -68,6 +68,11 @@
   let saving: boolean = $state(false);
   let saveWarning: string | null = $state(null);
 
+  // Env editor state (for .env files)
+  interface EnvEntry { key: string; value: string; isSet: boolean; dirty: boolean }
+  let envEntries: EnvEntry[] = $state([]);
+  let isEnvFile: boolean = $state(false);
+
   // Install
   let installUrl: string = $state("");
   let installing: boolean = $state(false);
@@ -252,10 +257,22 @@
   async function fetchFile(owner: string, name: string, filePath: string) {
     loading = true;
     error = null;
+    isEnvFile = false;
+    envEntries = [];
     try {
       const r = await api(`/api/skills/${owner}/${name}/files/${filePath}`);
       if (!r.ok) throw new Error(`${r.status}`);
-      fileContent = await r.json();
+      const data = await r.json();
+      if (data.is_env) {
+        isEnvFile = true;
+        envEntries = (data.entries as { key: string; is_set: boolean }[]).map(e => ({
+          key: e.key, value: "", isSet: e.is_set, dirty: false,
+        }));
+        if (envEntries.length === 0) envEntries = [{ key: "", value: "", isSet: false, dirty: true }];
+        fileContent = { path: data.path, content: "", size: data.size };
+      } else {
+        fileContent = data;
+      }
       loading = false;
     } catch (e: any) {
       error = e.message;
@@ -273,6 +290,46 @@
 
   function cancelEdit() {
     editing = false;
+  }
+
+  // Env editor helpers
+  function addEnvRow() { envEntries = [...envEntries, { key: "", value: "", isSet: false, dirty: true }]; }
+  function removeEnvRow(idx: number) {
+    envEntries = envEntries.filter((_, i) => i !== idx);
+    if (envEntries.length === 0) envEntries = [{ key: "", value: "", isSet: false, dirty: true }];
+  }
+  function updateEnvEntry(idx: number, field: "key" | "value", val: string) {
+    envEntries = envEntries.map((e, i) => i === idx ? { ...e, [field]: val, dirty: true } : e);
+  }
+
+  async function saveEnvFile() {
+    if (!params.owner || !params.name || !filePath) return;
+    saving = true;
+    saveWarning = null;
+    try {
+      const payload = envEntries
+        .filter(e => e.key.trim())
+        .map(e => ({ key: e.key, value: e.dirty ? e.value : null }));
+      const r = await api(`/api/skills/${params.owner}/${params.name}/files/${filePath}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: payload }),
+      });
+      if (!r.ok) {
+        const b = await r.json().catch(() => ({}));
+        throw new Error(b.detail ?? `${r.status}`);
+      }
+      envEntries = envEntries.map(e => ({
+        ...e,
+        isSet: e.dirty ? !!e.value : e.isSet,
+        dirty: false,
+        value: "",
+      }));
+    } catch (e: any) {
+      error = e.message;
+    } finally {
+      saving = false;
+    }
   }
 
   async function saveEdit() {
@@ -377,7 +434,37 @@
         <h1>{fileContent.path}</h1>
         <span class="file-size">{fileContent.size} bytes</span>
       </header>
-      {#if editing}
+      {#if isEnvFile}
+        <!-- .env key-value editor (never shows raw secrets) -->
+        <div class="env-editor">
+          {#each envEntries as entry, idx}
+            <div class="env-row">
+              <input
+                class="env-key"
+                type="text"
+                value={entry.key}
+                placeholder="KEY"
+                oninput={(e) => updateEnvEntry(idx, "key", e.currentTarget.value)}
+              />
+              <span class="env-eq">=</span>
+              <input
+                class="env-val"
+                type="password"
+                value={entry.value}
+                placeholder={entry.isSet && !entry.dirty ? "configured" : ""}
+                oninput={(e) => updateEnvEntry(idx, "value", e.currentTarget.value)}
+              />
+              <button class="env-remove" onclick={() => removeEnvRow(idx)} title="Remove">&times;</button>
+            </div>
+          {/each}
+          <div class="env-actions">
+            <button class="btn-link" onclick={addEnvRow}>+ Add variable</button>
+            <button class="btn btn-primary" onclick={saveEnvFile} disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      {:else if editing}
         <div class="file-editor">
           {#if fileContent.path === "SKILL.md"}
             <CodeEditor bind:value={editContent} disabled={saving} language="yaml+markdown" />
@@ -940,6 +1027,33 @@
   .btn-danger-sm:not(:disabled):hover { filter: brightness(1.1); }
   .archive-file-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: var(--surface-low); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 0.15rem; }
   .archive-file-item { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }
+
+  /* Env editor */
+  .env-editor { padding: 0.25rem 0; }
+  .env-row { display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.35rem; }
+  .env-key {
+    width: 40%; padding: 0.3rem 0.5rem; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-family: monospace; font-size: 0.78rem;
+    background: var(--surface-low); color: var(--text);
+  }
+  .env-key:focus, .env-val:focus { outline: none; border-color: var(--primary); }
+  .env-eq { color: var(--text-muted); font-family: monospace; font-size: 0.82rem; flex-shrink: 0; }
+  .env-val {
+    flex: 1; padding: 0.3rem 0.5rem; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-family: monospace; font-size: 0.78rem;
+    background: var(--surface-low); color: var(--text);
+  }
+  .env-remove {
+    background: none; border: none; color: var(--text-muted); font-size: 1rem;
+    cursor: pointer; padding: 0 0.25rem; line-height: 1; flex-shrink: 0;
+  }
+  .env-remove:hover { color: var(--secondary); }
+  .env-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 0.35rem; }
+  .btn-link {
+    background: none; border: none; color: var(--text-muted); font-size: 0.75rem;
+    cursor: pointer; padding: 0; font-family: var(--font-sans);
+  }
+  .btn-link:hover { color: var(--text); }
 
   @media (max-width: 640px) {
     .file-article { padding: 1rem 1.25rem; }
