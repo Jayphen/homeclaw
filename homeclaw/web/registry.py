@@ -79,10 +79,11 @@ class WebProviderRegistry:
             code = e.response.status_code
             fb = self._try_search_fallback(fallback, primary)
             if code in {402, 429} and fb:
+                logger.debug("Search %s returned %d, falling back to %s", primary, code, fallback)
                 try:
                     return await fb.search(query)
-                except (httpx.HTTPStatusError, httpx.RequestError):
-                    pass
+                except (httpx.HTTPStatusError, httpx.RequestError) as fb_err:
+                    logger.debug("Search fallback %s also failed: %s", fallback, fb_err)
             result = {"error": f"HTTP {code}", "query": query}
         except httpx.RequestError as e:
             result = {"error": str(e), "query": query}
@@ -91,10 +92,13 @@ class WebProviderRegistry:
         if "error" in result:
             fb = self._try_search_fallback(fallback, primary)
             if fb:
+                logger.debug(
+                    "Search %s error, falling back to %s: %s", primary, fallback, result["error"],
+                )
                 try:
                     return await fb.search(query)
-                except (httpx.HTTPStatusError, httpx.RequestError):
-                    pass
+                except (httpx.HTTPStatusError, httpx.RequestError) as fb_err:
+                    logger.debug("Search fallback %s also failed: %s", fallback, fb_err)
 
         return result
 
@@ -120,10 +124,12 @@ class WebProviderRegistry:
         content = result.get("content", "")
         fb = self._try_read_fallback(fallback, primary)
         if fb and ("error" in result or (content_looks_bad and content_looks_bad(content))):
+            reason = result.get("error", "low-quality content")
+            logger.debug("Read %s: %s, falling back to %s", primary, reason, fallback)
             try:
                 result = await fb.read(url)
-            except (httpx.HTTPStatusError, httpx.RequestError):
-                pass  # keep primary result
+            except (httpx.HTTPStatusError, httpx.RequestError) as fb_err:
+                logger.debug("Read fallback %s also failed: %s", fallback, fb_err)
 
         return result
 

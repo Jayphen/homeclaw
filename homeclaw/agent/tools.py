@@ -759,7 +759,14 @@ def register_builtin_tools(
         primary = config.web_search_provider if config else "jina"
         fallback = config.web_search_fallback if config else None
 
-        return await web_providers.search(query, primary, fallback)
+        result = await web_providers.search(query, primary, fallback)
+
+        # Truncate raw-text results (non-structured fallback from some providers)
+        raw = result.get("results")
+        if isinstance(raw, str) and len(raw) > _WEB_READ_MAX_CHARS:
+            result["results"] = raw[:_WEB_READ_MAX_CHARS] + "\n\n[… truncated]"
+
+        return result
 
     # --- Message tool — delivers via channel dispatcher ---
 

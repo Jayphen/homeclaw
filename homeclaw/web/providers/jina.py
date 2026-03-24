@@ -51,11 +51,8 @@ class JinaProvider:
             ]
             return {"query": query, "results": results, "provider": "jina"}
 
-        # Non-JSON or unexpected shape
-        content = resp.text
-        if len(content) > 12_000:
-            content = content[:12_000] + "\n\n[… truncated]"
-        return {"query": query, "results": content, "provider": "jina"}
+        # Non-JSON or unexpected shape — return raw, let tool layer truncate
+        return {"query": query, "results": resp.text, "provider": "jina"}
 
     async def read(self, url: str) -> dict[str, Any]:
         import httpx
