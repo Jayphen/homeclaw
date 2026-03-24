@@ -1,6 +1,7 @@
 <script lang="ts">
   import { api } from "$lib/api";
   import { renderMarkdown } from "$lib/markdown";
+  import { formatDateTime } from "$lib/time";
   import MarkdownEditor from "$lib/MarkdownEditor.svelte";
   import CodeEditor from "$lib/CodeEditor.svelte";
 
@@ -71,6 +72,57 @@
   let installUrl: string = $state("");
   let installing: boolean = $state(false);
   let installResult: { status: string; name?: string; error?: string; deps?: { missing_bins: { name: string; hint: string }[]; missing_env: string[] } } | null = $state(null);
+
+  // Archives
+  interface SkillArchive {
+    id: string;
+    name: string;
+    owner: string;
+    archived_at: string;
+    file_count: number;
+    files: string[];
+  }
+
+  let archives: SkillArchive[] = $state([]);
+  let expandedArchiveFiles: Set<string> = $state(new Set());
+  let confirmingArchiveDelete: string | null = $state(null);
+  let deletingArchive: Set<string> = $state(new Set());
+  let restoringArchive: Set<string> = $state(new Set());
+
+  function toggleArchiveFileList(id: string) {
+    const next = new Set(expandedArchiveFiles);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    expandedArchiveFiles = next;
+  }
+
+  async function fetchArchives() {
+    try {
+      const r = await api("/api/skills/archives");
+      if (r.ok) archives = (await r.json()).archives;
+    } catch {}
+  }
+
+  async function deleteArchive(archive: SkillArchive) {
+    deletingArchive = new Set([...deletingArchive, archive.id]);
+    confirmingArchiveDelete = null;
+    try {
+      const r = await api(`/api/skills/archives/${archive.owner}/${archive.id}`, { method: "DELETE" });
+      if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail ?? `${r.status}`); }
+      archives = archives.filter(a => a.id !== archive.id);
+    } catch (e: any) { error = `Failed to delete "${archive.name}": ${e.message}`; }
+    const next = new Set(deletingArchive); next.delete(archive.id); deletingArchive = next;
+  }
+
+  async function restoreArchive(archive: SkillArchive) {
+    restoringArchive = new Set([...restoringArchive, archive.id]);
+    try {
+      const r = await api(`/api/skills/archives/${archive.owner}/${archive.id}/restore`, { method: "POST" });
+      if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.detail ?? `${r.status}`); }
+      archives = archives.filter(a => a.id !== archive.id);
+      fetchIndex();
+    } catch (e: any) { error = `Failed to restore "${archive.name}": ${e.message}`; }
+    const next = new Set(restoringArchive); next.delete(archive.id); restoringArchive = next;
+  }
 
   // Settings
   let settingsLoaded: boolean = $state(false);
@@ -255,6 +307,7 @@
     } else {
       fetchIndex();
       fetchSettings();
+      fetchArchives();
     }
   });
 
@@ -547,6 +600,51 @@
         </section>
       {/each}
     {/if}
+
+    {#if archives.length > 0}
+      <section class="archive-section">
+        <h2>Archived skills</h2>
+        <p class="section-desc">Skills removed via chat are archived here. Restore them to bring them back, or delete permanently.</p>
+        <div class="archive-list">
+          {#each archives as archive}
+            <div class="archive-card">
+              <div class="archive-title-row">
+                <div class="archive-identity">
+                  <span class="archive-name">{archive.name}</span>
+                  <span class="scope-badge" class:scope-household={archive.owner === "household"}>
+                    {archive.owner}
+                  </span>
+                </div>
+                <div class="archive-actions">
+                  {#if confirmingArchiveDelete === archive.id}
+                    <span class="confirm-text">Delete permanently?</span>
+                    <button class="btn btn-danger-sm" disabled={deletingArchive.has(archive.id)} onclick={() => deleteArchive(archive)}>Yes</button>
+                    <button class="btn btn-ghost-sm" onclick={() => (confirmingArchiveDelete = null)}>Cancel</button>
+                  {:else}
+                    <button class="btn btn-ghost-sm" disabled={restoringArchive.has(archive.id)} onclick={() => restoreArchive(archive)}>
+                      {restoringArchive.has(archive.id) ? "Restoring..." : "Restore"}
+                    </button>
+                    <button class="btn btn-danger-outline-sm" disabled={deletingArchive.has(archive.id)} onclick={() => (confirmingArchiveDelete = archive.id)}>Delete</button>
+                  {/if}
+                </div>
+              </div>
+              <div class="archive-meta">
+                <span class="meta-item">Archived {formatDateTime(archive.archived_at)}</span>
+                <button class="meta-toggle" onclick={() => toggleArchiveFileList(archive.id)}>
+                  {archive.file_count} {archive.file_count === 1 ? "file" : "files"}
+                  <span class="toggle-arrow" class:open={expandedArchiveFiles.has(archive.id)}>&#9662;</span>
+                </button>
+              </div>
+              {#if expandedArchiveFiles.has(archive.id)}
+                <ul class="archive-file-list">
+                  {#each archive.files as file}<li class="archive-file-item">{file}</li>{/each}
+                </ul>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
   {/if}
 </div>
 
@@ -807,6 +905,41 @@
     background: #fef8ee; border-radius: var(--radius); padding: 0.6rem 0.85rem;
     margin-bottom: 0.75rem; font-size: 0.82rem; color: #8a6d3b;
   }
+
+  /* ---- Skill archives ---- */
+  .archive-section { margin-bottom: 2rem; }
+  .archive-section h2 {
+    font-family: var(--font-serif); font-weight: 600; font-size: 1.1rem;
+    margin: 0 0 0.3rem; color: var(--text);
+  }
+  .section-desc { font-size: 0.82rem; color: var(--text-muted); margin: 0 0 0.75rem; line-height: 1.5; }
+  .archive-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .archive-card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 0.85rem 1.1rem; transition: background 0.15s;
+  }
+  .archive-card:hover { background: var(--surface-low); }
+  .archive-title-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+  .archive-identity { display: flex; align-items: center; gap: 0.5rem; }
+  .archive-name { font-weight: 600; font-size: 0.92rem; color: var(--text); }
+  .scope-badge { font-size: 0.68rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: var(--radius-sm); background: var(--surface-low); color: var(--text-muted); }
+  .scope-household { color: var(--sage); }
+  .archive-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+  .archive-meta { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.4rem; flex-wrap: wrap; }
+  .meta-item { font-size: 0.75rem; color: var(--text-muted); }
+  .meta-toggle { background: none; border: none; padding: 0; font-family: var(--font-sans); font-size: 0.75rem; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 0.2rem; transition: color 0.15s; }
+  .meta-toggle:hover { color: var(--text); }
+  .toggle-arrow { display: inline-block; transition: transform 0.2s ease; font-size: 0.7rem; }
+  .toggle-arrow.open { transform: rotate(180deg); }
+  .confirm-text { font-size: 0.78rem; color: var(--text-muted); font-style: italic; }
+  .btn-ghost-sm { background: transparent; color: var(--text-muted); font-size: 0.75rem; padding: 0.25rem 0.6rem; border: none; border-radius: var(--radius-pill); cursor: pointer; }
+  .btn-ghost-sm:not(:disabled):hover { background: var(--surface-low); color: var(--text); }
+  .btn-danger-outline-sm { background: transparent; color: var(--secondary); font-size: 0.75rem; padding: 0.25rem 0.6rem; border: none; border-radius: var(--radius-pill); cursor: pointer; }
+  .btn-danger-outline-sm:not(:disabled):hover { background: #fef2f0; }
+  .btn-danger-sm { background: var(--secondary); color: #fff; font-size: 0.75rem; padding: 0.25rem 0.65rem; border: none; border-radius: var(--radius-pill); cursor: pointer; }
+  .btn-danger-sm:not(:disabled):hover { filter: brightness(1.1); }
+  .archive-file-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: var(--surface-low); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 0.15rem; }
+  .archive-file-item { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }
 
   @media (max-width: 640px) {
     .file-article { padding: 1rem 1.25rem; }
