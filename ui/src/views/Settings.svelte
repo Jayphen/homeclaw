@@ -858,8 +858,9 @@
         <div class="field">
           <label for="web-read-provider">web_read provider</label>
           <select id="web-read-provider" bind:value={webReadProvider}>
-            <option value="jina">Jina</option>
-            <option value="tavily">Tavily</option>
+            {#each (setup.available_read_providers || ["jina", "tavily"]) as p}
+              <option value={p}>{p}</option>
+            {/each}
           </select>
           <small class="field-hint">Primary provider for fetching web page content.</small>
         </div>
@@ -867,16 +868,18 @@
           <label for="web-read-fallback">web_read fallback</label>
           <select id="web-read-fallback" bind:value={webReadFallback}>
             <option value="">None</option>
-            <option value="jina">Jina</option>
-            <option value="tavily">Tavily</option>
+            {#each (setup.available_read_providers || ["jina", "tavily"]) as p}
+              <option value={p}>{p}</option>
+            {/each}
           </select>
           <small class="field-hint">Used when the primary provider fails or returns low-quality content.</small>
         </div>
         <div class="field">
           <label for="web-search-provider">web_search provider</label>
           <select id="web-search-provider" bind:value={webSearchProvider}>
-            <option value="jina">Jina</option>
-            <option value="tavily">Tavily</option>
+            {#each (setup.available_search_providers || ["jina", "tavily"]) as p}
+              <option value={p}>{p}</option>
+            {/each}
           </select>
           <small class="field-hint">Primary provider for web search queries.</small>
         </div>
@@ -884,8 +887,9 @@
           <label for="web-search-fallback">web_search fallback</label>
           <select id="web-search-fallback" bind:value={webSearchFallback}>
             <option value="">None</option>
-            <option value="jina">Jina</option>
-            <option value="tavily">Tavily</option>
+            {#each (setup.available_search_providers || ["jina", "tavily"]) as p}
+              <option value={p}>{p}</option>
+            {/each}
           </select>
           <small class="field-hint">Used when the primary search provider fails or runs out of credits.</small>
         </div>

@@ -28,13 +28,7 @@ from homeclaw.api.deps import (
 from homeclaw.api.deps import (
     get_whatsapp_qr as _get_whatsapp_qr,
 )
-from homeclaw.config import (
-    NoteDetailLevel,
-    ProviderMode,
-    ProviderType,
-    WebReadProvider,
-    WebSearchProvider,
-)
+from homeclaw.config import NoteDetailLevel, ProviderMode, ProviderType
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +94,8 @@ async def setup_status(request: Request) -> dict[str, Any]:
         base[field_name] = val
 
     # Derived/computed fields that aren't direct config attributes
+    from homeclaw.web import web_providers
+
     base.update({
         "members": members,
         "members_with_passwords": members_with_passwords,
@@ -111,6 +107,8 @@ async def setup_status(request: Request) -> dict[str, Any]:
         "conversation_model": config.routing.conversation_model,
         "fast_model": config.routing.fast_model,
         "vision_model": config.routing.vision_model,
+        "available_search_providers": web_providers.search_providers(),
+        "available_read_providers": web_providers.read_providers(),
     })
     return base
 
@@ -145,10 +143,10 @@ class SetupBody(BaseModel):
     # Web search
     jina_api_key: str | None = None
     tavily_api_key: str | None = None
-    web_read_provider: WebReadProvider | None = None
-    web_read_fallback: WebReadProvider | None = None
-    web_search_provider: WebSearchProvider | None = None
-    web_search_fallback: WebSearchProvider | None = None
+    web_read_provider: str | None = None
+    web_read_fallback: str | None = None
+    web_search_provider: str | None = None
+    web_search_fallback: str | None = None
 
     # Home Assistant
     ha_url: str | None = None

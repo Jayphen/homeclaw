@@ -1,6 +1,5 @@
 """Tool registry, built-in tool definitions, and handlers."""
 
-import json
 import logging
 from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime, timedelta
@@ -693,49 +692,6 @@ def register_builtin_tools(
 
     _WEB_READ_MAX_CHARS = 12_000
 
-    def _jina_headers(accept: str = "text/markdown") -> dict[str, str]:
-        headers = {"Accept": accept}
-        key = config.jina_api_key if config else None
-        if key:
-            headers["Authorization"] = f"Bearer {key}"
-        return headers
-
-    async def _read_via_jina(url: str) -> dict[str, Any]:
-        """Fetch a URL via Jina Reader and return markdown content."""
-        import httpx
-
-        transport = httpx.AsyncHTTPTransport(retries=2)
-        async with httpx.AsyncClient(timeout=30, transport=transport) as client:
-            resp = await client.get(
-                f"https://r.jina.ai/{url}",
-                headers=_jina_headers("text/markdown"),
-            )
-            resp.raise_for_status()
-        return {"url": url, "content": resp.text, "provider": "jina"}
-
-    async def _read_via_tavily(url: str) -> dict[str, Any]:
-        """Fetch a URL via Tavily Extract API and return markdown content."""
-        import httpx
-
-        key = config.tavily_api_key if config else None
-        if not key:
-            return {"error": "Tavily Extract requires TAVILY_API_KEY to be set", "url": url}
-
-        transport = httpx.AsyncHTTPTransport(retries=2)
-        async with httpx.AsyncClient(timeout=30, transport=transport) as client:
-            resp = await client.post(
-                "https://api.tavily.com/extract",
-                json={"urls": [url]},
-                headers={"Authorization": f"Bearer {key}"},
-            )
-            resp.raise_for_status()
-        data = resp.json()
-        results = data.get("results", [])
-        if not results:
-            return {"error": "Tavily returned no content", "url": url}
-        content = results[0].get("raw_content") or results[0].get("text", "")
-        return {"url": url, "content": content, "provider": "tavily"}
-
     def _content_looks_bad(content: str) -> bool:
         """Heuristic: content is mostly navigation/image chrome, not real text."""
         if len(content) < 200:
@@ -747,11 +703,6 @@ def register_builtin_tools(
             1 for line in lines if line.strip().startswith(("[![", "[!", "![", "* [", "*   ["))
         )
         return link_or_image_lines > len(lines) * 0.6
-
-    _READERS: dict[str, Any] = {
-        "jina": _read_via_jina,
-        "tavily": _read_via_tavily,
-    }
 
     @_reg(
         name="web_read",
@@ -768,107 +719,22 @@ def register_builtin_tools(
         url: Annotated[str, Desc("The URL to fetch")],
         **_: Any,
     ) -> dict[str, Any]:
-        import httpx
+        from homeclaw.web import web_providers
 
         primary = config.web_read_provider if config else "jina"
         fallback = config.web_read_fallback if config else None
-        reader_fn = _READERS.get(primary, _read_via_jina)
 
-        try:
-            result = await reader_fn(url)
-        except (httpx.HTTPStatusError, httpx.RequestError) as e:
-            result = {"error": str(e), "url": url}
-
-        content = result.get("content", "")
-        # Try fallback if primary returned an error or low-quality content
-        if fallback and fallback != primary and fallback in _READERS:
-            if "error" in result or _content_looks_bad(content):
-                try:
-                    result = await _READERS[fallback](url)
-                    content = result.get("content", "")
-                except (httpx.HTTPStatusError, httpx.RequestError):
-                    pass  # keep primary result
+        result = await web_providers.read(
+            url, primary, fallback, content_looks_bad=_content_looks_bad,
+        )
 
         if "error" in result:
             return result
 
+        content = result.get("content", "")
         if len(content) > _WEB_READ_MAX_CHARS:
             content = content[:_WEB_READ_MAX_CHARS] + "\n\n[… truncated]"
         return {"url": url, "content": content}
-
-    # Credit-exhaustion status codes that should trigger a fallback.
-    _SEARCH_CREDIT_EXHAUSTED = {402, 429}
-
-    async def _search_via_jina(query: str) -> dict[str, Any]:
-        """Search via Jina Search API and return structured results."""
-        import httpx
-
-        if not (config and config.jina_api_key):
-            return {"error": "Jina search requires JINA_API_KEY to be set", "query": query}
-
-        transport = httpx.AsyncHTTPTransport(retries=2)
-        async with httpx.AsyncClient(timeout=30, transport=transport) as client:
-            resp = await client.get(
-                f"https://s.jina.ai/{query}",
-                headers=_jina_headers("application/json"),
-            )
-            resp.raise_for_status()
-
-        try:
-            data = json.loads(resp.text)
-        except json.JSONDecodeError:
-            data = None
-
-        if isinstance(data, dict) and "data" in data:
-            results = [
-                {
-                    "title": item.get("title", ""),
-                    "url": item.get("url", ""),
-                    "description": item.get("description", ""),
-                }
-                for item in data["data"]
-            ]
-            return {"query": query, "results": results, "provider": "jina"}
-
-        # Non-JSON or unexpected shape
-        content = resp.text
-        max_chars = 12_000
-        if len(content) > max_chars:
-            content = content[:max_chars] + "\n\n[… truncated]"
-        return {"query": query, "results": content, "provider": "jina"}
-
-    async def _search_via_tavily(query: str) -> dict[str, Any]:
-        """Search via Tavily Search API and return structured results."""
-        import httpx
-
-        key = config.tavily_api_key if config else None
-        if not key:
-            return {"error": "Tavily search requires TAVILY_API_KEY to be set", "query": query}
-
-        transport = httpx.AsyncHTTPTransport(retries=2)
-        async with httpx.AsyncClient(timeout=30, transport=transport) as client:
-            resp = await client.post(
-                "https://api.tavily.com/search",
-                json={"query": query},
-                headers={"Authorization": f"Bearer {key}"},
-            )
-            resp.raise_for_status()
-
-        data = resp.json()
-        results = [
-            {
-                "title": item.get("title", ""),
-                "url": item.get("url", ""),
-                "description": item.get("content", ""),
-            }
-            for item in data.get("results", [])
-        ]
-        return {"query": query, "results": results, "provider": "tavily"}
-
-    _SEARCHERS: dict[str, Any] = {
-        "jina": _search_via_jina,
-        "tavily": _search_via_tavily,
-    }
 
     @_reg(
         name="web_search",
@@ -888,33 +754,17 @@ def register_builtin_tools(
         query: Annotated[str, Desc("The search query")],
         **_: Any,
     ) -> dict[str, Any]:
-        import httpx
+        from homeclaw.web import web_providers
 
         primary = config.web_search_provider if config else "jina"
         fallback = config.web_search_fallback if config else None
-        search_fn = _SEARCHERS.get(primary, _search_via_jina)
 
-        try:
-            result = await search_fn(query)
-        except httpx.HTTPStatusError as e:
-            code = e.response.status_code
-            # Credit exhaustion — try fallback immediately
-            can_fallback = fallback and fallback != primary and fallback in _SEARCHERS
-            if code in _SEARCH_CREDIT_EXHAUSTED and can_fallback:
-                try:
-                    return await _SEARCHERS[fallback](query)
-                except (httpx.HTTPStatusError, httpx.RequestError):
-                    pass  # fall through to original error
-            result = {"error": f"HTTP {code}", "query": query}
-        except httpx.RequestError as e:
-            result = {"error": str(e), "query": query}
+        result = await web_providers.search(query, primary, fallback)
 
-        # Also try fallback if primary returned an error (e.g. missing API key)
-        if "error" in result and fallback and fallback != primary and fallback in _SEARCHERS:
-            try:
-                return await _SEARCHERS[fallback](query)
-            except (httpx.HTTPStatusError, httpx.RequestError):
-                pass  # keep primary error
+        # Truncate raw-text results (non-structured fallback from some providers)
+        raw = result.get("results")
+        if isinstance(raw, str) and len(raw) > _WEB_READ_MAX_CHARS:
+            result["results"] = raw[:_WEB_READ_MAX_CHARS] + "\n\n[… truncated]"
 
         return result
 

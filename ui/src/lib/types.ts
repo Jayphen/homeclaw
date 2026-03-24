@@ -1,7 +1,5 @@
 /** Constrained types mirroring Python Literal definitions. */
 export type ProviderType = "anthropic" | "openai";
-export type WebReadProvider = "jina" | "tavily";
-export type WebSearchProvider = "jina" | "tavily";
 export type ProviderMode = "simple" | "advanced";
 export type NoteDetailLevel = "minimal" | "normal" | "detailed";
 export type InteractionType = "call" | "message" | "meetup" | "other";
@@ -40,10 +38,12 @@ export interface SetupStatus {
   whatsapp_allowed_users?: string | null;
   jina_api_key?: string | null;
   tavily_api_key?: string | null;
-  web_read_provider?: WebReadProvider | null;
-  web_read_fallback?: WebReadProvider | null;
-  web_search_provider?: WebSearchProvider | null;
-  web_search_fallback?: WebSearchProvider | null;
+  web_read_provider?: string | null;
+  web_read_fallback?: string | null;
+  web_search_provider?: string | null;
+  web_search_fallback?: string | null;
+  available_search_providers?: string[];
+  available_read_providers?: string[];
   ha_configured?: boolean;
   conversation_model?: string;
   fast_model?: string;

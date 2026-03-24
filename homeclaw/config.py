@@ -14,8 +14,8 @@ from homeclaw.agent.routing import RoutingConfig
 
 # Constrained string types for config fields with fixed vocabularies.
 ProviderType = Literal["anthropic", "openai"]
-WebReadProvider = Literal["jina", "tavily"]
-WebSearchProvider = Literal["jina", "tavily"]
+# Web provider config fields accept any str so custom providers can register.
+# Use homeclaw.web.BuiltinProvider enum for type-safe references to built-ins.
 ProviderMode = Literal["simple", "advanced"]
 NoteDetailLevel = Literal["minimal", "normal", "detailed"]
 EmbeddingProvider = Literal["local", "openai"]
@@ -163,10 +163,10 @@ class HomeclawConfig(BaseSettings):
     # Web search & reading
     jina_api_key: str | None = None
     tavily_api_key: str | None = None
-    web_read_provider: WebReadProvider = "jina"
-    web_read_fallback: WebReadProvider | None = None
-    web_search_provider: WebSearchProvider = "jina"
-    web_search_fallback: WebSearchProvider | None = None
+    web_read_provider: str = "jina"
+    web_read_fallback: str | None = None
+    web_search_provider: str = "jina"
+    web_search_fallback: str | None = None
 
     # Home Assistant (optional)
     ha_url: str | None = None
