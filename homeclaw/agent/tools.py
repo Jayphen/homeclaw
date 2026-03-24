@@ -906,7 +906,11 @@ def register_builtin_tools(
         routines = parse_routines_md(workspaces)
         return {
             "routines": [
-                {"name": r.name, "description": r.description}
+                {
+                    "name": r.name,
+                    "description": r.description,
+                    "target": r.target or "household",
+                }
                 for r in routines
             ]
         }
@@ -914,9 +918,11 @@ def register_builtin_tools(
     @_reg(
         name="routine_add",
         description=(
-            "Add a new scheduled routine for the household. "
-            "Schedule can be natural language or a 5-field cron expression "
-            "for complex schedules."
+            "Add a new scheduled routine. "
+            "Schedule can be natural language or a 5-field cron expression. "
+            "You MUST provide a target — ask the user who this routine is for "
+            "before calling. If target is not provided, the tool will return a "
+            "prompt for you to relay to the user."
         ),
     )
     async def routine_add(
@@ -931,20 +937,46 @@ def register_builtin_tools(
             "(e.g. '30 7 * * 1-5' for weekdays at 7:30am, '0 9 1 * *' for 1st of month at 9am)."
         )],
         action: Annotated[str, Desc("What the routine should do")],
+        target: Annotated[str | None, Desc(
+            "Who receives this routine's output. "
+            "A person's name (e.g. 'stephen') sends it as a private DM. "
+            "'each_member' runs it once per household member and DMs each. "
+            "'household' sends it to the shared group chat."
+        )] = None,
+        person: Annotated[str, Desc("Caller")] = "",
         **_: Any,
     ) -> dict[str, Any]:
+        if target is None:
+            return {
+                "status": "confirm_target",
+                "message": (
+                    "Who should receive this routine? Ask the user to pick one:\n"
+                    f"• Just me ({person}) — sends as a private message\n"
+                    "• Each member — runs for everyone and DMs each person\n"
+                    "• Household — sends to the shared group chat"
+                ),
+                "pending": {"title": title, "schedule": schedule, "action": action},
+            }
+        # Normalise target
+        if target.lower() in ("household", "group"):
+            target = None
+        elif target.lower() == "each_member":
+            target = "each_member"
+        # else: treat as a person name (lowercase)
+        elif target.lower() not in ("each_member",):
+            target = target.lower()
         try:
-            add_routine(workspaces, title, schedule, action)
+            add_routine(workspaces, title, schedule, action, target=target)
         except ValueError as e:
             return {"error": str(e)}
         if on_routines_changed:
             on_routines_changed()
-        return {"status": "added", "title": title, "schedule": schedule}
+        return {"status": "added", "title": title, "schedule": schedule, "target": target or "household"}
 
     @_reg(
         name="routine_update",
         description=(
-            "Update an existing routine's schedule, action, or title. "
+            "Update an existing routine's schedule, action, title, or target. "
             "Use routine_list first to see available routine names. "
             "Use this when someone wants to change what a routine does "
             "(e.g. 'add news to my morning briefing') or when it runs."
@@ -956,10 +988,24 @@ def register_builtin_tools(
         schedule: Annotated[str | None, Desc("New schedule (optional — omit to keep current)")] = None,
         action: Annotated[str | None, Desc("New action description (optional — omit to keep current)")] = None,
         title: Annotated[str | None, Desc("New title (optional — omit to keep current)")] = None,
+        target: Annotated[str | None, Desc(
+            "New delivery target (optional — omit to keep current). "
+            "A person name for private DM, 'each_member' for all, 'household' for group chat."
+        )] = ...,  # type: ignore[assignment]  # sentinel
         **_: Any,
     ) -> dict[str, Any]:
         from homeclaw.scheduler.routines import update_routine
-        updated = update_routine(workspaces, name, schedule=schedule, action=action, title=title)
+        # Normalise target when explicitly provided
+        real_target: str | None | type(Ellipsis) = ...
+        if target is not ...:
+            if target is not None and target.lower() in ("household", "group"):
+                real_target = None
+            else:
+                real_target = target.lower() if target else target
+        updated = update_routine(
+            workspaces, name, schedule=schedule, action=action, title=title,
+            target=real_target,  # type: ignore[arg-type]
+        )
         if not updated:
             return {"error": f"Routine '{name}' not found"}
         if on_routines_changed:

@@ -80,19 +80,79 @@ class Scheduler:
         results[job_id] = result[:8000] if result else ""
         results_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
 
-    def _make_routine_func(self, job_id: str, description: str) -> Any:
+    def _list_members(self) -> list[str]:
+        """Enumerate household member workspace directories."""
+        skip = {"household", "plugins"}
+        if not self._workspaces.is_dir():
+            return []
+        return sorted(
+            d.name
+            for d in self._workspaces.iterdir()
+            if d.is_dir()
+            and d.name not in skip
+            and not d.name.startswith(".")
+            and not d.name.startswith("group-")
+        )
+
+    def _make_routine_func(
+        self, job_id: str, description: str, target: str | None = None,
+    ) -> Any:
         """Create the async callable for a routine job.
 
         The routine executes the LLM agent, then the *scheduler* delivers the
         result via the channel dispatcher.  The LLM no longer needs to call
         ``message_send`` itself — it just produces the output text.
+
+        *target* controls delivery:
+        - ``None`` → group chat (household)
+        - ``"each_member"`` → run once per member, DM each
+        - a person name → run with that person's context, DM them
         """
         loop = self._loop
         scheduler = self
 
+        async def _run_for_person(person: str) -> str:
+            """Run the routine for a single person and deliver via DM."""
+            result = await loop.run(
+                f"[Scheduled routine] {description}",
+                person,
+                call_type=CallType.ROUTINE,
+            )
+            if result and result.strip() and scheduler._dispatcher:
+                await scheduler._dispatcher.send(
+                    person, f"📋 *{description}*\n\n{result}",
+                )
+            return result
+
         async def _run_routine() -> str:
-            logger.info("Routine fired: %s", description)
+            logger.info("Routine fired: %s (target=%s)", description, target or "group")
             try:
+                if target == "each_member":
+                    members = scheduler._list_members()
+                    results: list[str] = []
+                    for member in members:
+                        try:
+                            r = await _run_for_person(member)
+                            results.append(r)
+                        except Exception:
+                            logger.exception(
+                                "Routine failed for member %s: %s", member, description,
+                            )
+                    combined = "\n---\n".join(r for r in results if r.strip())
+                    scheduler._save_last_run(job_id, combined)
+                    logger.info(
+                        "Routine completed for %d members: %s", len(members), description,
+                    )
+                    return combined
+
+                if target:
+                    # Specific person
+                    result = await _run_for_person(target)
+                    scheduler._save_last_run(job_id, result)
+                    logger.info("Routine completed: %s (response length: %d)", description, len(result))
+                    return result
+
+                # Default: household group chat
                 result = await loop.run(
                     f"[Scheduled routine] {description}",
                     HOUSEHOLD_WORKSPACE,
@@ -101,7 +161,6 @@ class Scheduler:
                 scheduler._save_last_run(job_id, result)
                 logger.info("Routine completed: %s (response length: %d)", description, len(result))
 
-                # Deliver result via channel dispatcher
                 if result and result.strip() and scheduler._dispatcher:
                     try:
                         await scheduler._dispatcher.send_group(
@@ -123,11 +182,12 @@ class Scheduler:
         description: str,
         trigger_type: str,
         trigger_kwargs: dict[str, Any],
+        target: str | None = None,
     ) -> None:
         trigger = self._make_trigger(trigger_type, trigger_kwargs)
 
         self._scheduler.add_job(
-            self._make_routine_func(job_id, description),
+            self._make_routine_func(job_id, description, target=target),
             trigger=trigger,
             id=job_id,
             name=description,
@@ -135,7 +195,7 @@ class Scheduler:
             misfire_grace_time=900,  # 15 min grace period to avoid silent skips
         )
         self._job_count += 1
-        logger.info("Registered routine: %s (%s)", job_id, trigger)
+        logger.info("Registered routine: %s (%s, target=%s)", job_id, trigger, target or "group")
 
     def load_routines_md(self) -> int:
         """Parse ROUTINES.md and register all routines. Returns count added."""
@@ -146,6 +206,7 @@ class Scheduler:
                 description=r.description,
                 trigger_type=r.trigger_type,
                 trigger_kwargs=r.trigger_kwargs,
+                target=r.target,
             )
         return len(routines)
 

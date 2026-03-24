@@ -29,6 +29,7 @@ class ParsedRoutine:
     description: str
     trigger_type: str  # "cron" or "interval"
     trigger_kwargs: dict[str, int | str]
+    target: str | None = None  # None/"household" = group, "each_member" = all, name = DM
 
 
 def _parse_time(time_str: str) -> tuple[int, int]:
@@ -177,14 +178,19 @@ def _ordinal_day_range(ordinal: str) -> str:
     return mapping.get(ordinal, "1-7")
 
 
-def _extract_schedule_and_actions(lines: list[str]) -> tuple[str | None, list[str]]:
-    """Extract schedule and action lines from a routine's body.
+def _extract_schedule_and_actions(
+    lines: list[str],
+) -> tuple[str | None, list[str], str | None]:
+    """Extract schedule, action lines, and target from a routine's body.
 
     Supports two formats:
       1. Structured: lines with **Schedule**: ... and **Action**: ...
       2. Plain: all bullet points are action descriptions (schedule is in heading)
+
+    Returns (schedule, actions, target).
     """
     schedule: str | None = None
+    target: str | None = None
     actions: list[str] = []
 
     for line in lines:
@@ -193,6 +199,11 @@ def _extract_schedule_and_actions(lines: list[str]) -> tuple[str | None, list[st
         m = re.match(r"\*\*Schedule\*\*:\s*(.+)", stripped)
         if m:
             schedule = m.group(1).strip()
+            continue
+        # Check for **Target**: ...
+        m = re.match(r"\*\*Target\*\*:\s*(.+)", stripped)
+        if m:
+            target = m.group(1).strip().lower()
             continue
         # Check for **Action**: ...
         m = re.match(r"\*\*Action\*\*:\s*(.+)", stripped)
@@ -203,7 +214,7 @@ def _extract_schedule_and_actions(lines: list[str]) -> tuple[str | None, list[st
         if stripped:
             actions.append(stripped)
 
-    return schedule, actions
+    return schedule, actions, target
 
 
 def parse_routines_md(workspaces: Path) -> list[ParsedRoutine]:
@@ -226,7 +237,7 @@ def parse_routines_md(workspaces: Path) -> list[ParsedRoutine]:
         heading = lines[0].strip()
         body_lines = lines[1:]
 
-        schedule_text, actions = _extract_schedule_and_actions(body_lines)
+        schedule_text, actions, target = _extract_schedule_and_actions(body_lines)
 
         # If no explicit **Schedule** field, try parsing the heading as the schedule
         if schedule_text is None:
@@ -238,6 +249,10 @@ def parse_routines_md(workspaces: Path) -> list[ParsedRoutine]:
             # Skip routines we can't parse
             continue
 
+        # Normalise target: "household"/"group" → None (group chat default)
+        if target in ("household", "group"):
+            target = None
+
         # Build description from heading + actions
         description = f"{heading}: {'; '.join(actions)}" if actions else heading
 
@@ -247,6 +262,7 @@ def parse_routines_md(workspaces: Path) -> list[ParsedRoutine]:
                 description=description,
                 trigger_type=trigger_type,
                 trigger_kwargs=trigger_kwargs,
+                target=target,
             )
         )
 
@@ -257,7 +273,13 @@ def _routines_path(workspaces: Path) -> Path:
     return workspaces / _ROUTINES_FILE
 
 
-def add_routine(workspaces: Path, title: str, schedule: str, action: str) -> None:
+def add_routine(
+    workspaces: Path,
+    title: str,
+    schedule: str,
+    action: str,
+    target: str | None = None,
+) -> None:
     """Append a routine section to ROUTINES.md.
 
     Validates the schedule string before writing.
@@ -270,7 +292,8 @@ def add_routine(workspaces: Path, title: str, schedule: str, action: str) -> Non
     text = path.read_text(encoding="utf-8")
     if not text.endswith("\n"):
         text += "\n"
-    text += f"\n## {title}\n- **Schedule**: {schedule}\n- **Action**: {action}\n"
+    target_line = f"\n- **Target**: {target}" if target else ""
+    text += f"\n## {title}\n- **Schedule**: {schedule}{target_line}\n- **Action**: {action}\n"
     path.write_text(text, encoding="utf-8")
 
 
@@ -281,10 +304,13 @@ def update_routine(
     schedule: str | None = None,
     action: str | None = None,
     title: str | None = None,
+    target: str | None = ...,  # type: ignore[assignment]  # sentinel: ... = unchanged
 ) -> bool:
-    """Update an existing routine's schedule, action, or title by slug name.
+    """Update an existing routine's schedule, action, target, or title by slug name.
 
-    Returns True if found and updated.
+    Returns True if found and updated.  Pass ``target=None`` to explicitly
+    clear the target (revert to household group).  Omit ``target`` (or pass
+    the ``...`` sentinel) to leave it unchanged.
     """
     if schedule is not None:
         _parse_schedule(schedule)  # validate before modifying file
@@ -306,16 +332,19 @@ def update_routine(
                 found = True
                 # Parse existing body to get current values
                 body = sections[i + 1] if i + 1 < len(sections) else ""
-                cur_schedule, cur_actions = _extract_schedule_and_actions(
+                cur_schedule, cur_actions, cur_target = _extract_schedule_and_actions(
                     body.strip().splitlines()
                 )
                 new_title = title or heading
                 new_schedule = schedule or cur_schedule or ""
                 new_action = action or ("; ".join(cur_actions) if cur_actions else "")
+                new_target = cur_target if target is ... else target
 
                 sections[i] = f"## {new_title}"
+                target_line = f"\n- **Target**: {new_target}" if new_target else ""
                 sections[i + 1] = (
                     f"\n- **Schedule**: {new_schedule}"
+                    f"{target_line}"
                     f"\n- **Action**: {new_action}\n"
                 )
                 break

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from homeclaw.scheduler.routines import ParsedRoutine, parse_routines_md, _parse_schedule, _parse_time, _ordinal_day_range, update_routine
+from homeclaw.scheduler.routines import ParsedRoutine, parse_routines_md, _parse_schedule, _parse_time, _ordinal_day_range, add_routine, update_routine
 
 
 class TestParseTime:
@@ -270,3 +270,95 @@ class TestUpdateRoutine:
         )
         with pytest.raises(ValueError, match="Cannot parse schedule"):
             update_routine(tmp_path, "test", schedule="whenever")
+
+
+class TestRoutineTarget:
+    """Tests for the Target field on routines."""
+
+    def test_parse_target_field(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        (tmp_path / "household" / "ROUTINES.md").write_text(
+            "# Routines\n\n"
+            "## Morning briefing\n"
+            "- **Schedule**: Every weekday at 7:30am\n"
+            "- **Target**: stephen\n"
+            "- **Action**: Send daily summary\n"
+        )
+        routines = parse_routines_md(tmp_path)
+        assert len(routines) == 1
+        assert routines[0].target == "stephen"
+
+    def test_parse_each_member_target(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        (tmp_path / "household" / "ROUTINES.md").write_text(
+            "# Routines\n\n"
+            "## Digest\n"
+            "- **Schedule**: Every day at 8:00am\n"
+            "- **Target**: each_member\n"
+            "- **Action**: Personalised digest\n"
+        )
+        routines = parse_routines_md(tmp_path)
+        assert routines[0].target == "each_member"
+
+    def test_household_target_normalised_to_none(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        (tmp_path / "household" / "ROUTINES.md").write_text(
+            "# Routines\n\n"
+            "## Alert\n"
+            "- **Schedule**: Every day at 9:00am\n"
+            "- **Target**: household\n"
+            "- **Action**: Group alert\n"
+        )
+        routines = parse_routines_md(tmp_path)
+        assert routines[0].target is None
+
+    def test_no_target_defaults_to_none(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        (tmp_path / "household" / "ROUTINES.md").write_text(
+            "# Routines\n\n"
+            "## Reminder\n"
+            "- **Schedule**: Every day at 10:00am\n"
+            "- **Action**: Something\n"
+        )
+        routines = parse_routines_md(tmp_path)
+        assert routines[0].target is None
+
+    def test_add_routine_with_target(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        add_routine(tmp_path, "Test", "Every day at 8:00am", "Do stuff", target="stephen")
+        routines = parse_routines_md(tmp_path)
+        assert routines[0].target == "stephen"
+
+    def test_add_routine_without_target(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        add_routine(tmp_path, "Test", "Every day at 8:00am", "Do stuff")
+        routines = parse_routines_md(tmp_path)
+        assert routines[0].target is None
+
+    def test_update_routine_target(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        add_routine(tmp_path, "Test", "Every day at 8:00am", "Do stuff", target="stephen")
+        update_routine(tmp_path, "test", target="each_member")
+        routines = parse_routines_md(tmp_path)
+        assert routines[0].target == "each_member"
+
+    def test_update_routine_clear_target(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        add_routine(tmp_path, "Test", "Every day at 8:00am", "Do stuff", target="stephen")
+        update_routine(tmp_path, "test", target=None)
+        routines = parse_routines_md(tmp_path)
+        assert routines[0].target is None
+
+    def test_update_routine_preserves_target(self, tmp_path: Path):
+        (tmp_path / "household").mkdir()
+        add_routine(tmp_path, "Test", "Every day at 8:00am", "Do stuff", target="stephen")
+        update_routine(tmp_path, "test", action="New action")
+        routines = parse_routines_md(tmp_path)
+        assert routines[0].target == "stephen"
+        assert "New action" in routines[0].description
+
+    def test_dev_fixtures_have_no_target(self, dev_workspaces: Path):
+        """Existing routines without Target field default to None."""
+        routines = parse_routines_md(dev_workspaces)
+        for r in routines:
+            assert r.target is None
