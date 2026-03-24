@@ -72,7 +72,7 @@ class Scheduler:
             results = json.loads(results_path.read_text(encoding="utf-8")) if results_path.exists() else {}
         except (json.JSONDecodeError, OSError):
             results = {}
-        results[job_id] = result[:2000] if result else ""
+        results[job_id] = result[:8000] if result else ""
         results_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
 
     def _make_routine_func(self, job_id: str, description: str) -> Any:

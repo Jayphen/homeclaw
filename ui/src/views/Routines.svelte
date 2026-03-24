@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from "$lib/api";
+  import { renderMarkdown } from "$lib/markdown";
   import { formatRelativeTime } from "$lib/time";
 
   interface Routine {
@@ -212,7 +213,7 @@
           {#if routine.last_result}
             <details class="routine-result">
               <summary>Last result</summary>
-              <div class="result-body">{routine.last_result}</div>
+              <div class="result-body">{@html renderMarkdown(routine.last_result)}</div>
             </details>
           {/if}
         </div>
@@ -518,10 +519,22 @@
     border-radius: var(--radius-sm);
     color: var(--text);
     line-height: 1.5;
-    white-space: pre-wrap;
     word-break: break-word;
-    max-height: 12rem;
-    overflow-y: auto;
+  }
+
+  .result-body :global(p) { margin: 0.3rem 0; }
+  .result-body :global(ul), .result-body :global(ol) { margin: 0.3rem 0; padding-left: 1.2rem; }
+  .result-body :global(h1), .result-body :global(h2), .result-body :global(h3) {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0.5rem 0 0.2rem;
+  }
+  .result-body :global(a) { color: var(--primary); }
+  .result-body :global(code) {
+    font-size: 0.8rem;
+    background: var(--surface);
+    padding: 0.1rem 0.3rem;
+    border-radius: var(--radius-sm);
   }
 
   /* ---- Empty ---- */
