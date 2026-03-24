@@ -29,6 +29,18 @@
   let toggling: Set<string> = $state(new Set());
   let actionError: string | null = $state(null);
 
+  // Install from URL
+  let installUrl: string = $state("");
+  let installing: boolean = $state(false);
+  let installResult: {
+    status: string;
+    name?: string;
+    error?: string;
+    env_hints?: string[];
+    plugins?: { path: string }[];
+    installed?: { name: string }[];
+  } | null = $state(null);
+
   function toggleTools(name: string) {
     const next = new Set(expandedTools);
     if (next.has(name)) next.delete(name); else next.add(name);
@@ -73,6 +85,33 @@
     const next = new Set(toggling); next.delete(plugin.name); toggling = next;
   }
 
+  async function installFromUrl(installAll = false) {
+    if (!installUrl.trim()) return;
+    installing = true;
+    installResult = null;
+    try {
+      const r = await api("/api/plugins/install", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: installUrl.trim(), install_all: installAll }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        installResult = { status: "error", error: data.detail || `HTTP ${r.status}` };
+      } else if (data.status === "multiple_plugins") {
+        installResult = { status: "multiple_plugins", plugins: data.plugins };
+      } else {
+        installResult = data;
+        installUrl = "";
+        fetchAll();
+      }
+    } catch (e: any) {
+      installResult = { status: "error", error: e.message };
+    } finally {
+      installing = false;
+    }
+  }
+
   $effect(() => { fetchAll(); });
 </script>
 
@@ -87,6 +126,51 @@
     <h1>Plugins</h1>
     <p class="subtitle">Manage installed plugins and browse the marketplace</p>
   </header>
+
+  <section class="install-panel">
+    <h2>Install from URL</h2>
+    <form class="install-form" onsubmit={(e) => { e.preventDefault(); installFromUrl(); }}>
+      <input
+        type="url"
+        class="install-input"
+        bind:value={installUrl}
+        placeholder="https://github.com/user/plugin-name"
+        disabled={installing}
+      />
+      <button class="btn btn-primary" type="submit" disabled={installing || !installUrl.trim()}>
+        {installing ? "Installing..." : "Install"}
+      </button>
+    </form>
+    {#if installResult}
+      {#if installResult.status === "installed"}
+        <p class="install-success">Installed <strong>{installResult.name}</strong></p>
+        {#if installResult.env_hints && installResult.env_hints.length > 0}
+          <div class="env-hints">
+            <p class="env-hints-heading">This plugin may need environment variables set in its .env file:</p>
+            {#each installResult.env_hints as hint}
+              <code class="env-hint-item">{hint}</code>
+            {/each}
+          </div>
+        {/if}
+      {:else if installResult.status === "installed_multiple"}
+        <p class="install-success">Installed {installResult.installed?.length ?? 0} plugins</p>
+      {:else if installResult.status === "multiple_plugins"}
+        <div class="multi-plugins">
+          <p class="multi-plugins-desc">Multiple plugins found in this repository:</p>
+          <div class="multi-plugins-list">
+            {#each installResult.plugins ?? [] as p}
+              <span class="multi-plugin-name">{p.path}</span>
+            {/each}
+          </div>
+          <button class="btn btn-primary" onclick={() => installFromUrl(true)} disabled={installing}>
+            {installing ? "Installing..." : "Install all"}
+          </button>
+        </div>
+      {:else}
+        <p class="install-error">{installResult.error}</p>
+      {/if}
+    {/if}
+  </section>
 
   {#if actionError}
     <div class="action-error">{actionError}</div>
@@ -269,6 +353,45 @@
 
   .btn { border: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-weight: 500; cursor: pointer; transition: filter 0.15s, opacity 0.15s; white-space: nowrap; }
   .btn:disabled { opacity: 0.45; cursor: default; }
+  .btn-primary { background: var(--primary); color: #fff; padding: 0.45rem 1rem; font-size: 0.82rem; }
+  .btn-primary:not(:disabled):hover { opacity: 0.9; }
+
+  /* Install panel */
+  .install-panel {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 1rem 1.25rem; margin-bottom: 2rem;
+  }
+  .install-panel h2 {
+    font-family: var(--font-serif); font-weight: 600; font-size: 1.2rem;
+    margin: 0 0 0.75rem; color: var(--text); letter-spacing: -0.01em;
+  }
+  .install-form { display: flex; gap: 0.5rem; }
+  .install-input {
+    flex: 1; padding: 0.45rem 0.75rem; border: 1px solid var(--border);
+    border-radius: var(--radius-md); font-size: 0.85rem; color: var(--text);
+    background: var(--bg); outline: none; font-family: var(--font-sans);
+  }
+  .install-input:focus { border-color: var(--primary); }
+  .install-input::placeholder { color: var(--text-muted); opacity: 0.7; }
+  .install-success { color: var(--sage); font-size: 0.82rem; margin: 0.5rem 0 0; }
+  .install-error { color: var(--secondary); font-size: 0.82rem; margin: 0.5rem 0 0; }
+  .env-hints {
+    background: #fef8ee; border-radius: var(--radius);
+    padding: 0.6rem 0.85rem; margin-top: 0.5rem; font-size: 0.8rem; color: #8a6d3b;
+  }
+  .env-hints-heading { margin: 0 0 0.35rem; font-weight: 500; }
+  .env-hint-item {
+    display: inline-block; background: rgba(28, 28, 23, 0.05);
+    padding: 0.1rem 0.35rem; border-radius: var(--radius-sm);
+    margin: 0.15rem 0.25rem 0.15rem 0; font-size: 0.78rem;
+  }
+  .multi-plugins { margin-top: 0.5rem; }
+  .multi-plugins-desc { font-size: 0.82rem; color: var(--text-muted); margin: 0 0 0.4rem; }
+  .multi-plugins-list { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.6rem; }
+  .multi-plugin-name {
+    font-size: 0.78rem; font-weight: 600; font-family: monospace;
+    background: var(--surface-low); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); color: var(--text);
+  }
 
   .empty { text-align: center; padding: 2.5rem 1rem; color: var(--text-muted); background: var(--surface-low); border-radius: var(--radius); }
   .empty p { font-family: var(--font-serif); font-style: italic; font-size: 1.05rem; margin: 0 0 0.4rem; }
