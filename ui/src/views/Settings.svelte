@@ -265,6 +265,8 @@
   let tavilyKey: string = $state("");
   let webReadProvider: string = $state("jina");
   let webReadFallback: string = $state("");
+  let webSearchProvider: string = $state("jina");
+  let webSearchFallback: string = $state("");
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
   let whatsappEnabled: boolean = $state(false);
@@ -312,6 +314,8 @@
     // Web read
     webReadProvider = s.web_read_provider || "jina";
     webReadFallback = s.web_read_fallback || "";
+    webSearchProvider = s.web_search_provider || "jina";
+    webSearchFallback = s.web_search_fallback || "";
     // Clear secrets
     anthropicKey = "";
     openaiKey = "";
@@ -479,6 +483,12 @@
     }
     if (webReadFallback !== (setup?.web_read_fallback || "")) {
       body.web_read_fallback = webReadFallback || null;
+    }
+    if (webSearchProvider !== (setup?.web_search_provider || "jina")) {
+      body.web_search_provider = webSearchProvider;
+    }
+    if (webSearchFallback !== (setup?.web_search_fallback || "")) {
+      body.web_search_fallback = webSearchFallback || null;
     }
     if (telegramToken) body.telegram_token = telegramToken;
     if (telegramAllowedUsers !== (setup?.telegram_allowed_users || "")) {
@@ -837,13 +847,13 @@
           <label for="jina-key">Jina API key</label>
           <input id="jina-key" type="password" bind:value={jinaKey}
             placeholder={setup.jina_api_key ? `Current: ${setup.jina_api_key}` : "Not set"} />
-          <small class="field-hint">Powers web_search and web_read (Jina provider). Get a key at <a href="https://jina.ai" target="_blank" rel="noopener">jina.ai</a>.</small>
+          <small class="field-hint">Powers web_search and web_read (Jina provider). Get a key at <a href="https://jina.ai" target="_blank" rel="noopener noreferrer">jina.ai</a>.</small>
         </div>
         <div class="field">
           <label for="tavily-key">Tavily API key</label>
           <input id="tavily-key" type="password" bind:value={tavilyKey}
             placeholder={setup.tavily_api_key ? `Current: ${setup.tavily_api_key}` : "Not set"} />
-          <small class="field-hint">Alternative web_read provider. Get a key at <a href="https://tavily.com" target="_blank" rel="noopener">tavily.com</a>.</small>
+          <small class="field-hint">Alternative provider for web_search and web_read. Get a key at <a href="https://tavily.com" target="_blank" rel="noopener noreferrer">tavily.com</a>.</small>
         </div>
         <div class="field">
           <label for="web-read-provider">web_read provider</label>
@@ -861,6 +871,23 @@
             <option value="tavily">Tavily</option>
           </select>
           <small class="field-hint">Used when the primary provider fails or returns low-quality content.</small>
+        </div>
+        <div class="field">
+          <label for="web-search-provider">web_search provider</label>
+          <select id="web-search-provider" bind:value={webSearchProvider}>
+            <option value="jina">Jina</option>
+            <option value="tavily">Tavily</option>
+          </select>
+          <small class="field-hint">Primary provider for web search queries.</small>
+        </div>
+        <div class="field">
+          <label for="web-search-fallback">web_search fallback</label>
+          <select id="web-search-fallback" bind:value={webSearchFallback}>
+            <option value="">None</option>
+            <option value="jina">Jina</option>
+            <option value="tavily">Tavily</option>
+          </select>
+          <small class="field-hint">Used when the primary search provider fails or runs out of credits.</small>
         </div>
       </section>
 

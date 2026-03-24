@@ -28,7 +28,13 @@ from homeclaw.api.deps import (
 from homeclaw.api.deps import (
     get_whatsapp_qr as _get_whatsapp_qr,
 )
-from homeclaw.config import NoteDetailLevel, ProviderMode, ProviderType, WebReadProvider
+from homeclaw.config import (
+    NoteDetailLevel,
+    ProviderMode,
+    ProviderType,
+    WebReadProvider,
+    WebSearchProvider,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +147,8 @@ class SetupBody(BaseModel):
     tavily_api_key: str | None = None
     web_read_provider: WebReadProvider | None = None
     web_read_fallback: WebReadProvider | None = None
+    web_search_provider: WebSearchProvider | None = None
+    web_search_fallback: WebSearchProvider | None = None
 
     # Home Assistant
     ha_url: str | None = None
@@ -222,6 +230,10 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
         config.web_read_provider = body.web_read_provider or "jina"
     if body.web_read_fallback is not None:
         config.web_read_fallback = body.web_read_fallback or None
+    if body.web_search_provider is not None:
+        config.web_search_provider = body.web_search_provider or "jina"
+    if body.web_search_fallback is not None:
+        config.web_search_fallback = body.web_search_fallback or None
     if body.conversation_model is not None:
         config.routing.conversation_model = body.conversation_model
     if body.fast_model is not None:

@@ -796,6 +796,80 @@ def register_builtin_tools(
             content = content[:_WEB_READ_MAX_CHARS] + "\n\n[… truncated]"
         return {"url": url, "content": content}
 
+    # Credit-exhaustion status codes that should trigger a fallback.
+    _SEARCH_CREDIT_EXHAUSTED = {402, 429}
+
+    async def _search_via_jina(query: str) -> dict[str, Any]:
+        """Search via Jina Search API and return structured results."""
+        import httpx
+
+        if not (config and config.jina_api_key):
+            return {"error": "Jina search requires JINA_API_KEY to be set", "query": query}
+
+        transport = httpx.AsyncHTTPTransport(retries=2)
+        async with httpx.AsyncClient(timeout=30, transport=transport) as client:
+            resp = await client.get(
+                f"https://s.jina.ai/{query}",
+                headers=_jina_headers("application/json"),
+            )
+            resp.raise_for_status()
+
+        try:
+            data = json.loads(resp.text)
+        except json.JSONDecodeError:
+            data = None
+
+        if isinstance(data, dict) and "data" in data:
+            results = [
+                {
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                    "description": item.get("description", ""),
+                }
+                for item in data["data"]
+            ]
+            return {"query": query, "results": results, "provider": "jina"}
+
+        # Non-JSON or unexpected shape
+        content = resp.text
+        max_chars = 12_000
+        if len(content) > max_chars:
+            content = content[:max_chars] + "\n\n[… truncated]"
+        return {"query": query, "results": content, "provider": "jina"}
+
+    async def _search_via_tavily(query: str) -> dict[str, Any]:
+        """Search via Tavily Search API and return structured results."""
+        import httpx
+
+        key = config.tavily_api_key if config else None
+        if not key:
+            return {"error": "Tavily search requires TAVILY_API_KEY to be set", "query": query}
+
+        transport = httpx.AsyncHTTPTransport(retries=2)
+        async with httpx.AsyncClient(timeout=30, transport=transport) as client:
+            resp = await client.post(
+                "https://api.tavily.com/search",
+                json={"query": query},
+                headers={"Authorization": f"Bearer {key}"},
+            )
+            resp.raise_for_status()
+
+        data = resp.json()
+        results = [
+            {
+                "title": item.get("title", ""),
+                "url": item.get("url", ""),
+                "description": item.get("content", ""),
+            }
+            for item in data.get("results", [])
+        ]
+        return {"query": query, "results": results, "provider": "tavily"}
+
+    _SEARCHERS: dict[str, Any] = {
+        "jina": _search_via_jina,
+        "tavily": _search_via_tavily,
+    }
+
     @_reg(
         name="web_search",
         description=(
@@ -816,44 +890,33 @@ def register_builtin_tools(
     ) -> dict[str, Any]:
         import httpx
 
-        if not (config and config.jina_api_key):
-            return {"error": "Web search requires JINA_API_KEY to be set", "query": query}
+        primary = config.web_search_provider if config else "jina"
+        fallback = config.web_search_fallback if config else None
+        search_fn = _SEARCHERS.get(primary, _search_via_jina)
 
         try:
-            transport = httpx.AsyncHTTPTransport(retries=2)
-            async with httpx.AsyncClient(timeout=30, transport=transport) as client:
-                resp = await client.get(
-                    f"https://s.jina.ai/{query}",
-                    headers=_jina_headers("application/json"),
-                )
-                resp.raise_for_status()
+            result = await search_fn(query)
         except httpx.HTTPStatusError as e:
-            return {"error": f"HTTP {e.response.status_code}", "query": query}
+            code = e.response.status_code
+            # Credit exhaustion — try fallback immediately
+            can_fallback = fallback and fallback != primary and fallback in _SEARCHERS
+            if code in _SEARCH_CREDIT_EXHAUSTED and can_fallback:
+                try:
+                    return await _SEARCHERS[fallback](query)
+                except (httpx.HTTPStatusError, httpx.RequestError):
+                    pass  # fall through to original error
+            result = {"error": f"HTTP {code}", "query": query}
         except httpx.RequestError as e:
-            return {"error": str(e), "query": query}
+            result = {"error": str(e), "query": query}
 
-        try:
-            data = json.loads(resp.text)
-        except json.JSONDecodeError:
-            data = None
+        # Also try fallback if primary returned an error (e.g. missing API key)
+        if "error" in result and fallback and fallback != primary and fallback in _SEARCHERS:
+            try:
+                return await _SEARCHERS[fallback](query)
+            except (httpx.HTTPStatusError, httpx.RequestError):
+                pass  # keep primary error
 
-        if isinstance(data, dict) and "data" in data:
-            results = [
-                {
-                    "title": item.get("title", ""),
-                    "url": item.get("url", ""),
-                    "description": item.get("description", ""),
-                }
-                for item in data["data"]
-            ]
-            return {"query": query, "results": results}
-
-        # Fallback: non-JSON or unexpected shape
-        content = resp.text
-        max_chars = 12_000
-        if len(content) > max_chars:
-            content = content[:max_chars] + "\n\n[… truncated]"
-        return {"query": query, "results": content}
+        return result
 
     # --- Message tool — delivers via channel dispatcher ---
 
