@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.17.0](https://github.com/Jayphen/homeclaw/compare/v0.16.1...v0.17.0) (2026-03-24)
+
+
+### Features
+
+* add Claude Code PR review workflow ([#78](https://github.com/Jayphen/homeclaw/issues/78)) ([7716f7d](https://github.com/Jayphen/homeclaw/commit/7716f7dddd5d26c3a91f5ddd49581a6fab0a1e11))
+* add primary/fallback providers for web_search ([e64afef](https://github.com/Jayphen/homeclaw/commit/e64afeff533031434b9aee9082c3a7dd06f7c503))
+* pluggable web search/read provider system ([#79](https://github.com/Jayphen/homeclaw/issues/79)) ([2299ad0](https://github.com/Jayphen/homeclaw/commit/2299ad088735747031bb0f275051d45683cd5de7))
+* plugins can register custom web search/read providers ([#81](https://github.com/Jayphen/homeclaw/issues/81)) ([c6290fa](https://github.com/Jayphen/homeclaw/commit/c6290faf6fdcceabf2b882938c8f747022f61eb3))
+
+
+### Bug Fixes
+
+* remove deprecated --no-install flag from uv lock in CI ([65ef4d5](https://github.com/Jayphen/homeclaw/commit/65ef4d5dfb7f8774e7d5b64ea6bec96e291a3a33))
+* routines now deliver results via message_send ([7db381e](https://github.com/Jayphen/homeclaw/commit/7db381eda4e85e532d13031763c543ed71ac763b))
+
 ## [0.16.1](https://github.com/Jayphen/homeclaw/compare/v0.16.0...v0.16.1) (2026-03-23)
 
 
