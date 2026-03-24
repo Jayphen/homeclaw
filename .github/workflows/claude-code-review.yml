@@ -30,4 +30,13 @@ jobs:
             - Performance considerations
             - Security concerns
             - Test coverage
+            - **Documentation**: Check if the PR adds or changes features, tools,
+              configuration options, or architecture. If it does, verify that the
+              corresponding docs in `docs/src/routes/` are updated. Flag missing
+              docs updates — the docs site is the public reference and must stay
+              in sync with the codebase. Key pages to check:
+              - `getting-started/configuration/+page.md` for new config fields or env vars
+              - `development/architecture/+page.md` for structural changes
+              - `development/tools/+page.md` for new or changed tools
+              - `guides/` for feature-level changes (channels, memory, scheduler, plugins)
             Be constructive and helpful in your feedback.

@@ -15,6 +15,7 @@ homeclaw/           # Main Python package
   scheduler/        # APScheduler + ROUTINES.md parser
   api/              # FastAPI app + routes
   plugins/          # Registry, loaders, MCP client, marketplace
+  web/              # Pluggable web search & read providers
   cli.py            # CLI entry point
 ui/                 # Svelte 5 web UI (built to ui/dist/)
 docs/               # This docs site (SvelteKit)
@@ -44,6 +45,10 @@ The agent loop never imports Anthropic or OpenAI SDKs directly. Instead, the pro
 2. **Semantic recall** — memsearch indexes markdown files into a vector DB for similarity search
 
 The markdown files are the source of truth. The vector DB is a derived index that can be rebuilt at any time.
+
+### Pluggable web providers
+
+Web search and page-fetch capabilities use a registry-based provider system (`homeclaw/web/`). Providers implement the `WebSearchProvider` or `WebReadProvider` protocol — structural typing, no inheritance required. Jina and Tavily ship as built-ins. The registry handles primary/fallback dispatch with automatic credit-exhaustion detection. Custom providers can register at startup or via Python plugins.
 
 ### Cost-aware routing
 
