@@ -172,6 +172,9 @@ _PERSONAL_READ_TOOLS = frozenset({
 # blocked so the LLM asks the user to confirm. The block fires once per
 # tool name per run() call — after the user confirms, the retry goes through.
 # Each predicate returns True when the call targets household data.
+# Tools blocked during routine execution — the scheduler handles delivery.
+_ROUTINE_BLOCKED_TOOLS = frozenset({"message_send", "image_send"})
+
 _HOUSEHOLD_WRITE_TOOLS: dict[str, Callable[[dict[str, Any]], bool]] = {
     # contact_note: blocked when person is absent (default → household)
     "contact_note": lambda args: "person" not in args or args.get("person") is None,
@@ -677,6 +680,7 @@ class AgentLoop:
             tool_names_used.extend(tc.name for tc in response.tool_calls)
             tool_results = await self._dispatch_tools(
                 response.tool_calls, person=person, channel=channel,
+                call_type=call_type,
             )
             for tc, result in zip(response.tool_calls, tool_results):
                 history.append(
@@ -757,10 +761,16 @@ class AgentLoop:
         tool_calls: list[ToolCall],
         person: str,
         channel: str | None,
+        call_type: CallType = CallType.CONVERSATION,
     ) -> list[dict[str, Any]]:
         is_dm = channel is None
         results: list[dict[str, Any]] = []
         for tc in tool_calls:
+            # Routines deliver output via the scheduler — block direct messaging
+            # to prevent double-sends.
+            if call_type == CallType.ROUTINE and tc.name in _ROUTINE_BLOCKED_TOOLS:
+                results.append({"status": "skipped", "reason": "Routine output is delivered automatically by the scheduler."})
+                continue
             args = dict(tc.arguments)
 
             # Normalize person names to lowercase to prevent duplicate workspaces.
