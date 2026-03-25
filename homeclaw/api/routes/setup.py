@@ -1,6 +1,7 @@
 """Setup API routes — first-run onboarding and configuration."""
 
 import logging
+from importlib.metadata import version as _pkg_version
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -28,9 +29,15 @@ from homeclaw.api.deps import (
 from homeclaw.api.deps import (
     get_whatsapp_qr as _get_whatsapp_qr,
 )
-from homeclaw.config import NoteDetailLevel, ProviderMode, ProviderType
+from homeclaw.config import NoteDetailLevel, ProviderMode, ProviderType, _SAVEABLE_FIELDS
+from homeclaw.web import web_providers
 
 logger = logging.getLogger(__name__)
+
+try:
+    _APP_VERSION = _pkg_version("homeclaw")
+except Exception:
+    _APP_VERSION = "dev"
 
 router = APIRouter(prefix="/api/setup", tags=["setup"])
 
@@ -47,14 +54,6 @@ def _mask(value: str | None) -> str | None:
 @router.get("/status")
 async def setup_status(request: Request) -> dict[str, Any]:
     config = get_config()
-
-    from importlib.metadata import version as _pkg_version
-
-    try:
-        app_version = _pkg_version("homeclaw")
-    except Exception:
-        app_version = "dev"
-
     workspaces = config.workspaces.resolve()
     members = list_member_workspaces(workspaces)
     members_with_passwords = [
@@ -66,7 +65,7 @@ async def setup_status(request: Request) -> dict[str, Any]:
     # NOTE: Do NOT leak member names here — only expose a count so the
     # UI knows whether to show the member login flow.
     base: dict[str, Any] = {
-        "version": app_version,
+        "version": _APP_VERSION,
         "has_password": bool(config.web_password) or bool(config.member_passwords),
         "needs_setup_token": get_setup_token() is not None,
         "provider_configured": config.is_provider_configured,
@@ -82,8 +81,6 @@ async def setup_status(request: Request) -> dict[str, Any]:
 
     # Auto-expose saveable config fields — keys ending in _key are masked.
     _SECRET_SUFFIXES = ("_api_key", "_token")
-    from homeclaw.config import _SAVEABLE_FIELDS
-
     for field_name in sorted(_SAVEABLE_FIELDS):
         val = getattr(config, field_name, None)
         if any(field_name.endswith(s) for s in _SECRET_SUFFIXES):
@@ -94,8 +91,6 @@ async def setup_status(request: Request) -> dict[str, Any]:
         base[field_name] = val
 
     # Derived/computed fields that aren't direct config attributes
-    from homeclaw.web import web_providers
-
     base.update({
         "members": members,
         "members_with_passwords": members_with_passwords,
