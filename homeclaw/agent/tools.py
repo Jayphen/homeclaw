@@ -1841,6 +1841,8 @@ def register_builtin_tools(
         loc = next((sk for sk in locations if sk.name == name), None)
         if loc is None:
             return {"error": f"Skill '{name}' not found"}
+        if loc.scope == "builtin":
+            return {"error": f"Cannot edit built-in skill '{name}'. Install a copy to household or personal skills first."}
 
         # Resolve and validate path
         path = (loc.skill_dir / file).resolve()
