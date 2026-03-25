@@ -303,7 +303,7 @@ def register_builtin_tools(
         lines = content.split("\n")
         entry_parts = [f"- [{time_str}] {lines[0]}"]
         for line in lines[1:]:
-            entry_parts.append(f"  {line}" if line.strip() else "")
+            entry_parts.append(f"  {line}" if line.strip() else "  ")
         entry = "\n".join(entry_parts)
         if path.exists():
             existing = path.read_text().rstrip("\n")
