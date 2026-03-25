@@ -659,9 +659,13 @@
     return () => stopLogPolling();
   });
 
-  $effect(() => {
-    if (activeTab !== "data") stopLogPolling();
-  });
+$effect(() => {
+  if (activeTab !== "data") {
+    stopLogPolling();
+  } else if (logExpanded && logPollTimer === null) {
+    startLogPolling();
+  }
+});
 </script>
 
 <div class="settings-page">
