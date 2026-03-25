@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.22.0](https://github.com/Jayphen/homeclaw/compare/v0.21.1...v0.22.0) (2026-03-25)
+
+
+### Features
+
+* index homeclaw docs in memsearch for self-referencing ([#100](https://github.com/Jayphen/homeclaw/issues/100)) ([da4d2a4](https://github.com/Jayphen/homeclaw/commit/da4d2a4139645e8845754779d0777311ec1970c3))
+
+
+### Bug Fixes
+
+* **ui:** restore API-based .env detection in skill file viewer ([#104](https://github.com/Jayphen/homeclaw/issues/104)) ([946043a](https://github.com/Jayphen/homeclaw/commit/946043a7964d31a2e2c358d7f951648ac2175f22))
+
 ## [0.21.1](https://github.com/Jayphen/homeclaw/compare/v0.21.0...v0.21.1) (2026-03-24)
 
 
