@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.2](https://github.com/Jayphen/homeclaw/compare/v0.22.1...v0.22.2) (2026-03-25)
+
+
+### Bug Fixes
+
+* docs path auto-detection broken in Docker ([#110](https://github.com/Jayphen/homeclaw/issues/110)) ([8e740bb](https://github.com/Jayphen/homeclaw/commit/8e740bb4af5b0bd7f0adcfdbbfde47e815dfb3da))
+* **ui:** stop log polling when leaving Settings view ([#109](https://github.com/Jayphen/homeclaw/issues/109)) ([f503d39](https://github.com/Jayphen/homeclaw/commit/f503d39b15ad607a6751b19ecbd47054a44cc012))
+
 ## [0.22.1](https://github.com/Jayphen/homeclaw/compare/v0.22.0...v0.22.1) (2026-03-25)
 
 
