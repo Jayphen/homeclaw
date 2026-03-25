@@ -80,18 +80,21 @@ class Scheduler:
         results[job_id] = result[:8000] if result else ""
         results_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
 
-    def _make_routine_func(self, job_id: str, description: str) -> Any:
+    def _make_routine_func(self, job_id: str, title: str, description: str) -> Any:
         """Create the async callable for a routine job.
 
         The routine executes the LLM agent, then the *scheduler* delivers the
         result via the channel dispatcher.  The LLM no longer needs to call
         ``message_send`` itself — it just produces the output text.
+
+        *title* is the human-readable heading (shown to users).
+        *description* is the full detail including actions (sent to the LLM).
         """
         loop = self._loop
         scheduler = self
 
         async def _run_routine() -> str:
-            logger.info("Routine fired: %s", description)
+            logger.info("Routine fired: %s", title)
             try:
                 result = await loop.run(
                     f"[Scheduled routine] {description}",
@@ -99,16 +102,16 @@ class Scheduler:
                     call_type=CallType.ROUTINE,
                 )
                 scheduler._save_last_run(job_id, result)
-                logger.info("Routine completed: %s (response length: %d)", description, len(result))
+                logger.info("Routine completed: %s (response length: %d)", title, len(result))
 
                 # Deliver result via channel dispatcher
                 if result and result.strip() and scheduler._dispatcher:
                     try:
                         await scheduler._dispatcher.send_group(
-                            "", f"📋 *{description}*\n\n{result}",
+                            "", f"📋 *{title}*\n\n{result}",
                         )
                     except Exception:
-                        logger.exception("Failed to deliver routine result: %s", description)
+                        logger.exception("Failed to deliver routine result: %s", title)
 
                 return result
             except Exception:
@@ -120,6 +123,7 @@ class Scheduler:
     def _add_routine_job(
         self,
         job_id: str,
+        title: str,
         description: str,
         trigger_type: str,
         trigger_kwargs: dict[str, Any],
@@ -127,10 +131,10 @@ class Scheduler:
         trigger = self._make_trigger(trigger_type, trigger_kwargs)
 
         self._scheduler.add_job(
-            self._make_routine_func(job_id, description),
+            self._make_routine_func(job_id, title, description),
             trigger=trigger,
             id=job_id,
-            name=description,
+            name=title,
             replace_existing=True,
             misfire_grace_time=900,  # 15 min grace period to avoid silent skips
         )
@@ -143,6 +147,7 @@ class Scheduler:
         for r in routines:
             self._add_routine_job(
                 job_id=f"routine:{r.name}",
+                title=r.title,
                 description=r.description,
                 trigger_type=r.trigger_type,
                 trigger_kwargs=r.trigger_kwargs,
@@ -168,6 +173,7 @@ class Scheduler:
             job_id = f"plugin:{plugin_name}:{r.description[:40]}"
             self._add_routine_job(
                 job_id=job_id,
+                title=f"[{plugin_name}] {r.description}",
                 description=f"[{plugin_name}] {r.description}",
                 trigger_type="cron",
                 trigger_kwargs=trigger_kwargs,

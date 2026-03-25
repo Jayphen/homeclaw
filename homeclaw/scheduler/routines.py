@@ -26,7 +26,8 @@ class ParsedRoutine:
     """A routine parsed from ROUTINES.md."""
 
     name: str
-    description: str
+    title: str  # human-readable heading, used in user-facing messages
+    description: str  # full detail including actions, used as LLM prompt
     trigger_type: str  # "cron" or "interval"
     trigger_kwargs: dict[str, int | str]
 
@@ -244,6 +245,7 @@ def parse_routines_md(workspaces: Path) -> list[ParsedRoutine]:
         routines.append(
             ParsedRoutine(
                 name=re.sub(r"[^a-z0-9]+", "_", heading.lower()).strip("_"),
+                title=heading,
                 description=description,
                 trigger_type=trigger_type,
                 trigger_kwargs=trigger_kwargs,
