@@ -279,15 +279,16 @@ def register_builtin_tools(
     @_reg(
         name="note_save",
         description=(
-            "Append a single note entry to a household member's daily log. "
-            "Each call adds one timestamped entry — do NOT include previous "
-            "entries, only the new information to record."
+            "Save a journal entry to a household member's daily notes. "
+            "Can be short (a quick observation) or long (detailed notes from "
+            "a conversation or research session). Each call adds one timestamped "
+            "entry — do NOT include previous entries, only the new content."
         ),
     )
     async def note_save(
         *,
         person: Annotated[str, Desc("Household member name")],
-        content: Annotated[str, Desc("The new note to append (just the new info, not the full note)")],
+        content: Annotated[str, Desc("The note content — can be a sentence or multiple paragraphs")],
         **_: Any,
     ) -> dict[str, Any]:
         if err := _check_content_length(content):
@@ -297,7 +298,13 @@ def register_builtin_tools(
         notes_dir = workspaces / person / "notes"
         notes_dir.mkdir(parents=True, exist_ok=True)
         path = notes_dir / f"{today}.md"
-        entry = f"- [{time_str}] {content}"
+        # Support multi-line content: first line gets the timestamp bullet,
+        # continuation lines are indented under it.
+        lines = content.split("\n")
+        entry_parts = [f"- [{time_str}] {lines[0]}"]
+        for line in lines[1:]:
+            entry_parts.append(f"  {line}" if line.strip() else "  ")
+        entry = "\n".join(entry_parts)
         if path.exists():
             existing = path.read_text().rstrip("\n")
             path.write_text(f"{existing}\n{entry}\n")
