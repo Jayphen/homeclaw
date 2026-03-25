@@ -22,10 +22,12 @@ class SemanticMemory:
         workspaces_path: str,
         embedding_provider: str = "local",
         embedding_api_key: str | None = None,
+        docs_path: str | None = None,
     ) -> None:
         self._workspaces_path = workspaces_path
         self._embedding_provider = embedding_provider
         self._embedding_api_key = embedding_api_key
+        self._docs_path = docs_path
         self._mem: Any = None
         self._watcher: Any = None
         self._enabled = False
@@ -35,7 +37,10 @@ class SemanticMemory:
         return self._enabled
 
     def _collect_paths(self) -> list[str]:
-        """Collect all workspace subdirectories that contain indexable content."""
+        """Collect all workspace subdirectories that contain indexable content.
+
+        Also includes the docs path if configured and present on disk.
+        """
         ws = Path(self._workspaces_path)
         paths: list[str] = []
         if not ws.is_dir():
@@ -44,6 +49,13 @@ class SemanticMemory:
             if not child.is_dir() or child.name.startswith("."):
                 continue
             paths.append(str(child))
+        # Include project docs so the agent can reference its own documentation
+        if self._docs_path:
+            docs = Path(self._docs_path)
+            if docs.is_dir():
+                paths.append(str(docs))
+            else:
+                logger.debug("Docs path %s does not exist — skipping", docs)
         return paths
 
     async def initialize(self) -> None:
@@ -136,11 +148,15 @@ class SemanticMemory:
 
         household_prefix = f"{self._workspaces_path}/household"
         person_prefix = f"{self._workspaces_path}/{person}" if person else None
+        docs_prefix = self._docs_path if self._docs_path else None
 
         filtered: list[dict[str, Any]] = []
         for r in results:
             source = r.get("source", "")
             if source.startswith(household_prefix):
+                filtered.append(r)
+            elif docs_prefix and source.startswith(docs_prefix):
+                # Docs are public — visible to all users in any context
                 filtered.append(r)
             elif not shared_only and person_prefix and source.startswith(person_prefix):
                 filtered.append(r)

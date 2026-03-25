@@ -158,10 +158,17 @@ class HomeclawApp:
             _key = self.config.openai_api_key or ""
             _is_openai_key = _key.startswith("sk-") and not _key.startswith("sk-or-")
             embedding_provider = "openai" if _is_openai_key else "local"
+        # Resolve docs path: explicit config, or auto-detect from package location.
+        docs_path = self.config.docs_path
+        if not docs_path:
+            _candidate = Path(__file__).resolve().parent.parent / "docs" / "src" / "routes"
+            if _candidate.is_dir():
+                docs_path = str(_candidate)
         self._semantic_memory = SemanticMemory(
             str(self.workspaces),
             embedding_provider=embedding_provider,
             embedding_api_key=self.config.openai_api_key,
+            docs_path=docs_path,
         )
 
         def _admin_check(person: str) -> bool:

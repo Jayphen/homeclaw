@@ -197,6 +197,7 @@ class HomeclawConfig(BaseSettings):
 
     # Paths
     workspaces_path: str = "./workspaces"
+    docs_path: str | None = None  # path to docs/src/routes for semantic indexing
 
     # Cost routing
     routing: RoutingConfig = RoutingConfig()
