@@ -656,6 +656,11 @@
 
   $effect(() => {
     fetchAll();
+    return () => stopLogPolling();
+  });
+
+  $effect(() => {
+    if (activeTab !== "data") stopLogPolling();
   });
 </script>
 
