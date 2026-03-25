@@ -1,7 +1,6 @@
 """Memory API routes — serves markdown-based memory topics."""
 
 from datetime import datetime
-from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
@@ -98,16 +97,11 @@ async def memory_recall(
     validate_person(person, workspaces)
     require_person_access(member, person)
     embedding_provider = "openai" if config.openai_api_key else "local"
-    docs_path = config.docs_path
-    if not docs_path:
-        _candidate = Path(__file__).resolve().parent.parent.parent / "docs" / "src" / "routes"
-        if _candidate.is_dir():
-            docs_path = str(_candidate)
     semantic = SemanticMemory(
         str(workspaces),
         embedding_provider=embedding_provider,
         embedding_api_key=config.openai_api_key,
-        docs_path=docs_path,
+        docs_path=config.resolve_docs_path(),
     )
     await semantic.initialize()
     if not semantic.enabled:
