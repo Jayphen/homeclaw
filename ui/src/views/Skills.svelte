@@ -255,15 +255,17 @@
   async function fetchFile(owner: string, name: string, filePath: string) {
     loading = true;
     error = null;
-    isEnvFile = filePath === ".env";
+    isEnvFile = false;
     try {
-      if (isEnvFile) {
-        // EnvEditor component handles its own fetching; just set minimal fileContent
-        fileContent = { path: ".env", content: "", size: 0 };
+      const r = await api(`/api/skills/${owner}/${name}/files/${filePath}`);
+      if (!r.ok) throw new Error(`${r.status}`);
+      const data = await r.json();
+      if (data.is_env) {
+        isEnvFile = true;
+        // EnvEditor handles its own fetching; store minimal fileContent for header
+        fileContent = { path: data.path, content: "", size: data.size };
       } else {
-        const r = await api(`/api/skills/${owner}/${name}/files/${filePath}`);
-        if (!r.ok) throw new Error(`${r.status}`);
-        fileContent = await r.json();
+        fileContent = data;
       }
       loading = false;
     } catch (e: any) {
