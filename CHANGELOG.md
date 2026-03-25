@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.1](https://github.com/Jayphen/homeclaw/compare/v0.22.0...v0.22.1) (2026-03-25)
+
+
+### Bug Fixes
+
+* **agent:** make notes journal-style with multi-line support ([#106](https://github.com/Jayphen/homeclaw/issues/106)) ([95354de](https://github.com/Jayphen/homeclaw/commit/95354de171e7128b7f10005115e466f49355fd91))
+* **api:** hoist lazy imports in setup status endpoint ([#108](https://github.com/Jayphen/homeclaw/issues/108)) ([80a5b14](https://github.com/Jayphen/homeclaw/commit/80a5b144705611f987a2585096583e1dcfd0966f))
+
 ## [0.22.0](https://github.com/Jayphen/homeclaw/compare/v0.21.1...v0.22.0) (2026-03-25)
 
 
