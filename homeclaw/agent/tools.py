@@ -801,13 +801,19 @@ def register_builtin_tools(
             "server-side, so you do NOT need to download it yourself first. "
             "For authenticated APIs (e.g. Immich), pass the auth header "
             "directly (e.g. headers={\"x-api-key\": \"...\"}). "
-            "Use file_path only for images already on disk."
+            "Use file_path for images on disk, or base64 for inline data "
+            "(raw base64 or data:image/...;base64,... URI). "
+            "Max image size: 10 MB."
         ),
     )
     async def image_send(
         *,
         url: Annotated[str | None, Desc("Image URL (use headers if auth is needed)")] = None,
         file_path: Annotated[str | None, Desc("Local file path to an image on disk")] = None,
+        base64: Annotated[
+            str | None,
+            Desc("Base64-encoded image data (raw or data:image/...;base64,... URI)"),
+        ] = None,
         headers: Annotated[
             dict[str, str] | None,
             Desc("HTTP headers to send when fetching the URL (e.g. x-api-key)"),
@@ -817,27 +823,101 @@ def register_builtin_tools(
         caption: Annotated[str | None, Desc("Optional caption for the image")] = None,
         **_: Any,
     ) -> dict[str, Any]:
+        import base64 as b64mod
         from pathlib import Path as _Path
 
         import httpx
 
-        if not url and not file_path:
-            return {"error": "Either 'url' or 'file_path' is required."}
+        _MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
+        _ALLOWED_CONTENT_TYPES = frozenset({
+            "image/jpeg", "image/png", "image/gif", "image/webp",
+            "image/svg+xml", "image/bmp", "image/tiff",
+        })
+        _ALLOWED_EXTENSIONS = frozenset({
+            ".jpg", ".jpeg", ".png", ".gif", ".webp",
+            ".svg", ".bmp", ".tiff", ".tif",
+        })
 
-        # Pre-fetch image bytes when we have auth headers or a local file,
-        # so channel adapters don't need to handle authentication themselves.
+        sources = sum(1 for s in (url, file_path, base64) if s)
+        if sources == 0:
+            return {"error": "One of 'url', 'file_path', or 'base64' is required."}
+        if sources > 1:
+            return {"error": "Provide only one of 'url', 'file_path', or 'base64'."}
+
         image_data: bytes | None = None
-        if file_path:
+
+        if base64 is not None:
+            # Strip data URI prefix if present
+            raw = base64
+            if raw.startswith("data:"):
+                # data:image/png;base64,iVBOR...
+                parts = raw.split(",", 1)
+                if len(parts) != 2:
+                    return {"error": "Invalid data URI format."}
+                header_part = parts[0]
+                if "image/" not in header_part:
+                    return {"error": f"Data URI is not an image type: {header_part}"}
+                raw = parts[1]
+            try:
+                image_data = b64mod.b64decode(raw, validate=True)
+            except Exception:
+                return {"error": "Invalid base64 data."}
+            if len(image_data) > _MAX_IMAGE_BYTES:
+                mb = len(image_data) / (1024 * 1024)
+                return {"error": f"Image too large ({mb:.1f} MB). Max is 10 MB."}
+
+        elif file_path is not None:
             p = _Path(file_path)
             if not p.is_file():
                 return {"error": f"File not found: {file_path}"}
+            if p.suffix.lower() not in _ALLOWED_EXTENSIONS:
+                return {"error": f"Unsupported image type: {p.suffix}"}
+            size = p.stat().st_size
+            if size > _MAX_IMAGE_BYTES:
+                mb = size / (1024 * 1024)
+                return {"error": f"Image too large ({mb:.1f} MB). Max is 10 MB."}
             image_data = p.read_bytes()
-        elif headers and url:
+
+        elif url is not None:
+            # Validate and stream-download with size cap
             try:
                 async with httpx.AsyncClient(follow_redirects=True) as client:
-                    resp = await client.get(url, headers=headers, timeout=30)
-                    resp.raise_for_status()
-                    image_data = resp.content
+                    # HEAD first to check content-type and size before downloading
+                    head = await client.head(url, headers=headers or {}, timeout=15)
+                    ct = head.headers.get("content-type", "").split(";")[0].strip().lower()
+                    if ct and ct not in _ALLOWED_CONTENT_TYPES:
+                        return {"error": f"URL is not an image (content-type: {ct})."}
+                    cl = head.headers.get("content-length")
+                    if cl and cl.isdigit() and int(cl) > _MAX_IMAGE_BYTES:
+                        mb = int(cl) / (1024 * 1024)
+                        return {"error": f"Image too large ({mb:.1f} MB). Max is 10 MB."}
+
+                    # Stream download with hard size cap
+                    chunks: list[bytes] = []
+                    total = 0
+                    async with client.stream(
+                        "GET", url, headers=headers or {}, timeout=30,
+                    ) as resp:
+                        resp.raise_for_status()
+                        # Re-check content-type from GET response
+                        get_ct = (
+                            resp.headers.get("content-type", "")
+                            .split(";")[0].strip().lower()
+                        )
+                        if get_ct and get_ct not in _ALLOWED_CONTENT_TYPES:
+                            return {
+                                "error": f"URL is not an image (content-type: {get_ct}).",
+                            }
+                        async for chunk in resp.aiter_bytes(chunk_size=64 * 1024):
+                            total += len(chunk)
+                            if total > _MAX_IMAGE_BYTES:
+                                return {
+                                    "error": "Image exceeds 10 MB limit during download.",
+                                }
+                            chunks.append(chunk)
+                    image_data = b"".join(chunks)
+            except httpx.HTTPStatusError as exc:
+                return {"error": f"Failed to fetch image: HTTP {exc.response.status_code}"}
             except Exception as exc:
                 return {"error": f"Failed to fetch image: {exc}"}
 
