@@ -101,6 +101,7 @@ async def memory_recall(
         str(workspaces),
         embedding_provider=embedding_provider,
         embedding_api_key=config.openai_api_key,
+        docs_path=config.resolve_docs_path(),
     )
     await semantic.initialize()
     if not semantic.enabled:

@@ -1,5 +1,74 @@
 # Changelog
 
+## [0.22.2](https://github.com/Jayphen/homeclaw/compare/v0.22.1...v0.22.2) (2026-03-25)
+
+
+### Bug Fixes
+
+* docs path auto-detection broken in Docker ([#110](https://github.com/Jayphen/homeclaw/issues/110)) ([8e740bb](https://github.com/Jayphen/homeclaw/commit/8e740bb4af5b0bd7f0adcfdbbfde47e815dfb3da))
+* **ui:** stop log polling when leaving Settings view ([#109](https://github.com/Jayphen/homeclaw/issues/109)) ([f503d39](https://github.com/Jayphen/homeclaw/commit/f503d39b15ad607a6751b19ecbd47054a44cc012))
+
+## [0.22.1](https://github.com/Jayphen/homeclaw/compare/v0.22.0...v0.22.1) (2026-03-25)
+
+
+### Bug Fixes
+
+* **agent:** make notes journal-style with multi-line support ([#106](https://github.com/Jayphen/homeclaw/issues/106)) ([95354de](https://github.com/Jayphen/homeclaw/commit/95354de171e7128b7f10005115e466f49355fd91))
+* **api:** hoist lazy imports in setup status endpoint ([#108](https://github.com/Jayphen/homeclaw/issues/108)) ([80a5b14](https://github.com/Jayphen/homeclaw/commit/80a5b144705611f987a2585096583e1dcfd0966f))
+
+## [0.22.0](https://github.com/Jayphen/homeclaw/compare/v0.21.1...v0.22.0) (2026-03-25)
+
+
+### Features
+
+* index homeclaw docs in memsearch for self-referencing ([#100](https://github.com/Jayphen/homeclaw/issues/100)) ([da4d2a4](https://github.com/Jayphen/homeclaw/commit/da4d2a4139645e8845754779d0777311ec1970c3))
+
+
+### Bug Fixes
+
+* **ui:** restore API-based .env detection in skill file viewer ([#104](https://github.com/Jayphen/homeclaw/issues/104)) ([946043a](https://github.com/Jayphen/homeclaw/commit/946043a7964d31a2e2c358d7f951648ac2175f22))
+
+## [0.21.1](https://github.com/Jayphen/homeclaw/compare/v0.21.0...v0.21.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* handle http_call headers passed as JSON string instead of dict ([#98](https://github.com/Jayphen/homeclaw/issues/98)) ([53e3f6e](https://github.com/Jayphen/homeclaw/commit/53e3f6e8d6ab98fcc71ee537c40ddd7548976a71))
+
+## [0.21.0](https://github.com/Jayphen/homeclaw/compare/v0.20.0...v0.21.0) (2026-03-24)
+
+
+### Features
+
+* add delivery targeting for routines ([#95](https://github.com/Jayphen/homeclaw/issues/95)) ([d0801b6](https://github.com/Jayphen/homeclaw/commit/d0801b6f2e396841015bd27430961ed15f8da8d2))
+* merge household_share into memory_save and add admin tool log ([#97](https://github.com/Jayphen/homeclaw/issues/97)) ([9b88fa4](https://github.com/Jayphen/homeclaw/commit/9b88fa454929cdc23fa14ff49757baddc5776562))
+
+## [0.20.0](https://github.com/Jayphen/homeclaw/compare/v0.19.0...v0.20.0) (2026-03-24)
+
+
+### Features
+
+* **ui:** add .env editor for plugins ([#91](https://github.com/Jayphen/homeclaw/issues/91)) ([5e8f084](https://github.com/Jayphen/homeclaw/commit/5e8f0847adcd78864a734f86f0887af272860e1b))
+
+
+### Bug Fixes
+
+* **ci:** allow Claude to read files during code review ([#92](https://github.com/Jayphen/homeclaw/issues/92)) ([9c6335f](https://github.com/Jayphen/homeclaw/commit/9c6335f0dba88cd96eb08859e87c894b1937518b))
+
+## [0.19.0](https://github.com/Jayphen/homeclaw/compare/v0.18.0...v0.19.0) (2026-03-24)
+
+
+### Features
+
+* **ui:** separate Skills and Plugins into distinct nav items ([#85](https://github.com/Jayphen/homeclaw/issues/85)) ([40a5f27](https://github.com/Jayphen/homeclaw/commit/40a5f27c8de2132a2ede5cb976adca1990a78f54))
+
+
+### Bug Fixes
+
+* **ci:** grant pull-requests write permission to Claude code review ([#90](https://github.com/Jayphen/homeclaw/issues/90)) ([85e6c5f](https://github.com/Jayphen/homeclaw/commit/85e6c5fca5c38ab0c073c9d758bc407554eff35e))
+* deliver routine output via scheduler instead of relying on LLM ([#88](https://github.com/Jayphen/homeclaw/issues/88)) ([03e4b0e](https://github.com/Jayphen/homeclaw/commit/03e4b0e9985c27f8a497a8031dae0a8858ea7d8e))
+* don't advance consolidation pointer on parse failure ([#89](https://github.com/Jayphen/homeclaw/issues/89)) ([bba4b7e](https://github.com/Jayphen/homeclaw/commit/bba4b7e29590f243636beecc211b69e17e3ace48))
+
 ## [0.18.0](https://github.com/Jayphen/homeclaw/compare/v0.17.0...v0.18.0) (2026-03-24)
 
 

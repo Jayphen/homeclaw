@@ -4,6 +4,7 @@
   import { formatDateTime } from "$lib/time";
   import MarkdownEditor from "$lib/MarkdownEditor.svelte";
   import CodeEditor from "$lib/CodeEditor.svelte";
+  import EnvEditor from "$lib/EnvEditor.svelte";
 
   let { params = {} }: { params?: { owner?: string; name?: string; wild?: string } } = $props();
 
@@ -67,6 +68,8 @@
   let confirmDelete: boolean = $state(false);
   let saving: boolean = $state(false);
   let saveWarning: string | null = $state(null);
+
+  let isEnvFile: boolean = $state(false);
 
   // Install
   let installUrl: string = $state("");
@@ -252,10 +255,18 @@
   async function fetchFile(owner: string, name: string, filePath: string) {
     loading = true;
     error = null;
+    isEnvFile = false;
     try {
       const r = await api(`/api/skills/${owner}/${name}/files/${filePath}`);
       if (!r.ok) throw new Error(`${r.status}`);
-      fileContent = await r.json();
+      const data = await r.json();
+      if (data.is_env) {
+        isEnvFile = true;
+        // EnvEditor handles its own fetching; store minimal fileContent for header
+        fileContent = { path: data.path, content: "", size: data.size };
+      } else {
+        fileContent = data;
+      }
       loading = false;
     } catch (e: any) {
       error = e.message;
@@ -377,7 +388,12 @@
         <h1>{fileContent.path}</h1>
         <span class="file-size">{fileContent.size} bytes</span>
       </header>
-      {#if editing}
+      {#if isEnvFile}
+        <EnvEditor
+          fetchUrl="/api/skills/{params.owner}/{params.name}/files/.env"
+          saveUrl="/api/skills/{params.owner}/{params.name}/files/.env"
+        />
+      {:else if editing}
         <div class="file-editor">
           {#if fileContent.path === "SKILL.md"}
             <CodeEditor bind:value={editContent} disabled={saving} language="yaml+markdown" />

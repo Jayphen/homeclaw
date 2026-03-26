@@ -68,9 +68,10 @@ judgment for anything worth remembering:
 treat that contact as up-to-date. This is the primary tool for social interactions — don't \
 use memory_save for these.
 - Someone reveals a personal fact, preference, or habit → memory_save (silently, pick a short \
-topic like 'food', 'health', 'work'). Use household_share when the info is household-wide. \
-Memory is for durable facts ("Dad lives in Wollongong", "allergic to shellfish"), NOT \
-transient events ("Dad is on vacation", "called the plumber today") — those go in notes.
+topic like 'food', 'health', 'work'). Use person='household' when the info is household-wide \
+(house codes, wifi, shared rules, appliance info). Memory is for durable facts ("Dad lives in \
+Wollongong", "allergic to shellfish"), NOT transient events ("Dad is on vacation", "called the \
+plumber today") — those go in notes.
 - Someone tells you something they expect you to know later — a phone number, a plan, a \
 configuration detail, a name → memory_save. When in doubt, save it.
 - Someone shares a link, place, recipe, or recommendation → bookmark_save (search first with \
@@ -79,8 +80,8 @@ bookmark_search to avoid duplicates; if a match exists, use bookmark_note to add
 already shows a settled decision, respect it — do not re-ask unless they want to revisit.
 - Someone wants to be reminded of something → reminder_add.
 
-Daily notes are a journal of what the household is doing. Use note_save liberally — it's the \
-household's daily log. Save things like:
+Daily notes are a journal — a rich, detailed record of household life. Use note_save liberally \
+for things like:
 - What someone cooked, ate, or is planning to eat
 - Activities, outings, errands, or plans mentioned
 - Health updates (feeling sick, exercise, sleep)
@@ -88,9 +89,12 @@ household's daily log. Save things like:
 - Visitors, social plans, or events
 - Anything the person tells you about their day
 - Decisions made, things purchased, or deliveries expected
-Keep each note_save entry short (one line). Call it silently — don't announce you're saving \
-a note. When in doubt about whether something is "noteworthy enough", save it. The daily log \
-is meant to be a rich record of household life, not just major events.
+Notes can be as long as they need to be. When someone asks you to save notes about a \
+conversation or topic, write a thorough entry that captures the key points, reasoning, \
+options discussed, and conclusions — not just a one-line summary. Think of it as writing \
+in a notebook, not a tweet. Multiple paragraphs are fine.
+Call note_save silently — don't announce you're saving a note. When in doubt about whether \
+something is "noteworthy enough", save it.
 
 When saving bookmarks: check bookmark_categories first and prefer an existing category. If the \
 link has no context, ask briefly what it is. Use bookmark_note for extra detail — location, \
@@ -180,8 +184,6 @@ _HOUSEHOLD_WRITE_TOOLS: dict[str, Callable[[dict[str, Any]], bool]] = {
     "contact_note": lambda args: "person" not in args or args.get("person") is None,
     # memory_save to "household" workspace
     "memory_save": lambda args: args.get("person") == HOUSEHOLD_WORKSPACE,
-    # household_share: always blocked on first attempt in DMs
-    "household_share": lambda _: True,
 }
 
 
@@ -487,18 +489,19 @@ class AgentLoop:
         result = await consolidate_chunk(chunk, person, consolidation_provider)
 
         if "error" in result:
-            logger.warning("Consolidation failed for '%s': %s", history_key, result["error"])
-            # Fallback: advance pointer anyway to prevent unbounded growth
-            _advance_consolidation_pointer(self._workspaces, history_key, last_consolidated + chunk_end)
-            return
+            logger.warning("Consolidation failed for '%s': %s — will retry next cycle", history_key, result["error"])
+            return  # Don't advance pointer — retry next cycle
 
         # Save extracted memories
         entries = result.get("memory_entries", [])
-        if entries:
-            saved = await save_consolidated_memories(entries, person, self._workspaces)
-            logger.info("Consolidated %d messages → %d memory entries for '%s'", len(chunk), saved, history_key)
+        if not entries:
+            logger.info("Consolidation returned no memory entries for '%s' — will retry", history_key)
+            return  # Don't advance pointer — LLM likely returned bad JSON
 
-        # Advance the pointer
+        saved = await save_consolidated_memories(entries, person, self._workspaces)
+        logger.info("Consolidated %d messages → %d memory entries for '%s'", len(chunk), saved, history_key)
+
+        # Only advance the pointer after successfully extracting memories
         _advance_consolidation_pointer(self._workspaces, history_key, last_consolidated + chunk_end)
 
     async def run(
@@ -875,7 +878,6 @@ _FEED_WORTHY_TOOLS: set[str] = {
     "routine_update",
     "routine_remove",
     "decision_log",
-    "household_share",
     "skill_create",
     "skill_install",
     "channel_preference_set",

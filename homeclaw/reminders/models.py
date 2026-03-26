@@ -1,6 +1,6 @@
 """Pydantic models for household member reminders."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from pydantic import BaseModel, computed_field, model_validator
 
@@ -37,7 +37,5 @@ class Reminder(BaseModel):
             return self.due_date
         if self.interval_days:
             base = self.last_completed or (self.due_date or date.today())
-            from datetime import timedelta
-
             return base + timedelta(days=self.interval_days)
         return self.due_date

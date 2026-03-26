@@ -1,9 +1,11 @@
 """Settings API routes — system configuration."""
 
-from datetime import datetime
+import json
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from fastapi.responses import PlainTextResponse
 
 from homeclaw.api.deps import AdminDep, get_config
@@ -66,3 +68,69 @@ async def download_logs(
             "Content-Disposition": 'attachment; filename="homeclaw-logs.txt"',
         },
     )
+
+
+def _read_tool_log(
+    log_path: Path,
+    days: int = 7,
+    tool: str | None = None,
+    person: str | None = None,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    """Read raw tool_use.jsonl entries with full args."""
+    if not log_path.exists():
+        return []
+    since = datetime.now(UTC) - timedelta(days=days)
+    entries: list[dict[str, Any]] = []
+    try:
+        for line in log_path.read_text().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            ts_str = entry.get("ts", "")
+            try:
+                ts = datetime.fromisoformat(ts_str)
+            except (ValueError, TypeError):
+                continue
+            if ts < since:
+                continue
+            if tool and entry.get("tool") != tool:
+                continue
+            if person and entry.get("person") != person:
+                continue
+            entries.append(entry)
+    except OSError:
+        return []
+    entries.sort(key=lambda e: e.get("ts", ""), reverse=True)
+    return entries[:limit]
+
+
+@router.get("/tool-log", dependencies=[AdminDep])
+async def get_tool_log(
+    days: int = Query(default=7, ge=1, le=90, description="Lookback window in days"),
+    tool: str | None = Query(default=None, description="Filter by tool name"),
+    person: str | None = Query(default=None, description="Filter by person"),
+    limit: int = Query(default=200, ge=1, le=1000, description="Max entries"),
+) -> dict[str, Any]:
+    """Admin tool call log — raw entries from tool_use.jsonl with full args."""
+    config = get_config()
+    log_path = config.workspaces.resolve() / "household" / "logs" / "tool_use.jsonl"
+    entries = _read_tool_log(log_path, days=days, tool=tool, person=person, limit=limit)
+    # Collect unique tool names for filter dropdown
+    tools_seen: set[str] = set()
+    persons_seen: set[str] = set()
+    for e in entries:
+        if t := e.get("tool"):
+            tools_seen.add(t)
+        if p := e.get("person"):
+            persons_seen.add(p)
+    return {
+        "entries": entries,
+        "total": len(entries),
+        "tools": sorted(tools_seen),
+        "persons": sorted(persons_seen),
+    }

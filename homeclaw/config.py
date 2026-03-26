@@ -197,6 +197,21 @@ class HomeclawConfig(BaseSettings):
 
     # Paths
     workspaces_path: str = "./workspaces"
+    docs_path: str | None = None  # path to docs/src/routes for semantic indexing
+
+    def resolve_docs_path(self) -> str | None:
+        """Return the docs path, auto-detecting if not explicitly configured."""
+        if self.docs_path:
+            return self.docs_path
+        # Try relative to the source tree (works in local dev)
+        _src = Path(__file__).resolve().parent.parent / "docs" / "src" / "routes"
+        if _src.is_dir():
+            return str(_src)
+        # Docker: docs are copied to /app/docs/src/routes/
+        _docker = Path("/app/docs/src/routes")
+        if _docker.is_dir():
+            return str(_docker)
+        return None
 
     # Cost routing
     routing: RoutingConfig = RoutingConfig()

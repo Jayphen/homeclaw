@@ -27,13 +27,9 @@ class RoutingConfig(BaseSettings):
 
     # Whether to use OpenRouter (dev) or direct providers (hosted)
     use_openrouter: bool = False
-    openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # Prompt caching (Anthropic direct only)
     enable_prompt_caching: bool = True
-
-    # Batch routines (Anthropic direct only)
-    enable_batch_routines: bool = True
 
     # Context window size (tokens). Set to match your model's limit.
     # Defaults to 200k for Anthropic models; override for others.
@@ -48,7 +44,6 @@ class RoutingConfig(BaseSettings):
         """Adjust features based on provider mode."""
         if self.use_openrouter:
             self.enable_prompt_caching = False
-            self.enable_batch_routines = False
         return self
 
 
@@ -57,7 +52,7 @@ _REASONING_TOOLS = frozenset({"web_read", "web_search"})
 
 # Tools that do simple writes — Haiku is fine for the follow-up summary.
 _SIMPLE_WRITE_TOOLS = frozenset({
-    "memory_save", "memory_read", "household_share", "note_save",
+    "memory_save", "memory_read", "note_save",
     "reminder_add", "reminder_complete", "reminder_delete",
     "bookmark_save", "decision_log", "interaction_log",
 })

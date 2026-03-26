@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,6 +32,24 @@ def _check_deps(
     if deps["satisfied"]:
         return None
     return deps
+
+_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _parse_env(env_file: Path) -> list[tuple[str, str]]:
+    """Parse a .env file into (key, value) pairs."""
+    entries: list[tuple[str, str]] = []
+    if env_file.is_file():
+        for line in env_file.read_text().splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if "=" not in stripped:
+                continue
+            key, _, value = stripped.partition("=")
+            entries.append((key.strip(), value.strip()))
+    return entries
+
 
 # The timestamp suffix appended by skill_remove: _YYYYMMDD_HHMMSS (16 chars)
 _TIMESTAMP_SUFFIX_LEN = 16
@@ -422,7 +441,11 @@ async def get_skill(owner: str, name: str) -> dict[str, Any]:
 
 @router.get("/{owner}/{name}/files/{file_path:path}", dependencies=[AuthDep])
 async def read_skill_file(owner: str, name: str, file_path: str) -> dict[str, Any]:
-    """Read the content of a file inside a skill directory."""
+    """Read the content of a file inside a skill directory.
+
+    For ``.env`` files, values are masked — only key names and whether
+    each key has a value set are returned.
+    """
     workspaces = get_config().workspaces.resolve()
     skill_dir = _safe_relative(workspaces / owner / "skills", name)
 
@@ -432,6 +455,16 @@ async def read_skill_file(owner: str, name: str, file_path: str) -> dict[str, An
     path = _safe_relative(skill_dir, file_path)
     if not path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
+
+    # .env files: return structured key/is_set data, never raw secrets
+    if file_path == ".env":
+        entries = _parse_env(path)
+        return {
+            "path": file_path,
+            "is_env": True,
+            "entries": [{"key": k, "is_set": bool(v)} for k, v in entries],
+            "size": path.stat().st_size,
+        }
 
     try:
         content = path.read_text()
@@ -446,14 +479,20 @@ async def read_skill_file(owner: str, name: str, file_path: str) -> dict[str, An
 
 
 class FileUpdate(BaseModel):
-    content: str
+    content: str | None = None
+    entries: list[dict[str, Any]] | None = None
 
 
 @router.put("/{owner}/{name}/files/{file_path:path}", dependencies=[AuthDep])
 async def write_skill_file(
     owner: str, name: str, file_path: str, body: FileUpdate,
 ) -> dict[str, Any]:
-    """Write or update a file inside a skill directory."""
+    """Write or update a file inside a skill directory.
+
+    For ``.env`` files, accepts ``entries`` (list of ``{key, value}`` dicts)
+    instead of raw ``content``.  Values set to ``null`` preserve the existing
+    secret.  Keys are validated and values are sanitized.
+    """
     workspaces = get_config().workspaces.resolve()
     skill_dir = _safe_relative(workspaces / owner / "skills", name)
 
@@ -461,6 +500,45 @@ async def write_skill_file(
         raise HTTPException(status_code=404, detail="Skill not found")
 
     path = _safe_relative(skill_dir, file_path)
+
+    # .env files: structured write with validation and merge
+    if file_path == ".env" and body.entries is not None:
+        for entry in body.entries:
+            key = entry.get("key", "").strip()
+            if key and not _ENV_KEY_RE.match(key):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid key: {key!r}. Keys must be alphanumeric with underscores.",
+                )
+
+        existing = dict(_parse_env(path)) if path.is_file() else {}
+
+        lines: list[str] = []
+        for entry in body.entries:
+            key = entry.get("key", "").strip()
+            if not key:
+                continue
+            value = entry.get("value")
+            if value is None:
+                value = existing.get(key, "")
+            else:
+                value = re.sub(r"[\x00-\x1f\x7f]", "", value)
+            lines.append(f"{key}={value}")
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(lines) + ("\n" if lines else ""))
+
+        return {"path": file_path, "size": path.stat().st_size, "status": "written"}
+
+    # Block raw content writes to .env (must use entries)
+    if file_path == ".env" and body.content is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Use the entries field to update .env files",
+        )
+
+    if body.content is None:
+        raise HTTPException(status_code=400, detail="content is required")
 
     # Validate SKILL.md before saving
     validation_error: str | None = None

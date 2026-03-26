@@ -1,4 +1,4 @@
-"""Tests for built-in memory tools (memory_save, memory_read, household_share)."""
+"""Tests for built-in memory tools (memory_save, memory_read)."""
 
 from __future__ import annotations
 
@@ -101,17 +101,17 @@ async def test_memory_read_nonexistent_person(registry: ToolRegistry) -> None:
     assert result["topics"] == []
 
 
-# ── household_share ──────────────────────────────────────────────────────
+# ── memory_save with person="household" ─────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_household_share_writes_to_household(
+async def test_memory_save_household_writes_to_household(
     registry: ToolRegistry, dev_workspaces: Path,
 ) -> None:
-    handler = registry.get_handler("household_share")
+    handler = registry.get_handler("memory_save")
     assert handler is not None
-    result = await handler(topic="pets", content="We adopted a cat named Miso")
-    assert result["status"] == "shared"
+    result = await handler(person="household", topic="pets", content="We adopted a cat named Miso")
+    assert result["status"] == "saved"
 
     path = dev_workspaces / "household" / "memory" / "pets.md"
     assert path.exists()
@@ -119,12 +119,12 @@ async def test_household_share_writes_to_household(
 
 
 @pytest.mark.asyncio
-async def test_household_share_does_not_touch_personal_memory(
+async def test_memory_save_household_does_not_touch_personal(
     registry: ToolRegistry, dev_workspaces: Path,
 ) -> None:
-    handler = registry.get_handler("household_share")
+    handler = registry.get_handler("memory_save")
     assert handler is not None
-    await handler(topic="house-rules", content="No shoes indoors")
+    await handler(person="household", topic="house-rules", content="No shoes indoors")
 
     # Alice should not have this in her personal memory
     alice_memory = dev_workspaces / "alice" / "memory" / "house-rules.md"

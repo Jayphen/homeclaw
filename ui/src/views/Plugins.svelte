@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from "$lib/api";
+  import EnvEditor from "$lib/EnvEditor.svelte";
 
   interface InstalledPlugin {
     name: string;
@@ -28,6 +29,8 @@
   let expandedTools: Set<string> = $state(new Set());
   let toggling: Set<string> = $state(new Set());
   let actionError: string | null = $state(null);
+
+  let expandedEnv: Set<string> = $state(new Set());
 
   // Install from URL
   let installUrl: string = $state("");
@@ -83,6 +86,12 @@
       plugins = plugins.map(p => p.name === plugin.name ? data.plugin : p);
     } catch (e: any) { actionError = `Failed to ${action} "${plugin.name}": ${e.message}`; }
     const next = new Set(toggling); next.delete(plugin.name); toggling = next;
+  }
+
+  function toggleEnv(name: string) {
+    const next = new Set(expandedEnv);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    expandedEnv = next;
   }
 
   async function installFromUrl(installAll = false) {
@@ -235,11 +244,26 @@
               {#if plugin.error}
                 <span class="meta-error">{plugin.error}</span>
               {/if}
+              {#if plugin.type === "python"}
+                <button class="meta-toggle" onclick={() => toggleEnv(plugin.name)}>
+                  {expandedEnv.has(plugin.name) ? "Hide .env" : "Configure"}
+                </button>
+              {/if}
             </div>
             {#if expandedTools.has(plugin.name)}
               <ul class="tool-list">
                 {#each plugin.tools as tool}<li class="tool-item">{stripNamespace(tool)}</li>{/each}
               </ul>
+            {/if}
+            {#if plugin.type === "python" && expandedEnv.has(plugin.name)}
+              <div class="env-editor-wrapper">
+                <EnvEditor
+                  fetchUrl="/api/plugins/{plugin.name}/env"
+                  saveUrl="/api/plugins/{plugin.name}/env"
+                  showHeader={true}
+                  onclose={() => toggleEnv(plugin.name)}
+                />
+              </div>
             {/if}
           </div>
         {/each}
@@ -350,6 +374,11 @@
 
   .tool-list { list-style: none; margin: 0.5rem 0 0; padding: 0.5rem 0.75rem; background: var(--surface-low); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 0.15rem; }
   .tool-item { font-family: monospace; font-size: 0.78rem; color: var(--text-muted); }
+
+  .env-editor-wrapper {
+    margin-top: 0.6rem; padding: 0.65rem 0.75rem;
+    background: var(--surface-low); border-radius: var(--radius-md);
+  }
 
   .btn { border: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-weight: 500; cursor: pointer; transition: filter 0.15s, opacity 0.15s; white-space: nowrap; }
   .btn:disabled { opacity: 0.45; cursor: default; }

@@ -162,6 +162,7 @@ class HomeclawApp:
             str(self.workspaces),
             embedding_provider=embedding_provider,
             embedding_api_key=self.config.openai_api_key,
+            docs_path=self.config.resolve_docs_path(),
         )
 
         def _admin_check(person: str) -> bool:
