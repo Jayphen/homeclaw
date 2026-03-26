@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.23.0](https://github.com/Jayphen/homeclaw/compare/v0.22.2...v0.23.0) (2026-03-26)
+
+
+### Features
+
+* optimise image_send with validation, size limits, and base64 support ([#114](https://github.com/Jayphen/homeclaw/issues/114)) ([9574184](https://github.com/Jayphen/homeclaw/commit/95741847afab22940470807eb219c47e59ab6747))
+
+
+### Bug Fixes
+
+* block editing built-in skills via skill_edit_file ([#112](https://github.com/Jayphen/homeclaw/issues/112)) ([c14e75b](https://github.com/Jayphen/homeclaw/commit/c14e75bbc4fca9d62518edb01b997f2d8215e5b4))
+
 ## [0.22.2](https://github.com/Jayphen/homeclaw/compare/v0.22.1...v0.22.2) (2026-03-25)
 
 
