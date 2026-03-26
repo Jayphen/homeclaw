@@ -88,14 +88,14 @@ async def test_valid_file_path(handler, tmp_path: Path) -> None:  # noqa: ANN001
 
 @pytest.mark.asyncio
 async def test_raw_base64(handler) -> None:  # noqa: ANN001
-    data = base64.b64encode(b"\x89PNG" + b"\x00" * 50).decode()
+    data = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50).decode()
     result = await handler(base64=data, person="alice")
     assert result.get("status") == "queued"
 
 
 @pytest.mark.asyncio
 async def test_data_uri_base64(handler) -> None:  # noqa: ANN001
-    encoded = base64.b64encode(b"\x89PNG" + b"\x00" * 50).decode()
+    encoded = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"\x00" * 50).decode()
     uri = f"data:image/png;base64,{encoded}"
     result = await handler(base64=uri, person="alice")
     assert result.get("status") == "queued"
@@ -115,6 +115,14 @@ async def test_invalid_base64_rejected(handler) -> None:  # noqa: ANN001
     result = await handler(base64="not!!!valid===base64", person="alice")
     assert "error" in result
     assert "invalid" in result["error"].lower()
+
+
+@pytest.mark.asyncio
+async def test_base64_bad_magic_bytes_rejected(handler) -> None:  # noqa: ANN001
+    data = base64.b64encode(b"not-an-image-format" + b"\x00" * 50).decode()
+    result = await handler(base64=data, person="alice")
+    assert "error" in result
+    assert "not a recognised image" in result["error"].lower()
 
 
 @pytest.mark.asyncio

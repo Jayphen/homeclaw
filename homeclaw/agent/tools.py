@@ -33,6 +33,26 @@ _logger = logging.getLogger(__name__)
 # Maximum size for user-supplied content written to disk (100 KB).
 MAX_CONTENT_LENGTH = 100_000
 
+# Image validation constants — used by image_send tool.
+_MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
+_ALLOWED_CONTENT_TYPES = frozenset({
+    "image/jpeg", "image/png", "image/gif", "image/webp",
+    "image/svg+xml", "image/bmp", "image/tiff",
+})
+_ALLOWED_EXTENSIONS = frozenset({
+    ".jpg", ".jpeg", ".png", ".gif", ".webp",
+    ".svg", ".bmp", ".tiff", ".tif",
+})
+_IMAGE_MAGIC_BYTES: tuple[bytes, ...] = (
+    b"\xff\xd8\xff",      # JPEG
+    b"\x89PNG\r\n\x1a\n", # PNG
+    b"GIF87a", b"GIF89a", # GIF
+    b"RIFF",              # WebP (RIFF....WEBP)
+    b"BM",                # BMP
+    b"II", b"MM",         # TIFF (little/big endian)
+    b"<?xml", b"<svg",    # SVG
+)
+
 # Scope vocabularies — skill tools use "private", decision tools use "personal".
 SkillScope = Literal["household", "private"]
 DecisionScope = Literal["household", "personal"]
@@ -819,16 +839,6 @@ def register_builtin_tools(
 
         import httpx
 
-        _MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
-        _ALLOWED_CONTENT_TYPES = frozenset({
-            "image/jpeg", "image/png", "image/gif", "image/webp",
-            "image/svg+xml", "image/bmp", "image/tiff",
-        })
-        _ALLOWED_EXTENSIONS = frozenset({
-            ".jpg", ".jpeg", ".png", ".gif", ".webp",
-            ".svg", ".bmp", ".tiff", ".tif",
-        })
-
         sources = sum(1 for s in (url, file_path, base64) if s)
         if sources == 0:
             return {"error": "One of 'url', 'file_path', or 'base64' is required."}
@@ -856,6 +866,8 @@ def register_builtin_tools(
             if len(image_data) > _MAX_IMAGE_BYTES:
                 mb = len(image_data) / (1024 * 1024)
                 return {"error": f"Image too large ({mb:.1f} MB). Max is 10 MB."}
+            if not any(image_data.startswith(m) for m in _IMAGE_MAGIC_BYTES):
+                return {"error": "Base64 data is not a recognised image format."}
 
         elif file_path is not None:
             p = _Path(file_path)
