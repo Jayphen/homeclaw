@@ -38,11 +38,18 @@ def _extract_text(message: dict[str, Any]) -> str:
     return (message.get("content") or "").strip()
 
 
+def _history_file(workspaces: Path, key: str) -> Path:
+    """Resolve the history JSONL path for a person or channel key."""
+    if key.startswith("group-") or key.startswith("web-"):
+        return workspaces / "household" / "channels" / key / "history.jsonl"
+    return workspaces / key / "history.jsonl"
+
+
 def _load_visible_history(
     workspaces: Path, person: str,
 ) -> list[dict[str, str]]:
     """Read the JSONL history and return recent user/assistant pairs."""
-    hist = workspaces / person / "history.jsonl"
+    hist = _history_file(workspaces, person)
     if not hist.exists():
         return []
 
@@ -78,11 +85,17 @@ def _load_visible_history(
 
 @router.get("/history")
 async def chat_history(request: Request) -> list[dict[str, str]]:
-    """Return recent conversation messages for the current user."""
+    """Return recent conversation messages for the current user.
+
+    Pass ``?channel=web-household`` to load the shared household chat history
+    instead of the member's private history.
+    """
     member = await get_current_member(request)
     person = member or "user"
     config = get_config()
-    return _load_visible_history(config.workspaces.resolve(), person)
+    channel: str | None = request.query_params.get("channel")
+    history_key = channel or person
+    return _load_visible_history(config.workspaces.resolve(), history_key)
 
 
 @router.post("")
@@ -111,6 +124,7 @@ async def chat(request: Request) -> StreamingResponse:
         raise HTTPException(400, "Empty message")
 
     person = member or "user"
+    channel: str | None = body.get("channel")
 
     async def generate():
         interim_q: asyncio.Queue[str] = asyncio.Queue()
@@ -123,6 +137,7 @@ async def chat(request: Request) -> StreamingResponse:
         result_task = asyncio.create_task(
             loop.run(
                 content, person,
+                channel=channel,
                 interim_callback=_on_interim, metadata=meta,
             ),
         )

@@ -1,9 +1,18 @@
 <script lang="ts">
-  import { chat, loadHistory } from "$lib/chat";
+  import { privateChat, householdChat, loadHistory, type ChatTab } from "$lib/chat";
   import { renderMarkdown } from "$lib/markdown";
   import { onMount, tick } from "svelte";
 
-  onMount(() => { loadHistory(); });
+  let activeTab: ChatTab = $state("private");
+
+  let chat = $derived(activeTab === "household" ? householdChat : privateChat);
+
+  onMount(() => { loadHistory("private"); });
+
+  function switchTab(tab: ChatTab) {
+    activeTab = tab;
+    loadHistory(tab);
+  }
 
   let inputText = $state("");
   let messagesEl: HTMLElement | undefined = $state();
@@ -73,7 +82,18 @@
 
 <div class="chat">
   <div class="chat-header">
-    <h1>Chat</h1>
+    <div class="tab-bar">
+      <button
+        class="tab"
+        class:active={activeTab === "private"}
+        onclick={() => switchTab("private")}
+      >Private</button>
+      <button
+        class="tab"
+        class:active={activeTab === "household"}
+        onclick={() => switchTab("household")}
+      >Household</button>
+    </div>
     <button
       class="debug-toggle"
       class:active={showDebug}
@@ -188,12 +208,33 @@
     gap: 0.75rem;
   }
 
-  .chat-header h1 {
-    font-family: var(--font-serif);
-    font-weight: 600;
-    font-size: 1.5rem;
+  .tab-bar {
+    display: flex;
+    gap: 0.25rem;
+    background: var(--surface-low);
+    border-radius: var(--radius-sm);
+    padding: 0.2rem;
+  }
+
+  .tab {
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-radius: calc(var(--radius-sm) - 0.1rem);
+    padding: 0.3rem 0.85rem;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .tab:hover { color: var(--text); }
+
+  .tab.active {
     color: var(--text);
-    margin: 0;
+    background: var(--surface);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   }
 
   .debug-toggle {
