@@ -982,7 +982,7 @@ def _append_chat_log(
 def _history_path(workspaces: Path, key: str) -> Path:
     # Channel/group histories go under household/channels/ to avoid
     # creating top-level directories that look like member workspaces.
-    if key.startswith("group-"):
+    if key.startswith("group-") or key.startswith("web-"):
         hist_dir = workspaces / "household" / "channels" / key
     else:
         hist_dir = workspaces / key
