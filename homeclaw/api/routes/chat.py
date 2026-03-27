@@ -24,6 +24,9 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 # Maximum number of user/assistant turns to return from history.
 _MAX_HISTORY_PAIRS = 50
 
+# Allowed channel values — reject anything else to prevent directory traversal.
+_ALLOWED_CHANNELS: frozenset[str] = frozenset({"web-household"})
+
 
 def _extract_text(message: dict[str, Any]) -> str:
     """Extract plain text from an AI SDK message (parts-based or legacy)."""
@@ -94,6 +97,8 @@ async def chat_history(request: Request) -> list[dict[str, str]]:
     person = member or "user"
     config = get_config()
     channel: str | None = request.query_params.get("channel")
+    if channel and channel not in _ALLOWED_CHANNELS:
+        raise HTTPException(400, "Invalid channel")
     history_key = channel or person
     return _load_visible_history(config.workspaces.resolve(), history_key)
 
@@ -125,6 +130,8 @@ async def chat(request: Request) -> StreamingResponse:
 
     person = member or "user"
     channel: str | None = body.get("channel")
+    if channel and channel not in _ALLOWED_CHANNELS:
+        raise HTTPException(400, "Invalid channel")
 
     async def generate():
         interim_q: asyncio.Queue[str] = asyncio.Queue()

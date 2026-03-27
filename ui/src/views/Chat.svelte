@@ -7,7 +7,7 @@
 
   let chat = $derived(activeTab === "household" ? householdChat : privateChat);
 
-  onMount(() => { loadHistory("private"); });
+  onMount(() => { loadHistory("private"); loadHistory("household"); });
 
   function switchTab(tab: ChatTab) {
     activeTab = tab;
