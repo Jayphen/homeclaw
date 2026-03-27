@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.24.0](https://github.com/Jayphen/homeclaw/compare/v0.23.0...v0.24.0) (2026-03-27)
+
+
+### Features
+
+* add tabbed private/household chat in web UI ([#115](https://github.com/Jayphen/homeclaw/issues/115)) ([407c7d5](https://github.com/Jayphen/homeclaw/commit/407c7d56657281409db2b5989fe7833102f7681e))
+
 ## [0.23.0](https://github.com/Jayphen/homeclaw/compare/v0.22.2...v0.23.0) (2026-03-26)
 
 
