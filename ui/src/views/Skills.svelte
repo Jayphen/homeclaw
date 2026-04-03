@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api } from "$lib/api";
+  import { api, getToken } from "$lib/api";
   import { renderMarkdown } from "$lib/markdown";
   import { formatDateTime } from "$lib/time";
   import MarkdownEditor from "$lib/MarkdownEditor.svelte";
@@ -16,6 +16,11 @@
     size: string;
   }
 
+  interface SkillUiApp {
+    entry: string;
+    title: string | null;
+  }
+
   interface SkillEntry {
     name: string;
     owner: string;
@@ -24,6 +29,7 @@
     file_count: number;
     files: SkillFile[];
     parse_error?: string;
+    ui_app?: SkillUiApp | null;
   }
 
   interface MissingBin {
@@ -49,6 +55,7 @@
     files: SkillFile[];
     deps: SkillDeps | null;
     parse_error?: string;
+    ui_app: SkillUiApp | null;
   }
 
   interface FileContent {
@@ -354,6 +361,14 @@
     const ext = name.split(".").pop()?.toLowerCase() ?? "";
     return ["md", "txt", "json", "yaml", "yml", "toml", "py", "sh", "js", "ts", "csv", "env"].includes(ext);
   }
+
+  // Build the iframe src for a skill's embedded UI app, appending the auth
+  // token as a query param so the browser navigation request is authenticated.
+  function appSrc(owner: string, name: string, entry: string): string {
+    const token = getToken();
+    const base = `/api/skills/${owner}/${name}/assets/${entry}`;
+    return token ? `${base}?token=${encodeURIComponent(token)}` : base;
+  }
 </script>
 
 <div class="skills-page">
@@ -501,6 +516,26 @@
         {/each}
       </div>
     </section>
+
+    {#if detail.ui_app}
+      <section class="app-panel">
+        <div class="app-panel-header">
+          <h2>{detail.ui_app.title || detail.name}</h2>
+          <a
+            href={appSrc(detail.owner, detail.name, detail.ui_app.entry)}
+            target="_blank"
+            rel="noopener"
+            class="btn-open-tab"
+          >Open in tab ↗</a>
+        </div>
+        <iframe
+          src={appSrc(detail.owner, detail.name, detail.ui_app.entry)}
+          sandbox="allow-scripts allow-same-origin allow-forms"
+          class="skill-app-frame"
+          title={detail.ui_app.title || detail.name}
+        ></iframe>
+      </section>
+    {/if}
 
     {#if detail.instructions}
       <section class="instructions-section">
@@ -959,5 +994,37 @@
 
   @media (max-width: 640px) {
     .file-article { padding: 1rem 1.25rem; }
+  }
+
+  /* ---- Embedded mini-app panel ---- */
+  .app-panel {
+    margin-bottom: 1.5rem;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .app-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-low);
+  }
+  .app-panel-header h2 {
+    margin: 0;
+    font-family: var(--font-serif); font-weight: 600; font-size: 0.95rem;
+    color: var(--text);
+  }
+  .btn-open-tab {
+    font-size: 0.78rem; color: var(--text-muted); text-decoration: none;
+    padding: 0.2rem 0.5rem; border-radius: calc(var(--radius) / 2);
+  }
+  .btn-open-tab:hover { background: var(--surface); color: var(--text); }
+  .skill-app-frame {
+    display: block;
+    width: 100%;
+    min-height: 400px;
+    border: none;
+    background: #fff;
   }
 </style>

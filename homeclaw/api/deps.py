@@ -258,22 +258,17 @@ def list_member_workspaces(workspaces: Path) -> list[str]:
     )
 
 
-def _parse_auth(request: Request) -> tuple[str | None, bool]:
-    """Parse the Authorization header and return (member_name, is_admin).
+def _parse_token(token: str) -> tuple[str | None, bool]:
+    """Validate a raw token string and return (member_name, is_admin).
 
     Token formats (tried in order):
-    - ``Bearer <jwt>``              → decoded from signed session token
-    - ``Bearer <web_password>``     → legacy admin (migration compat)
-    - ``Bearer <member>:<password>``→ specific member (legacy / CLI)
+    - ``<jwt>``              → decoded from signed session token
+    - ``<web_password>``     → legacy admin (migration compat)
+    - ``<member>:<password>``→ specific member (legacy / CLI)
 
-    Returns (None, False) if auth is invalid.
+    Returns (None, False) if the token is invalid.
     """
     config = get_config()
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        return None, False
-
-    token = auth.removeprefix("Bearer ")
 
     # Try JWT first (tokens always start with "eyJ")
     if token.startswith("eyJ"):
@@ -293,6 +288,30 @@ def _parse_auth(request: Request) -> tuple[str | None, bool]:
         expected = config.member_passwords.get(member)
         if expected is not None and verify_password(password, expected):
             return member, member in config.admin_members
+
+    return None, False
+
+
+def _parse_auth(request: Request) -> tuple[str | None, bool]:
+    """Parse auth from the request and return (member_name, is_admin).
+
+    Checks (in order):
+    - ``Authorization: Bearer <token>`` header
+    - ``?token=<token>`` query parameter (for browser-navigated resources
+      such as skill asset iframes that cannot set custom headers)
+
+    Returns (None, False) if auth is invalid.
+    """
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        result = _parse_token(auth.removeprefix("Bearer "))
+        if result[0] is not None:
+            return result
+
+    # Fall back to ?token= query parameter
+    query_token = request.query_params.get("token", "")
+    if query_token:
+        return _parse_token(query_token)
 
     return None, False
 
