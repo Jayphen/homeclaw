@@ -13,6 +13,13 @@ from typing import Any
 
 from homeclaw.agent.context import HOUSEHOLD_WORKSPACE, build_context, estimate_tokens
 from homeclaw.agent.providers.base import LLMProvider, LLMResponse, Message, ToolCall
+from homeclaw.agent.routing import (
+    CallType,
+    RoutingConfig,
+    classify_tool_round,
+    max_tokens_for,
+    route_model,
+)
 from homeclaw.agent.runtime_state import (
     ConsolidationEvent,
     PromptSection,
@@ -22,13 +29,7 @@ from homeclaw.agent.runtime_state import (
     ToolPolicyEntry,
     now_utc,
 )
-from homeclaw.agent.routing import (
-    CallType,
-    RoutingConfig,
-    classify_tool_round,
-    max_tokens_for,
-    route_model,
-)
+from homeclaw.agent.tool_decorator import ToolPolicy
 from homeclaw.agent.tools import ToolRegistry
 from homeclaw.locking import LockPool
 from homeclaw.memory.semantic import SemanticMemory
@@ -147,55 +148,6 @@ _ROUTINE_PREAMBLE = (
     "output, do NOT call message_send yourself.\n\n"
 )
 
-# Tools that write to a person's workspace. In DMs, the `person` argument
-# is forced to the authenticated caller so the LLM can't accidentally
-# attribute notes/memory/reminders to someone else.
-_PERSONAL_WRITE_TOOLS = frozenset({
-    "note_save",
-    "memory_save",
-    "contact_note",
-    "reminder_add",
-    "reminder_complete",
-    "reminder_delete",
-    "bookmark_save",
-    "skill_create",
-    "skill_update",
-    "skill_remove",
-    "skill_migrate",
-    "skill_install",
-    "decision_log",
-})
-
-# Tools that read from a person's workspace. In DMs, the `person` argument
-# is forced to the authenticated caller so the LLM can't read another
-# member's private notes, memory, or reminders. "household" is allowed
-# through for shared data.
-_PERSONAL_READ_TOOLS = frozenset({
-    "memory_read",
-    "note_get",
-    "reminder_list",
-    "decision_list",
-    "skill_list",
-    "read_skill",
-    "skill_edit_file",
-    "run_skill_script",
-})
-
-# Tools that write shared/household data. In DMs, the first attempt is
-# blocked so the LLM asks the user to confirm. The block fires once per
-# tool name per run() call — after the user confirms, the retry goes through.
-# Each predicate returns True when the call targets household data.
-# Tools blocked during routine execution — the scheduler handles delivery.
-_ROUTINE_BLOCKED_TOOLS = frozenset({"message_send", "image_send"})
-
-_HOUSEHOLD_WRITE_TOOLS: dict[str, Callable[[dict[str, Any]], bool]] = {
-    # contact_note: blocked when person is absent (default → household)
-    "contact_note": lambda args: "person" not in args or args.get("person") is None,
-    # memory_save to "household" workspace
-    "memory_save": lambda args: args.get("person") == HOUSEHOLD_WORKSPACE,
-}
-
-
 # Minimum length for an interim message to be worth sending.
 # Short filler like "Let me check" / "Un momento" / "ちょっと待って" are all
 # under this threshold regardless of language.
@@ -222,70 +174,80 @@ def _is_substantive_interim(text: str) -> bool:
     return len(_SELF_TALK_RE.findall(text)) < 3
 
 
-def describe_tool_policies(tool_names: list[str]) -> list[ToolPolicyEntry]:
-    """Return deterministic policy classifications for registered tools."""
-    policies: list[ToolPolicyEntry] = []
+def _policy_to_entry(tool_name: str, policy: ToolPolicy | None) -> ToolPolicyEntry:
+    """Convert a ToolPolicy to a ToolPolicyEntry for the observability API."""
     skill_read_suffixes = {"data_list", "data_read", "get_env"}
     skill_write_suffixes = {"data_write", "data_delete"}
 
-    for tool_name in sorted(tool_names):
-        categories: list[str] = []
-        dm_enforcement: str | None = None
-        routine_behavior: str | None = None
-        access: str = "unknown"
-        scope: str = "general"
+    categories: list[str] = []
+    dm_enforcement: str | None = None
+    routine_behavior: str | None = None
 
-        if "__" in tool_name:
-            scope = "skill"
-            categories.append("skill_namespaced")
-            suffix = tool_name.split("__", 1)[1]
-            if suffix in skill_read_suffixes:
-                access = "read"
-                categories.append("skill_read")
-            elif suffix in skill_write_suffixes:
-                access = "write"
-                categories.append("skill_write")
-            elif suffix == "http_call":
-                access = "action"
-                categories.extend(["skill_network", "allowed_domains_enforced"])
-            else:
-                access = "action"
-                categories.append("skill_action")
-
-        if tool_name in _PERSONAL_WRITE_TOOLS:
-            access = "write"
-            scope = "personal"
-            categories.append("personal_write")
-            dm_enforcement = "forces person to authenticated caller in DMs"
-
-        if tool_name in _PERSONAL_READ_TOOLS:
-            access = "read"
-            scope = "personal"
-            categories.append("personal_read")
-            dm_enforcement = "forces person to authenticated caller in DMs"
-
-        if tool_name in _HOUSEHOLD_WRITE_TOOLS:
-            access = "write"
-            scope = "household"
-            categories.append("household_write_confirmation")
-            dm_enforcement = "first DM attempt blocked until explicit confirmation"
-
-        if tool_name in _ROUTINE_BLOCKED_TOOLS:
-            routine_behavior = "blocked in routine execution"
-            categories.append("routine_blocked")
-            if access == "unknown":
-                access = "action"
-
-        policies.append(ToolPolicyEntry(
+    # Skill namespaced tools: classify by naming convention.
+    if "__" in tool_name:
+        categories.append("skill_namespaced")
+        suffix = tool_name.split("__", 1)[1]
+        if suffix in skill_read_suffixes:
+            categories.append("skill_read")
+        elif suffix in skill_write_suffixes:
+            categories.append("skill_write")
+        elif suffix == "http_call":
+            categories.extend(["skill_network", "allowed_domains_enforced"])
+        else:
+            categories.append("skill_action")
+        # Skill tools have no explicit ToolPolicy — derive from convention
+        access = "read" if suffix in skill_read_suffixes else "write" if suffix in skill_write_suffixes else "action"
+        return ToolPolicyEntry(
             tool_name=tool_name,
             access=access,  # type: ignore[arg-type]
-            scope=scope,  # type: ignore[arg-type]
+            scope="skill",
             categories=categories,
-            dm_enforcement=dm_enforcement,
-            routine_behavior=routine_behavior,
-        ))
+            dm_enforcement=None,
+            routine_behavior=None,
+        )
 
-    return policies
+    if policy is None:
+        return ToolPolicyEntry(
+            tool_name=tool_name,
+            access="unknown",
+            scope="general",
+            categories=[],
+            dm_enforcement=None,
+            routine_behavior=None,
+        )
+
+    access = policy.access
+    scope = policy.scope
+
+    if policy.scope == "personal" and policy.access == "write":
+        categories.append("personal_write")
+        dm_enforcement = "forces person to authenticated caller in DMs"
+    if policy.scope == "personal" and policy.access == "read":
+        categories.append("personal_read")
+        dm_enforcement = "forces person to authenticated caller in DMs"
+    if policy.household_confirm is not None:
+        categories.append("household_write_confirmation")
+        dm_enforcement = "first DM attempt blocked until explicit confirmation"
+    if policy.admin_only:
+        categories.append("admin_only")
+    if policy.routine_blocked:
+        categories.append("routine_blocked")
+        routine_behavior = "blocked in routine execution"
+
+    return ToolPolicyEntry(
+        tool_name=tool_name,
+        access=access,  # type: ignore[arg-type]
+        scope=scope,  # type: ignore[arg-type]
+        categories=categories,
+        dm_enforcement=dm_enforcement,
+        routine_behavior=routine_behavior,
+    )
+
+
+def describe_tool_policies(registry: ToolRegistry) -> list[ToolPolicyEntry]:
+    """Return deterministic policy classifications for all registered tools."""
+    tool_names = sorted(defn.name for defn in registry.get_definitions())
+    return [_policy_to_entry(name, registry.get_policy(name)) for name in tool_names]
 
 
 def _estimate_message_tokens(msg: Message) -> int:
@@ -555,8 +517,7 @@ class AgentLoop:
 
     def tool_policy_snapshot(self) -> list[ToolPolicyEntry]:
         """Return deterministic policy classifications for current tools."""
-        tool_names = [definition.name for definition in self._registry.get_definitions()]
-        return describe_tool_policies(tool_names)
+        return describe_tool_policies(self._registry)
 
     def start_background_consolidation(self) -> None:
         """Start the background consolidation loop (call once at startup)."""
@@ -918,47 +879,44 @@ class AgentLoop:
         is_dm = channel is None
         results: list[dict[str, Any]] = []
         for tc in tool_calls:
-            # Routines deliver output via the scheduler — block direct messaging
-            # to prevent double-sends.
-            if call_type == CallType.ROUTINE and tc.name in _ROUTINE_BLOCKED_TOOLS:
+            policy = self._registry.get_policy(tc.name)
+
+            # Routines: block tools that deliver output via the channel dispatcher
+            # to prevent double-sends (scheduler handles delivery).
+            if call_type == CallType.ROUTINE and policy is not None and policy.routine_blocked:
                 results.append({"status": "skipped", "reason": "Routine output is delivered automatically by the scheduler."})
                 continue
+
             args = dict(tc.arguments)
 
             # Normalize person names to lowercase to prevent duplicate workspaces.
             if "person" in args and isinstance(args["person"], str):
                 args["person"] = args["person"].lower()
 
-            # In DMs, force personal-write tools to use the authenticated caller.
+            # Admin-only enforcement: block non-admins before the handler runs.
+            if policy is not None and policy.admin_only:
+                if not self._admin_check(person):
+                    results.append({"error": f"Tool '{tc.name}' requires admin access."})
+                    continue
+
+            # In DMs, force personal-scope tools to the authenticated caller.
             # Allow "household" through — it's an explicit shared-write that the
-            # household-write guard below will handle.
-            if is_dm and tc.name in _PERSONAL_WRITE_TOOLS and "person" in args:
+            # household-confirm guard below will handle.
+            if is_dm and policy is not None and policy.scope == "personal" and "person" in args:
                 requested = args["person"]
                 if requested != person and requested != HOUSEHOLD_WORKSPACE:
+                    label = "DM write enforcement" if policy.access == "write" else "DM read enforcement"
                     logger.info(
-                        "Tool %s: overriding person %r → %r (DM enforcement)",
-                        tc.name, requested, person,
+                        "Tool %s: overriding person %r → %r (%s)",
+                        tc.name, requested, person, label,
                     )
                     args["person"] = person
 
-            # In DMs, force personal-read tools to the authenticated caller.
-            # "household" is allowed through for shared data reads.
-            if is_dm and tc.name in _PERSONAL_READ_TOOLS and "person" in args:
-                requested = args["person"]
-                if requested != person and requested != HOUSEHOLD_WORKSPACE:
-                    logger.info(
-                        "Tool %s: overriding person %r → %r (DM read enforcement)",
-                        tc.name, requested, person,
-                    )
-                    args["person"] = person
-
-            # In DMs, block tools that would write to household without
-            # explicit user confirmation. Return an error so the LLM asks the
-            # user. The block fires once per tool name per run() call — after
-            # the user confirms and the LLM retries, it goes through.
-            if is_dm and tc.name in _HOUSEHOLD_WRITE_TOOLS:
-                check = _HOUSEHOLD_WRITE_TOOLS[tc.name]
-                if check(args) and tc.name not in self._household_confirmed:
+            # In DMs, block tools that would write to shared household data without
+            # explicit user confirmation. The block fires once per tool per run()
+            # call — after the user confirms and the LLM retries, it goes through.
+            if is_dm and policy is not None and policy.household_confirm is not None:
+                if policy.household_confirm(args) and tc.name not in self._household_confirmed:
                     self._household_confirmed.add(tc.name)
                     logger.info(
                         "Tool %s: blocked household write in DM — asking LLM to confirm",

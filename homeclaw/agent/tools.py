@@ -14,7 +14,7 @@ from homeclaw.agent.runtime_state import (
     SkillActivationEvent,
     now_utc,
 )
-from homeclaw.agent.tool_decorator import Desc
+from homeclaw.agent.tool_decorator import Desc, ToolPolicy
 from homeclaw.agent.tool_decorator import tool as _tool
 from homeclaw.bookmarks.models import Bookmark
 from homeclaw.bookmarks.store import (
@@ -98,10 +98,22 @@ class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, ToolDefinition] = {}
         self._handlers: dict[str, ToolHandler] = {}
+        self._policies: dict[str, ToolPolicy] = {}
 
-    def register(self, definition: ToolDefinition, handler: ToolHandler) -> None:
+    def register(
+        self,
+        definition: ToolDefinition,
+        handler: ToolHandler,
+        policy: ToolPolicy | None = None,
+    ) -> None:
         self._tools[definition.name] = definition
         self._handlers[definition.name] = handler
+        if policy is not None:
+            self._policies[definition.name] = policy
+
+    def get_policy(self, name: str) -> ToolPolicy | None:
+        """Return the ToolPolicy for a registered tool, or None if not set."""
+        return self._policies.get(name)
 
     def get_definitions(self) -> list[ToolDefinition]:
         return list(self._tools.values())
@@ -117,6 +129,7 @@ class ToolRegistry:
             return False
         del self._tools[name]
         del self._handlers[name]
+        self._policies.pop(name, None)
         return True
 
 
@@ -197,6 +210,11 @@ def register_builtin_tools(
             "Set person to save as a private note visible only to that member, "
             "or omit for a shared household note."
         ),
+        policy=ToolPolicy(
+            access="write",
+            scope="personal",
+            household_confirm=lambda args: args.get("person") is None,
+        ),
     )
     async def contact_note(
         *,
@@ -267,6 +285,11 @@ def register_builtin_tools(
             "facts, or 'household' for shared info like house codes, wifi "
             "passwords, shared rules, or anything that applies to the whole home."
         ),
+        policy=ToolPolicy(
+            access="write",
+            scope="personal",
+            household_confirm=lambda args: args.get("person") == HOUSEHOLD_WORKSPACE,
+        ),
     )
     async def memory_save(
         *,
@@ -286,6 +309,7 @@ def register_builtin_tools(
             "Read stored knowledge about a household member. "
             "Call without topic to list all topics, or with a topic to read it."
         ),
+        policy=ToolPolicy(access="read", scope="personal"),
     )
     async def memory_read(
         *,
@@ -311,6 +335,7 @@ def register_builtin_tools(
             "a conversation or research session). Each call adds one timestamped "
             "entry — do NOT include previous entries, only the new content."
         ),
+        policy=ToolPolicy(access="write", scope="personal"),
     )
     async def note_save(
         *,
@@ -339,7 +364,7 @@ def register_builtin_tools(
             path.write_text(f"{entry}\n")
         return {"status": "saved", "path": str(path)}
 
-    @_reg(name="note_get", description="Read a note for a household member. Defaults to today.")
+    @_reg(name="note_get", description="Read a note for a household member. Defaults to today.", policy=ToolPolicy(access="read", scope="personal"))
     async def note_get(
         *,
         person: Annotated[str, Desc("Household member name")],
@@ -372,6 +397,7 @@ def register_builtin_tools(
             "weekly). Can provide both date + interval for 'starting on X, "
             "repeat every N days'."
         ),
+        policy=ToolPolicy(access="write", scope="personal"),
     )
     async def reminder_add(
         *,
@@ -411,7 +437,7 @@ def register_builtin_tools(
             "next_due": str(reminder.next_due),
         }
 
-    @_reg(name="reminder_list", description="List active reminders for a household member.")
+    @_reg(name="reminder_list", description="List active reminders for a household member.", policy=ToolPolicy(access="read", scope="personal"))
     async def reminder_list(
         *,
         person: Annotated[str, Desc("Household member name")],
@@ -439,6 +465,7 @@ def register_builtin_tools(
             "Mark a reminder as done. For recurring reminders, this advances "
             "to the next occurrence. For one-shot reminders, marks it complete."
         ),
+        policy=ToolPolicy(access="write", scope="personal"),
     )
     async def reminder_complete(
         *,
@@ -457,7 +484,7 @@ def register_builtin_tools(
             "next_due": str(result.next_due) if result.next_due else None,
         }
 
-    @_reg(name="reminder_delete", description="Permanently delete a reminder.")
+    @_reg(name="reminder_delete", description="Permanently delete a reminder.", policy=ToolPolicy(access="write", scope="personal"))
     async def reminder_delete(
         *,
         person: Annotated[str, Desc("Household member name")],
@@ -477,6 +504,7 @@ def register_builtin_tools(
             "to the household's shared bookmarks. Use this when someone shares a "
             "link or mentions a place/recipe they want to remember."
         ),
+        policy=ToolPolicy(access="write", scope="personal"),
     )
     async def bookmark_save(
         *,
@@ -795,6 +823,7 @@ def register_builtin_tools(
             "Set 'person' to message an individual, or 'group' to true to "
             "send to the household group chat."
         ),
+        policy=ToolPolicy(access="action", routine_blocked=True),
     )
     async def message_send(
         *,
@@ -823,6 +852,7 @@ def register_builtin_tools(
             "(raw base64 or data:image/...;base64,... URI). "
             "Max image size: 10 MB."
         ),
+        policy=ToolPolicy(access="action", routine_blocked=True),
     )
     async def image_send(
         *,
@@ -1152,6 +1182,7 @@ def register_builtin_tools(
             "List all skill plugins available to this household member — "
             "includes household-wide skills and their own private skills."
         ),
+        policy=ToolPolicy(access="read", scope="personal"),
     )
     async def skill_list(
         *,
@@ -1272,6 +1303,7 @@ def register_builtin_tools(
                 },
             },
         },
+        policy=ToolPolicy(access="write", scope="personal"),
     )
     async def skill_create(
         *,
@@ -1454,6 +1486,7 @@ def register_builtin_tools(
             "directory is archived (not permanently deleted). Data can be recovered "
             "or permanently deleted via the web UI."
         ),
+        policy=ToolPolicy(access="write", scope="personal"),
     )
     async def skill_remove(
         *,
@@ -1497,6 +1530,7 @@ def register_builtin_tools(
             "recreating it. The skill definition (skill.md) is rewritten "
             "and the skill is reloaded. Does not affect data files."
         ),
+        policy=ToolPolicy(access="write", scope="personal"),
     )
     async def skill_update(
         *,
@@ -1571,6 +1605,7 @@ def register_builtin_tools(
             "All skill data (definition + data files) moves with it. "
             "The skill is re-registered immediately under the new scope."
         ),
+        policy=ToolPolicy(access="write", scope="personal"),
     )
     async def skill_migrate(
         *,
@@ -1679,6 +1714,7 @@ def register_builtin_tools(
     @_reg(
         name="skill_approve",
         description="Approve a pending skill so it becomes active. Admin only.",
+        policy=ToolPolicy(access="action", admin_only=True),
     )
     async def skill_approve(
         *,
@@ -1693,7 +1729,6 @@ def register_builtin_tools(
 
         if not _is_admin(person):
             return {"error": "Only admins can approve skills"}
-
         pending_skill = _pending_dir() / safe_slug(name)
         if not pending_skill.is_dir():
             return {"error": f"No pending skill '{name}' found"}
@@ -1740,7 +1775,7 @@ def register_builtin_tools(
             ),
         }
 
-    @_reg(name="skill_reject", description="Reject and delete a pending skill. Admin only.")
+    @_reg(name="skill_reject", description="Reject and delete a pending skill. Admin only.", policy=ToolPolicy(access="action", admin_only=True))
     async def skill_reject(
         *,
         person: Annotated[str, Desc("Admin member name")],
@@ -1752,7 +1787,6 @@ def register_builtin_tools(
 
         if not _is_admin(person):
             return {"error": "Only admins can reject skills"}
-
         pending_skill = _pending_dir() / safe_slug(name)
         if not pending_skill.is_dir():
             return {"error": f"No pending skill '{name}' found"}
@@ -1880,6 +1914,7 @@ def register_builtin_tools(
             "For repos with multiple skills in subdirectories, returns the "
             "list of available skills unless install_all is true."
         ),
+        policy=ToolPolicy(access="write", scope="personal"),
     )
     async def skill_install(
         *,
@@ -1974,6 +2009,7 @@ def register_builtin_tools(
             "For .env files: skill_edit_file(name='x', file='.env', content='KEY=value'). "
             "Note: data_write only writes to data/ — use this tool for the skill root."
         ),
+        policy=ToolPolicy(access="read", scope="personal"),
     )
     async def skill_edit_file(
         *,
@@ -2052,6 +2088,7 @@ def register_builtin_tools(
             "to browse a skill's resources, scripts, and data files. "
             "The skill catalog in your context lists available skills."
         ),
+        policy=ToolPolicy(access="read", scope="personal"),
     )
     async def read_skill(
         *,
@@ -2124,6 +2161,7 @@ def register_builtin_tools(
             "scripts/ directory and are listed when you read_skill. Only "
             "pre-installed scripts can be run — no arbitrary shell commands."
         ),
+        policy=ToolPolicy(access="read", scope="personal"),
     )
     async def run_skill_script(
         *,
@@ -2210,6 +2248,7 @@ def register_builtin_tools(
             "'from now on', or otherwise settles on a choice. Examples: 'Piano lessons "
             "on Tuesdays', 'Switching to oat milk', 'No screens after 8pm'."
         ),
+        policy=ToolPolicy(access="write", scope="personal"),
     )
     async def decision_log(
         *,
@@ -2238,6 +2277,7 @@ def register_builtin_tools(
     @_reg(
         name="decision_list",
         description="List recorded decisions for the household or a person.",
+        policy=ToolPolicy(access="read", scope="personal"),
     )
     async def decision_list(
         *,
@@ -2280,6 +2320,7 @@ def register_builtin_tools(
             "Returns recent log entries with optional filtering "
             "by level, text search, and date range."
         ),
+        policy=ToolPolicy(access="read", admin_only=True),
     )
     async def log_read(
         *,

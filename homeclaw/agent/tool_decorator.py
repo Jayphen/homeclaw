@@ -55,7 +55,7 @@ pass ``schema_overrides`` to override specific parameter schemas:
 
 import inspect
 from collections.abc import Callable, Coroutine
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, Union, get_args, get_origin
 
 from homeclaw.agent.providers.base import ToolDefinition
@@ -64,6 +64,32 @@ if TYPE_CHECKING:
     from homeclaw.agent.tools import ToolRegistry
 
 ToolHandler = Callable[..., Coroutine[Any, Any, dict[str, Any]]]
+
+# --- Tool policy metadata ---
+
+
+@dataclass(slots=True)
+class ToolPolicy:
+    """Per-tool access and risk metadata for centralized enforcement.
+
+    Fields:
+        access:           What the tool does — read, write, action, or unknown.
+        scope:            Data boundary — personal (per-member), household (shared), or general.
+        admin_only:       Tool is restricted to admin members.
+        routine_blocked:  Tool is blocked during scheduled routine execution.
+        household_confirm: Predicate that returns True when a specific call targets
+                           household-shared data in a DM context, triggering a
+                           confirmation prompt before the call proceeds.
+    """
+    access: Literal["read", "write", "action", "unknown"] = "unknown"
+    scope: Literal["personal", "household", "general"] = "general"
+    admin_only: bool = False
+    routine_blocked: bool = False
+    # Callable field excluded from eq/hash since Callable is not hashable.
+    household_confirm: Callable[[dict[str, Any]], bool] | None = field(
+        default=None, compare=False, hash=False,
+    )
+
 
 # --- Annotation markers ---
 
@@ -243,12 +269,13 @@ def tool(
     description: str,
     *,
     schema_overrides: dict[str, dict[str, Any]] | None = None,
+    policy: ToolPolicy | None = None,
 ) -> "ToolRegistration":
     """Decorator that marks a function as a tool with auto-generated schema.
 
     Returns a ToolRegistration that can be registered with a ToolRegistry.
     """
-    return ToolRegistration(name, description, schema_overrides)
+    return ToolRegistration(name, description, schema_overrides, policy)
 
 
 class ToolRegistration:
@@ -259,10 +286,12 @@ class ToolRegistration:
         name: str,
         description: str,
         schema_overrides: dict[str, dict[str, Any]] | None,
+        policy: ToolPolicy | None = None,
     ) -> None:
         self._name = name
         self._description = description
         self._schema_overrides = schema_overrides
+        self._policy = policy
         self._func: ToolHandler | None = None
 
     def __call__(self, func: ToolHandler) -> ToolHandler:
@@ -285,4 +314,4 @@ class ToolRegistration:
 
     def register(self, registry: "ToolRegistry") -> None:
         """Register this tool with the given registry."""
-        registry.register(self.definition(), self.handler)
+        registry.register(self.definition(), self.handler, policy=self._policy)
