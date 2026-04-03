@@ -4,10 +4,16 @@ import logging
 from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import EllipsisType
 from typing import Annotated, Any, Literal
 
 from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.agent.providers.base import ToolDefinition
+from homeclaw.agent.runtime_state import (
+    RuntimeObservability,
+    SkillActivationEvent,
+    now_utc,
+)
 from homeclaw.agent.tool_decorator import Desc
 from homeclaw.agent.tool_decorator import tool as _tool
 from homeclaw.bookmarks.models import Bookmark
@@ -122,6 +128,7 @@ def register_builtin_tools(
     config: Any = None,
     plugin_registry: Any = None,  # PluginRegistry | None — avoided to prevent circular import
     dispatcher: Any = None,  # ChannelDispatcher | None — avoided to prevent circular import
+    runtime_observability: RuntimeObservability | None = None,
 ) -> None:
     """Register all built-in tools with the registry."""
 
@@ -1079,7 +1086,7 @@ def register_builtin_tools(
     ) -> dict[str, Any]:
         from homeclaw.scheduler.routines import update_routine
         # Normalise target when explicitly provided
-        real_target: str | None | type(Ellipsis) = ...
+        real_target: str | None | EllipsisType = ...
         if target is not ...:
             if target is not None and target.lower() in ("household", "group"):
                 real_target = None
@@ -1197,6 +1204,37 @@ def register_builtin_tools(
 
     def _pending_dir() -> Path:
         return workspaces / "household" / "skills" / ".pending"
+
+    def _verify_skill(
+        *,
+        skill_dir: Path,
+        owner: str,
+        scope: str,
+        source: str,
+        expect_registered: bool,
+    ) -> dict[str, Any]:
+        from homeclaw.plugins.skills.verification import (
+            verify_skill,
+            write_verification_report,
+        )
+
+        report = verify_skill(
+            skill_dir,
+            owner=owner,
+            scope=scope,
+            source=source,
+            allow_local_network=_skill_allow_local(),
+            plugin_registry=plugin_registry,
+            expect_registered=expect_registered,
+        )
+        write_verification_report(skill_dir, report)
+        if runtime_observability is not None:
+            runtime_observability.record_skill_verification(report)
+        return {
+            "verified": report.status == "verified",
+            "verification_status": report.status,
+            "verification": report.model_dump(mode="json"),
+        }
 
     @_reg(
         name="skill_create",
@@ -1369,10 +1407,18 @@ def register_builtin_tools(
                     "Skill created but needs admin approval before it becomes active. "
                     "An admin can approve it with skill_approve."
                 ),
+                **_verify_skill(
+                    skill_dir=skill_dir,
+                    owner=owner,
+                    scope=scope,
+                    source="skill_create",
+                    expect_registered=False,
+                ),
             }
 
         # Hot-load into registry
         loaded = False
+        warning: str | None = None
         if plugin_registry is not None:
             try:
                 plugin = load_skill(skill_dir, owner, allow_local_network=_skill_allow_local())
@@ -1380,17 +1426,9 @@ def register_builtin_tools(
                 loaded = True
             except Exception as e:
                 _logger.exception("skill_create: failed to hot-load skill '%s'", slug)
-                return {
-                    "status": "created",
-                    "name": slug,
-                    "scope": scope,
-                    "skill_dir": str(skill_dir),
-                    "seeded_files": seeded,
-                    "loaded": False,
-                    "warning": f"Skill created but failed to load: {e}",
-                }
+                warning = f"Skill created but failed to load: {e}"
 
-        return {
+        result = {
             "status": "created",
             "name": slug,
             "scope": scope,
@@ -1398,7 +1436,16 @@ def register_builtin_tools(
             "seeded_files": seeded,
             "loaded": loaded,
             **({"note": "Restart required to activate skill — no plugin registry available"} if not loaded else {}),
+            **({"warning": warning} if warning else {}),
+            **_verify_skill(
+                skill_dir=skill_dir,
+                owner=owner,
+                scope=scope,
+                source="skill_create",
+                expect_registered=loaded,
+            ),
         }
+        return result
 
     @_reg(
         name="skill_remove",
@@ -1491,6 +1538,7 @@ def register_builtin_tools(
 
         # Re-register so the plugin picks up the new instructions
         loaded = False
+        warning: str | None = None
         if plugin_registry is not None:
             plugin_registry.unregister(name)
             try:
@@ -1499,18 +1547,21 @@ def register_builtin_tools(
                 loaded = True
             except Exception as e:
                 _logger.exception("skill_update: failed to re-load skill '%s'", name)
-                return {
-                    "status": "updated",
-                    "name": name,
-                    "loaded": False,
-                    "warning": f"Skill updated but failed to reload: {e}",
-                }
+                warning = f"Skill updated but failed to reload: {e}"
 
         return {
             "status": "updated",
             "name": name,
             "owner": owner,
             "loaded": loaded,
+            **({"warning": warning} if warning else {}),
+            **_verify_skill(
+                skill_dir=skill_dir,
+                owner=owner,
+                scope=owner,
+                source="skill_update",
+                expect_registered=loaded,
+            ),
         }
 
     @_reg(
@@ -1663,6 +1714,7 @@ def register_builtin_tools(
 
         # Hot-load
         loaded = False
+        warning: str | None = None
         if plugin_registry is not None:
             try:
                 plugin = load_skill(dest, owner, allow_local_network=_skill_allow_local())
@@ -1670,13 +1722,7 @@ def register_builtin_tools(
                 loaded = True
             except Exception as exc:
                 _logger.exception("skill_approve: failed to load '%s'", name)
-                return {
-                    "status": "approved",
-                    "name": name,
-                    "owner": owner,
-                    "loaded": False,
-                    "warning": f"Approved but failed to load: {exc}",
-                }
+                warning = f"Approved but failed to load: {exc}"
 
         return {
             "status": "approved",
@@ -1684,6 +1730,14 @@ def register_builtin_tools(
             "owner": owner,
             "approved_by": person,
             "loaded": loaded,
+            **({"warning": warning} if warning else {}),
+            **_verify_skill(
+                skill_dir=dest,
+                owner=owner,
+                scope=owner,
+                source="skill_approve",
+                expect_registered=loaded,
+            ),
         }
 
     @_reg(name="skill_reject", description="Reject and delete a pending skill. Admin only.")
@@ -1776,9 +1830,17 @@ def register_builtin_tools(
                 "scope": scope,
                 "requested_by": person,
                 "fetched_files": ["SKILL.md", *fetched_extras],
+                **_verify_skill(
+                    skill_dir=skill_dir,
+                    owner=owner,
+                    scope=scope,
+                    source="skill_install",
+                    expect_registered=False,
+                ),
             }
 
         loaded = False
+        warning: str | None = None
         if plugin_registry is not None:
             try:
                 plugin = load_skill(
@@ -1788,15 +1850,7 @@ def register_builtin_tools(
                 loaded = True
             except Exception as e:
                 _logger.exception("skill_install: failed to load '%s'", slug)
-                return {
-                    "status": "installed",
-                    "name": slug,
-                    "loaded": False,
-                    "warning": f"Installed but failed to load: {e}",
-                }
-
-        from homeclaw.plugins.skills.deps import check_skill_deps
-        deps = check_skill_deps(defn.metadata)
+                warning = f"Installed but failed to load: {e}"
 
         result: dict[str, Any] = {
             "status": "installed",
@@ -1804,14 +1858,18 @@ def register_builtin_tools(
             "scope": scope,
             "loaded": loaded,
             "fetched_files": ["SKILL.md", *fetched_extras],
+            **({"warning": warning} if warning else {}),
+            **_verify_skill(
+                skill_dir=skill_dir,
+                owner=owner,
+                scope=scope,
+                source="skill_install",
+                expect_registered=loaded,
+            ),
         }
-        if not deps["satisfied"]:
-            dep_warnings: list[str] = []
-            for b in deps["missing_bins"]:
-                dep_warnings.append(f"Missing binary '{b['name']}': {b['hint']}")
-            for ev in deps["missing_env"]:
-                dep_warnings.append(f"Missing env var '{ev}'")
-            result["warnings"] = dep_warnings
+        verification = result["verification"]
+        if verification["dependency_warnings"]:
+            result["warnings"] = verification["dependency_warnings"]
         return result
 
     @_reg(
@@ -2030,7 +2088,16 @@ def register_builtin_tools(
                 if files:
                     resources[subdir] = files
 
+        already_loaded = name in activated_skills
         activated_skills.add(name)
+        if runtime_observability is not None and not already_loaded:
+            runtime_observability.record_skill_activation(SkillActivationEvent(
+                skill_name=name,
+                person=person,
+                reason="read_skill",
+                tool_name=None,
+                activated_at=now_utc(),
+            ))
 
         # List registered plugin tools for this skill (e.g. weather__http_call)
         available_tools: list[str] = []
@@ -2047,7 +2114,7 @@ def register_builtin_tools(
             "scope": loc.scope,
             "resources": resources,
             "tools": available_tools,
-            "already_loaded": name in activated_skills,
+            "already_loaded": already_loaded,
         }
 
     @_reg(

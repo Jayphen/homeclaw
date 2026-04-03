@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
+from homeclaw.agent.runtime_state import InMemoryRuntimeObservability
+from homeclaw.agent.tools import ToolRegistry, activated_skills, register_builtin_tools
 from homeclaw.plugins.registry import PluginRegistry
 
 
@@ -39,6 +40,11 @@ def _no_builtin_skills(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         "homeclaw.plugins.skills.loader._builtin_skills_dir",
         lambda: tmp_path / "_no_builtin_skills",
     )
+
+
+@pytest.fixture(autouse=True)
+def _clear_activated_skills() -> None:
+    activated_skills.clear()
 
 
 @pytest.fixture
@@ -634,3 +640,50 @@ async def test_skill_reject_non_admin_rejected(
         name="budget",
     )
     assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_skill_create_includes_verification(
+    registry: ToolRegistry,
+) -> None:
+    result = await registry.get_handler("skill_create")(  # type: ignore[misc]
+        person="alice",
+        name="weather",
+        description="Get weather info",
+        scope="household",
+        allowed_domains=["api.openweathermap.org"],
+        instructions="Use this to answer weather questions.",
+    )
+    assert result["verified"] is True
+    assert result["verification_status"] == "verified"
+    assert result["verification"]["skill_name"] == "weather"
+    assert "weather__data_write" in result["verification"]["expected_tools"]
+    assert "weather__http_call" in result["verification"]["expected_tools"]
+
+
+@pytest.mark.asyncio
+async def test_read_skill_tracks_activation_reason(
+    workspaces: Path,
+    plugin_reg: PluginRegistry,
+) -> None:
+    runtime_observability = InMemoryRuntimeObservability()
+    reg = ToolRegistry()
+    register_builtin_tools(
+        reg,
+        workspaces,
+        plugin_registry=plugin_reg,
+        runtime_observability=runtime_observability,
+    )
+    make_skill(workspaces, "household", "weather", WEATHER_SKILL_MD)
+
+    first = await reg.get_handler("read_skill")(person="alice", name="weather")  # type: ignore[misc]
+    second = await reg.get_handler("read_skill")(person="alice", name="weather")  # type: ignore[misc]
+
+    assert first["already_loaded"] is False
+    assert second["already_loaded"] is True
+
+    snapshot = runtime_observability.snapshot()
+    assert len(snapshot.recent_skill_activations) == 1
+    activation = snapshot.recent_skill_activations[0]
+    assert activation.skill_name == "weather"
+    assert activation.reason == "read_skill"

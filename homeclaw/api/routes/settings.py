@@ -8,7 +8,12 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import PlainTextResponse
 
-from homeclaw.api.deps import AdminDep, get_config
+from homeclaw.api.deps import (
+    AdminDep,
+    get_agent_loop,
+    get_config,
+    get_runtime_observability,
+)
 from homeclaw.api.logbuffer import get_log_buffer, get_log_entries_from_file
 from homeclaw.memory.status import get_semantic_status
 
@@ -21,6 +26,25 @@ async def get_settings() -> dict[str, Any]:
     return {
         "semantic_status": get_semantic_status(config.workspaces.resolve()),
     }
+
+
+@router.get("/runtime", dependencies=[AdminDep])
+async def get_runtime_state() -> dict[str, Any]:
+    """Admin runtime snapshot for prompt, skill, and consolidation inspection."""
+    runtime_observability = get_runtime_observability()
+    loop = get_agent_loop()
+    tool_policies = loop.tool_policy_snapshot() if loop is not None else []
+    if runtime_observability is None:
+        return {
+            "prompt_snapshots": [],
+            "recent_skill_activations": [],
+            "recent_skill_verifications": [],
+            "recent_consolidations": [],
+            "tool_policies": [policy.model_dump(mode="json") for policy in tool_policies],
+        }
+    snapshot = runtime_observability.snapshot()
+    snapshot.tool_policies = tool_policies
+    return snapshot.model_dump(mode="json")
 
 
 @router.get("/logs", dependencies=[AdminDep])

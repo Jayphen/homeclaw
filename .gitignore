@@ -20,6 +20,7 @@ workspaces/
 
 # Beads credential key
 .beads/.beads-credential-key
+.beads/.br_history/
 
 # Dev workspace data
 workspaces-dev/
