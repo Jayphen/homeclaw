@@ -8,7 +8,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Any
 
+import mimetypes
+
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from homeclaw.api.deps import AdminDep, AuthDep, MemberDep, get_config, list_member_workspaces
@@ -87,10 +90,12 @@ def _scan_active_skills(workspaces: Path) -> list[dict[str, Any]]:
                 continue
 
             parse_error: str | None = None
+            ui_app: dict[str, Any] | None = None
             try:
                 defn = skill_md_to_definition(skill_md.read_text())
                 description = defn.description
                 allowed_domains = defn.allowed_domains
+                ui_app = defn.ui_app.model_dump() if defn.ui_app else None
             except Exception as exc:
                 description = ""
                 allowed_domains = []
@@ -110,6 +115,7 @@ def _scan_active_skills(workspaces: Path) -> list[dict[str, Any]]:
                 "allowed_domains": allowed_domains,
                 "file_count": len(files),
                 "files": files,
+                "ui_app": ui_app,
             }
             if parse_error:
                 entry["parse_error"] = parse_error
@@ -436,6 +442,7 @@ async def get_skill(owner: str, name: str) -> dict[str, Any]:
         "compatibility": defn.compatibility,
         "files": files,
         "deps": _check_deps(defn.metadata, _load_env(skill_dir)),
+        "ui_app": defn.ui_app.model_dump() if defn.ui_app else None,
     }
 
 
@@ -581,6 +588,40 @@ async def delete_skill_file(owner: str, name: str, file_path: str) -> dict[str, 
 
     path.unlink()
     return {"status": "deleted", "path": file_path}
+
+
+# ---------------------------------------------------------------------------
+# Skill asset serving — for embedded mini-apps (Arrow.js etc.)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{owner}/{name}/assets/{file_path:path}", dependencies=[AuthDep])
+async def serve_skill_asset(owner: str, name: str, file_path: str) -> FileResponse:
+    """Serve a file from the skill's assets/ directory as a browser document.
+
+    This endpoint is used to load embedded mini-apps (e.g. Arrow.js apps)
+    declared via the ``ui-app`` SKILL.md frontmatter key. The browser
+    navigates to this URL inside an iframe, so auth is accepted via the
+    ``?token=`` query parameter in addition to the ``Authorization`` header.
+
+    Files are served with correct MIME types. Path traversal is rejected.
+    """
+    workspaces = get_config().workspaces.resolve()
+    skill_dir = _safe_relative(workspaces / owner / "skills", name)
+
+    if not skill_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Skill not found")
+
+    assets_dir = skill_dir / "assets"
+    if not assets_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Skill has no assets directory")
+
+    path = _safe_relative(assets_dir, file_path)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"Asset not found: {file_path}")
+
+    media_type, _ = mimetypes.guess_type(str(path))
+    return FileResponse(path, media_type=media_type or "application/octet-stream")
 
 
 # ---------------------------------------------------------------------------

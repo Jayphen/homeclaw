@@ -25,6 +25,13 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+class SkillUiApp(BaseModel):
+    """Embedded web app declaration for a skill."""
+
+    entry: str = "assets/index.html"
+    title: str | None = None
+
+
 class SkillFrontmatter(BaseModel):
     """YAML frontmatter parsed from a SKILL.md file (AgentSkills spec)."""
 
@@ -36,6 +43,7 @@ class SkillFrontmatter(BaseModel):
     allowed_tools: list[str] = []
     # homeclaw extensions (not in AgentSkills spec)
     allowed_domains: list[str] = []
+    ui_app: SkillUiApp | None = None
 
 
 class SkillDefinition(BaseModel):
@@ -49,6 +57,7 @@ class SkillDefinition(BaseModel):
     compatibility: str | None = None
     metadata: dict[str, Any] = {}
     allowed_tools: list[str] = []
+    ui_app: SkillUiApp | None = None
 
 
 @dataclass
@@ -113,6 +122,17 @@ def parse_skill_md(content: str) -> tuple[SkillFrontmatter, str]:
     # Normalize allowed-domains from YAML (homeclaw extension)
     allowed_domains = data.pop("allowed-domains", None) or data.pop("allowed_domains", None) or []
 
+    # Parse ui-app declaration (homeclaw extension)
+    ui_app_raw = data.pop("ui-app", None) or data.pop("ui_app", None)
+    ui_app: SkillUiApp | None = None
+    if isinstance(ui_app_raw, dict):
+        ui_app = SkillUiApp(
+            entry=ui_app_raw.get("entry", "assets/index.html"),
+            title=ui_app_raw.get("title"),
+        )
+    elif ui_app_raw is True:
+        ui_app = SkillUiApp()
+
     frontmatter = SkillFrontmatter(
         name=data.get("name", ""),
         description=data.get("description", ""),
@@ -121,6 +141,7 @@ def parse_skill_md(content: str) -> tuple[SkillFrontmatter, str]:
         metadata=data.get("metadata") or {},
         allowed_tools=allowed_tools,
         allowed_domains=allowed_domains,
+        ui_app=ui_app,
     )
 
     return frontmatter, body.strip()
@@ -138,6 +159,7 @@ def skill_md_to_definition(content: str) -> SkillDefinition:
         compatibility=fm.compatibility,
         metadata=fm.metadata,
         allowed_tools=fm.allowed_tools,
+        ui_app=fm.ui_app,
     )
 
 

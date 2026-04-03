@@ -220,3 +220,89 @@ in the Skills settings.
 ### Workflow skill
 Morning briefing, weekly review — orchestrates multiple tools.
 Instructions describe the workflow steps and what to include.
+
+### Mini-app skill (Arrow.js embedded UI)
+
+Skills can embed a small interactive web app in the homeclaw web UI.
+Declare it with `ui-app:` in the frontmatter — the app appears as a live
+panel on the skill's detail page, with a link to open in a new tab.
+
+**SKILL.md frontmatter:**
+```yaml
+---
+name: my-skill
+description: Track items and show them in an interactive list.
+ui-app:
+  entry: assets/index.html   # default — can omit if using this path
+  title: My App              # optional display title
+---
+```
+
+**Arrow.js is the preferred framework** — zero build step, reactive,
+tiny (~5KB). Load it from CDN or vendor it into `assets/`:
+
+```html
+<!-- assets/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: sans-serif; padding: 1rem; margin: 0; }
+  </style>
+</head>
+<body>
+<script type="module">
+  import { reactive, html } from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.js'
+
+  // Read the auth token from localStorage (same origin as homeclaw)
+  const token = localStorage.getItem('homeclaw_token') ?? ''
+  const headers = { Authorization: `Bearer ${token}` }
+
+  // Load skill data from the files API
+  const state = reactive({ items: [], loading: true })
+
+  fetch('/api/skills/household/my-skill/files/data/items.json', { headers })
+    .then(r => r.ok ? r.json() : { items: [] })
+    .then(d => { state.items = d.items ?? []; state.loading = false })
+
+  html`
+    ${() => state.loading
+      ? html`<p>Loading…</p>`
+      : html`<ul>${() => state.items.map(item => html`<li>${item}</li>`)}</ul>`
+    }
+  `(document.body)
+</script>
+</body>
+</html>
+```
+
+**How to create a mini-app skill:**
+```
+skill_create(
+  name="my-app",
+  description="Interactive tracker with embedded UI.",
+  scope="household",
+  instructions="...",
+  initial_files=[
+    {
+      "filename": "assets/index.html",
+      "content": "<!-- Arrow.js app here -->"
+    },
+    {
+      "filename": "data/items.json",
+      "content": "{\"items\": []}"
+    }
+  ]
+)
+```
+
+Then update `assets/index.html` via `skill_edit_file` with the full app.
+
+**Notes:**
+- The app runs on the same origin as homeclaw, so `fetch('/api/...')` works
+- Use `localStorage.getItem('homeclaw_token')` for the Bearer token
+- Data lives in `data/` — read via `/api/skills/{owner}/{name}/files/data/filename`
+- Write data back via the agent using `{name}__data_write`; the UI is read-only by default
+- LAN-only installs: vendor Arrow.js into `assets/arrow.js` and use a relative import
