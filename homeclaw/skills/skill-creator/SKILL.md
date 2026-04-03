@@ -227,6 +227,15 @@ Skills can embed a small interactive web app in the homeclaw web UI.
 Declare it with `ui-app:` in the frontmatter — the app appears as a live
 panel on the skill's detail page, with a link to open in a new tab.
 
+If the skill already exists, do NOT call `skill_create` again. Instead:
+1. Call `read_skill` to inspect the existing skill and its files
+2. Use `skill_edit_file` to update `SKILL.md` and add a `ui-app:` block
+3. Write the app to `assets/index.html` with `skill_edit_file`
+4. Keep the app inside the skill's `assets/` directory so the web UI can render it
+
+Do NOT return raw HTML to the user and tell them to save or run it manually.
+For embedded apps, the goal is a live skill panel in homeclaw, not a pasted HTML blob.
+
 **SKILL.md frontmatter:**
 ```yaml
 ---
@@ -299,6 +308,22 @@ skill_create(
 ```
 
 Then update `assets/index.html` via `skill_edit_file` with the full app.
+
+**Converting an existing skill into a mini-app:**
+```
+read_skill(name="budget", person="alice")
+skill_edit_file(
+  name="budget",
+  file="SKILL.md",
+  find="description: ...",
+  replace="description: ...\nui-app:\n  entry: assets/index.html\n  title: Budget Dashboard"
+)
+skill_edit_file(
+  name="budget",
+  file="assets/index.html",
+  content="<!-- Arrow.js app here -->"
+)
+```
 
 **Notes:**
 - The app runs on the same origin as homeclaw, so `fetch('/api/...')` works
