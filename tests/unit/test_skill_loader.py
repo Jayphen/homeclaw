@@ -99,6 +99,33 @@ def test_parse_skill_md_minimal() -> None:
     assert body == ""
 
 
+def test_parse_skill_md_stringified_allowed_domains_empty_list() -> None:
+    content = """\
+---
+name: embedded-app
+description: Generated embedded app skill
+allowed_domains: "[]"
+---
+Open the UI app when asked.
+"""
+    fm, body = parse_skill_md(content)
+    assert fm.allowed_domains == []
+    assert body == "Open the UI app when asked."
+
+
+def test_parse_skill_md_stringified_allowed_domains_json_list() -> None:
+    content = """\
+---
+name: embedded-app
+description: Generated embedded app skill
+allowed_domains: "[\\"api.example.com\\", \\"api.second.example\\"]"
+---
+Open the UI app when asked.
+"""
+    fm, _ = parse_skill_md(content)
+    assert fm.allowed_domains == ["api.example.com", "api.second.example"]
+
+
 def test_parse_skill_md_all_fields() -> None:
     fm, body = parse_skill_md(BUDGET_SKILL)
     assert fm.name == "budget-tracker"

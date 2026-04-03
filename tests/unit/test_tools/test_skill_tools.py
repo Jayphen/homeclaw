@@ -687,3 +687,38 @@ async def test_read_skill_tracks_activation_reason(
     activation = snapshot.recent_skill_activations[0]
     assert activation.skill_name == "weather"
     assert activation.reason == "read_skill"
+
+
+@pytest.mark.asyncio
+async def test_read_skill_accepts_stringified_allowed_domains(
+    workspaces: Path,
+    plugin_reg: PluginRegistry,
+) -> None:
+    runtime_observability = InMemoryRuntimeObservability()
+    reg = ToolRegistry()
+    register_builtin_tools(
+        reg,
+        workspaces,
+        plugin_registry=plugin_reg,
+        runtime_observability=runtime_observability,
+    )
+    make_skill(
+        workspaces,
+        "household",
+        "embedded_app",
+        """\
+---
+name: embedded_app
+description: Embedded app
+allowed_domains: "[]"
+---
+Use the embedded app.
+""",
+    )
+
+    result = await reg.get_handler("read_skill")(person="alice", name="embedded_app")  # type: ignore[misc]
+
+    assert result["name"] == "embedded_app"
+    assert result["description"] == "Embedded app"
+    assert result["instructions"] == "Use the embedded app."
+    assert result["already_loaded"] is False
