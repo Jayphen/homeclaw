@@ -158,6 +158,22 @@ make typecheck    # Pyright strict type checking
 make lint         # Ruff linting + formatting check
 ```
 
+### Releases
+
+This repo uses release-please from pushes to `main`.
+
+If you squash-merge PRs, the PR title becomes the commit subject on `main`, so
+it must use a conventional commit prefix such as `fix:`, `feat:`, or `chore:`
+for release-please to parse it.
+
+Examples:
+
+- `fix: handle stringified skill allowed_domains`
+- `feat: add Arrow.js embedded mini-app support for skills`
+
+Titles like `Fix embedded skill mini-app workflow` are not parseable by
+release-please and will not trigger a release PR.
+
 ## Scheduler & routines
 
 homeclaw runs recurring tasks defined in `workspaces/household/ROUTINES.md`:
