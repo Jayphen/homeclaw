@@ -19,6 +19,7 @@ from homeclaw.agent.runtime_state import (
     PromptSnapshot,
     RuntimeObservability,
     SkillActivationEvent,
+    ToolPolicyEntry,
     now_utc,
 )
 from homeclaw.agent.routing import (
@@ -219,6 +220,72 @@ def _is_substantive_interim(text: str) -> bool:
     # Suppress LLM deliberation / self-talk chains (e.g. "Let me try...
     # Actually, I need to... I'll download... Actually, let me...")
     return len(_SELF_TALK_RE.findall(text)) < 3
+
+
+def describe_tool_policies(tool_names: list[str]) -> list[ToolPolicyEntry]:
+    """Return deterministic policy classifications for registered tools."""
+    policies: list[ToolPolicyEntry] = []
+    skill_read_suffixes = {"data_list", "data_read", "get_env"}
+    skill_write_suffixes = {"data_write", "data_delete"}
+
+    for tool_name in sorted(tool_names):
+        categories: list[str] = []
+        dm_enforcement: str | None = None
+        routine_behavior: str | None = None
+        access: str = "unknown"
+        scope: str = "general"
+
+        if "__" in tool_name:
+            scope = "skill"
+            categories.append("skill_namespaced")
+            suffix = tool_name.split("__", 1)[1]
+            if suffix in skill_read_suffixes:
+                access = "read"
+                categories.append("skill_read")
+            elif suffix in skill_write_suffixes:
+                access = "write"
+                categories.append("skill_write")
+            elif suffix == "http_call":
+                access = "action"
+                categories.extend(["skill_network", "allowed_domains_enforced"])
+            else:
+                access = "action"
+                categories.append("skill_action")
+
+        if tool_name in _PERSONAL_WRITE_TOOLS:
+            access = "write"
+            scope = "personal"
+            categories.append("personal_write")
+            dm_enforcement = "forces person to authenticated caller in DMs"
+
+        if tool_name in _PERSONAL_READ_TOOLS:
+            access = "read"
+            scope = "personal"
+            categories.append("personal_read")
+            dm_enforcement = "forces person to authenticated caller in DMs"
+
+        if tool_name in _HOUSEHOLD_WRITE_TOOLS:
+            access = "write"
+            scope = "household"
+            categories.append("household_write_confirmation")
+            dm_enforcement = "first DM attempt blocked until explicit confirmation"
+
+        if tool_name in _ROUTINE_BLOCKED_TOOLS:
+            routine_behavior = "blocked in routine execution"
+            categories.append("routine_blocked")
+            if access == "unknown":
+                access = "action"
+
+        policies.append(ToolPolicyEntry(
+            tool_name=tool_name,
+            access=access,  # type: ignore[arg-type]
+            scope=scope,  # type: ignore[arg-type]
+            categories=categories,
+            dm_enforcement=dm_enforcement,
+            routine_behavior=routine_behavior,
+        ))
+
+    return policies
 
 
 def _estimate_message_tokens(msg: Message) -> int:
@@ -485,6 +552,11 @@ class AgentLoop:
         Can be sync or async.
         """
         self._on_interim = callback
+
+    def tool_policy_snapshot(self) -> list[ToolPolicyEntry]:
+        """Return deterministic policy classifications for current tools."""
+        tool_names = [definition.name for definition in self._registry.get_definitions()]
+        return describe_tool_policies(tool_names)
 
     def start_background_consolidation(self) -> None:
         """Start the background consolidation loop (call once at startup)."""

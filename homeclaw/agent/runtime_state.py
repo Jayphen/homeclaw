@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Literal, Protocol, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from homeclaw.plugins.skills.verification import SkillVerificationReport
 
@@ -60,6 +60,17 @@ class ConsolidationEvent(BaseModel):
     recorded_at: datetime
 
 
+class ToolPolicyEntry(BaseModel):
+    """Deterministic classification for a registered tool."""
+
+    tool_name: str
+    access: Literal["read", "write", "action", "unknown"]
+    scope: Literal["personal", "household", "skill", "general"]
+    categories: list[str]
+    dm_enforcement: str | None = None
+    routine_behavior: str | None = None
+
+
 class RuntimeSnapshot(BaseModel):
     """Admin-facing runtime state snapshot."""
 
@@ -67,6 +78,7 @@ class RuntimeSnapshot(BaseModel):
     recent_skill_activations: list[SkillActivationEvent]
     recent_skill_verifications: list[SkillVerificationReport]
     recent_consolidations: list[ConsolidationEvent]
+    tool_policies: list[ToolPolicyEntry] = Field(default_factory=list)
 
 
 class RuntimeObservability(Protocol):
