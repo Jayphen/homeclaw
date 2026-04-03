@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.1](https://github.com/Jayphen/homeclaw/compare/v0.25.0...v0.25.1) (2026-04-03)
+
+
+### Documentation
+
+* document release-please title requirements ([#124](https://github.com/Jayphen/homeclaw/issues/124)) ([6b9d78c](https://github.com/Jayphen/homeclaw/commit/6b9d78cfc3351f674a71d8e5c583abadbf761b3e))
+
 ## [0.25.0](https://github.com/Jayphen/homeclaw/compare/v0.24.0...v0.25.0) (2026-04-03)
 
 
