@@ -11,14 +11,14 @@ Read `homeclaw-planning-prompt.md` for the full architecture and product spec.
 
 ## Task tracking
 
-Use `bd` (beads) for ALL task tracking. Never create markdown TODO files or task
+Use `br` (beads_rust) for ALL task tracking. Never create markdown TODO files or task
 lists. Every piece of work goes into beads.
 
 ```bash
-bd ready          # Find unblocked work
-bd show <id>      # View issue details
-bd update <id> --claim  # Claim work
-bd close <id> --reason "..."  # Complete work
+br ready          # Find unblocked work
+br show <id>      # View issue details
+br update <id> --claim  # Claim work
+br close <id> --reason "..."  # Complete work
 ```
 
 ## Language and tooling
@@ -170,5 +170,5 @@ The version in `pyproject.toml` is managed by release-please — do not bump it 
 When ending a session:
 1. File remaining work as beads issues
 2. Run `make typecheck` and `make lint`
-3. Close completed issues with `bd close`
+3. Close completed issues with `br close`
 4. Commit and push (use conventional commit prefixes)
