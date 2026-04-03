@@ -54,6 +54,7 @@ pass ``schema_overrides`` to override specific parameter schemas:
 """
 
 import inspect
+import types
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, Union, get_args, get_origin
@@ -137,7 +138,7 @@ def _type_to_schema(annotation: Any) -> tuple[dict[str, Any], bool]:
     args = get_args(annotation)
 
     # Union types: X | None or Optional[X]
-    if origin is Union:
+    if origin in (Union, types.UnionType):
         non_none = [a for a in args if a is not type(None)]
         if len(non_none) == 1:
             schema, _ = _type_to_schema(non_none[0])

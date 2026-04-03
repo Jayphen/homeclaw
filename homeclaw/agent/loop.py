@@ -819,7 +819,10 @@ class AgentLoop:
             # Re-route: use cheaper model/provider for follow-up tool rounds.
             if self._routing:
                 tool_names = [tc.name for tc in response.tool_calls]
-                current_call_type = classify_tool_round(tool_names)
+                if any("error" in result for result in tool_results):
+                    current_call_type = CallType.CONVERSATION
+                else:
+                    current_call_type = classify_tool_round(tool_names)
                 model = route_model(current_call_type, self._routing)
                 active_provider = self._pick_provider(current_call_type, has_images=has_images)
                 if hasattr(active_provider, "model"):

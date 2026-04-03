@@ -61,6 +61,17 @@ class TestOptionalParams:
         assert d.parameters["required"] == ["name"]
         assert "topic" in d.parameters["properties"]
 
+    def test_optional_list_via_pep604_union_keeps_array_schema(self) -> None:
+        reg = tool(name="t", description="d")
+        async def fn(*, tags: list[str] | None = None, **_: Any) -> dict[str, Any]:
+            return {}
+        reg(fn)
+        d = reg.definition()
+        assert d.parameters["properties"]["tags"] == {
+            "type": "array",
+            "items": {"type": "string"},
+        }
+
     def test_optional_via_default(self) -> None:
         reg = tool(name="t", description="d")
         async def fn(*, name: str, scope: str = "household", **_: Any) -> dict[str, Any]:

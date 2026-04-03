@@ -237,6 +237,20 @@ async def test_skill_create_duplicate_error(
     )
     assert "error" in result
     assert "already exists" in result["error"]
+    assert result["existing_skill"] is True
+    assert "read_skill" in result["hint"]
+    assert "skill_edit_file" in result["hint"]
+
+
+def test_skill_create_schema_uses_arrays_for_optional_lists(
+    registry: ToolRegistry,
+) -> None:
+    skill_create = next(d for d in registry.get_definitions() if d.name == "skill_create")
+    props = skill_create.parameters["properties"]
+    assert props["allowed_domains"]["type"] == "array"
+    assert props["allowed_domains"]["items"] == {"type": "string"}
+    assert props["source_notes"]["type"] == "array"
+    assert props["source_notes"]["items"] == {"type": "string"}
 
 
 # ---------------------------------------------------------------------------
@@ -722,3 +736,41 @@ Use the embedded app.
     assert result["description"] == "Embedded app"
     assert result["instructions"] == "Use the embedded app."
     assert result["already_loaded"] is False
+
+
+@pytest.mark.asyncio
+async def test_read_skill_exposes_ui_app_assets_for_embedded_skills(
+    registry: ToolRegistry, workspaces: Path
+) -> None:
+    make_skill(
+        workspaces,
+        "household",
+        "budget_dashboard",
+        """\
+---
+name: budget_dashboard
+description: Budget dashboard
+ui-app:
+  entry: assets/index.html
+  title: Budget Dashboard
+---
+Use the embedded dashboard.
+""",
+    )
+    assets_dir = workspaces / "household" / "skills" / "budget_dashboard" / "assets"
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    (assets_dir / "index.html").write_text("<!doctype html><title>Budget</title>")
+
+    result = await registry.get_handler("read_skill")(person="alice", name="budget_dashboard")  # type: ignore[misc]
+
+    assert result["name"] == "budget_dashboard"
+    assert result["resources"]["assets"] == ["index.html"]
+
+
+def test_skill_creator_builtin_instructions_cover_existing_skill_mini_apps() -> None:
+    skill_md = Path(
+        "/Users/beepboop/dev/homeclaw/homeclaw/skills/skill-creator/SKILL.md"
+    ).read_text()
+    assert "If the skill already exists, do NOT call `skill_create` again." in skill_md
+    assert "Do NOT return raw HTML to the user" in skill_md
+    assert "assets/index.html" in skill_md

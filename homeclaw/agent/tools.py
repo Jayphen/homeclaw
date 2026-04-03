@@ -1357,7 +1357,17 @@ def register_builtin_tools(
         # Check for conflicts in both live and pending
         live_dir = workspaces / owner / "skills" / slug
         if live_dir.exists():
-            return {"error": f"Skill '{slug}' already exists under {owner}"}
+            return {
+                "error": f"Skill '{slug}' already exists under {owner}",
+                "hint": (
+                    "This skill already exists. Use read_skill to inspect it, then "
+                    "skill_edit_file to update SKILL.md or add assets/index.html "
+                    "instead of calling skill_create again."
+                ),
+                "existing_skill": True,
+                "owner": owner,
+                "name": slug,
+            }
         if not pending and (_pending_dir() / slug).exists():
             return {"error": f"Skill '{slug}' is already pending approval"}
 
