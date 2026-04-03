@@ -90,6 +90,38 @@ class SkillCatalogEntry:
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 
 
+def _normalize_string_list_field(value: Any, *, field_name: str) -> list[str]:
+    """Normalize YAML/stringified list fields into a list of strings.
+
+    Embedded app creation can sometimes serialize list-valued frontmatter as a
+    string like ``"[]"``. Accept that form in addition to native YAML lists.
+    """
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return []
+        if stripped.startswith("["):
+            try:
+                parsed = json.loads(stripped)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"Invalid {field_name} frontmatter: expected JSON list string, got {value!r}"
+                ) from exc
+            if not isinstance(parsed, list):
+                raise ValueError(
+                    f"Invalid {field_name} frontmatter: expected list, got {type(parsed).__name__}"
+                )
+            return [str(item) for item in parsed]
+        return [part.strip() for part in stripped.split(",") if part.strip()]
+    raise ValueError(
+        f"Invalid {field_name} frontmatter: expected list or string, got {type(value).__name__}"
+    )
+
+
 def parse_skill_md(content: str) -> tuple[SkillFrontmatter, str]:
     """Parse a SKILL.md file into frontmatter and markdown body.
 
@@ -120,7 +152,13 @@ def parse_skill_md(content: str) -> tuple[SkillFrontmatter, str]:
         allowed_tools = allowed_tools.split()
 
     # Normalize allowed-domains from YAML (homeclaw extension)
-    allowed_domains = data.pop("allowed-domains", None) or data.pop("allowed_domains", None) or []
+    allowed_domains_raw = data.pop("allowed-domains", None)
+    if allowed_domains_raw is None:
+        allowed_domains_raw = data.pop("allowed_domains", None)
+    allowed_domains = _normalize_string_list_field(
+        allowed_domains_raw,
+        field_name="allowed_domains",
+    )
 
     # Parse ui-app declaration (homeclaw extension)
     ui_app_raw = data.pop("ui-app", None) or data.pop("ui_app", None)
