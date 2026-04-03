@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.25.0](https://github.com/Jayphen/homeclaw/compare/v0.24.0...v0.25.0) (2026-04-03)
+
+
+### Features
+
+* add Arrow.js embedded mini-app support for skills ([#121](https://github.com/Jayphen/homeclaw/issues/121)) ([f580d4a](https://github.com/Jayphen/homeclaw/commit/f580d4aa44d439fe808e705399ea4dc7dc743348))
+* add formal tool policy metadata and centralized permission enforcement ([#119](https://github.com/Jayphen/homeclaw/issues/119)) ([2c30276](https://github.com/Jayphen/homeclaw/commit/2c30276ce7a3437f6985de456f281b8754fcf73b))
+
 ## [0.24.0](https://github.com/Jayphen/homeclaw/compare/v0.23.0...v0.24.0) (2026-03-27)
 
 
