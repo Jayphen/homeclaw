@@ -191,6 +191,18 @@ def get_plugin_registry() -> Any:
     return _plugin_registry
 
 
+_runtime_observability: Any = None
+
+
+def set_runtime_observability(runtime_observability: Any) -> None:
+    global _runtime_observability
+    _runtime_observability = runtime_observability
+
+
+def get_runtime_observability() -> Any:
+    return _runtime_observability
+
+
 _scheduler: Any = None  # Scheduler instance — set by main entry point
 
 

@@ -4,10 +4,15 @@ import asyncio
 import json
 import logging
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import model_validator
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    InitSettingsSource,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 
 from homeclaw.agent.context import ContextConfig
 from homeclaw.agent.routing import RoutingConfig
@@ -239,7 +244,7 @@ class HomeclawConfig(BaseSettings):
         import os
 
         ws = os.environ.get("WORKSPACES_PATH", "./workspaces")
-        init_data = init_settings.init_kwargs
+        init_data = cast(InitSettingsSource, init_settings).init_kwargs
         if "workspaces_path" in init_data:
             ws = init_data["workspaces_path"]
         json_path = Path(ws).resolve() / "config.json"

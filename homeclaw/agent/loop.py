@@ -13,6 +13,14 @@ from typing import Any
 
 from homeclaw.agent.context import HOUSEHOLD_WORKSPACE, build_context, estimate_tokens
 from homeclaw.agent.providers.base import LLMProvider, LLMResponse, Message, ToolCall
+from homeclaw.agent.runtime_state import (
+    ConsolidationEvent,
+    PromptSection,
+    PromptSnapshot,
+    RuntimeObservability,
+    SkillActivationEvent,
+    now_utc,
+)
 from homeclaw.agent.routing import (
     CallType,
     RoutingConfig,
@@ -328,6 +336,44 @@ def _truncate_history(
     return _sanitize_history(kept)
 
 
+def _build_system_prompt(
+    context: str,
+    note_detail_level: str,
+) -> tuple[str, list[PromptSection]]:
+    """Build the active system prompt and expose its sections for inspection."""
+    sections = [
+        PromptSection(
+            name="base_system_prompt",
+            content=SYSTEM_PROMPT.format(context="").strip(),
+        ),
+        PromptSection(name="context", content=context),
+    ]
+
+    if note_detail_level == "minimal":
+        sections.append(PromptSection(
+            name="note_detail_minimal",
+            content=(
+                "Note-taking level: MINIMAL. Only save notes for truly significant "
+                "events — major decisions, important plans, health emergencies. "
+                "Skip routine daily activities."
+            ),
+        ))
+    elif note_detail_level == "detailed":
+        sections.append(PromptSection(
+            name="note_detail_detailed",
+            content=(
+                "Note-taking level: DETAILED. Save notes aggressively for almost "
+                "everything mentioned — meals, activities, moods, weather "
+                "observations, conversations, purchases, plans, ideas, health, "
+                "exercise, chores. The household wants a rich, comprehensive daily "
+                "journal. When in doubt, always save."
+            ),
+        ))
+
+    system = "\n\n".join(section.content for section in sections if section.content).strip()
+    return system, sections
+
+
 InterimCallback = Callable[[str], Any]
 
 
@@ -355,6 +401,7 @@ class AgentLoop:
         note_detail_level: str = "normal",
         fast_provider: LLMProvider | None = None,
         vision_provider: LLMProvider | None = None,
+        runtime_observability: RuntimeObservability | None = None,
     ) -> None:
         self._provider = provider
         self._fast_provider = fast_provider
@@ -373,6 +420,7 @@ class AgentLoop:
         self._last_activity: dict[str, float] = {}
         self._consolidation_task: asyncio.Task[None] | None = None
         self._current_model: str = getattr(provider, "model", "unknown")
+        self._runtime_observability = runtime_observability
 
     def reload_providers(
         self,
@@ -418,6 +466,14 @@ class AgentLoop:
         instructions = load_skill_instructions(self._workspaces, person, skill_name)
         if instructions:
             logger.info("Auto-activated skill '%s' for tool %s", skill_name, tool_name)
+            if self._runtime_observability is not None:
+                self._runtime_observability.record_skill_activation(SkillActivationEvent(
+                    skill_name=skill_name,
+                    person=person,
+                    reason="auto_tool_use",
+                    tool_name=tool_name,
+                    activated_at=now_utc(),
+                ))
         return instructions
 
     def set_interim_callback(self, callback: InterimCallback | None) -> None:
@@ -459,6 +515,25 @@ class AgentLoop:
         path = _history_path(self._workspaces, history_key)
         last_consolidated, all_messages = _read_history_file(path)
         unconsolidated = all_messages[last_consolidated:]
+        person = history_key.split("-")[0] if "-" in history_key else history_key
+
+        def _record(status: str, reason: str, *, chunk_size: int = 0, saved_entries: int = 0) -> None:
+            if self._runtime_observability is None:
+                return
+            self._runtime_observability.record_consolidation(ConsolidationEvent(
+                history_key=history_key,
+                person=person,
+                status=status,  # type: ignore[arg-type]
+                reason=reason,
+                unconsolidated_messages=len(unconsolidated),
+                history_tokens=history_tokens,
+                chunk_size=chunk_size,
+                saved_entries=saved_entries,
+                model=getattr(consolidation_provider, "model", self._current_model)
+                if "consolidation_provider" in locals()
+                else self._current_model,
+                recorded_at=now_utc(),
+            ))
 
         # Check if consolidation is needed
         history_tokens = sum(_estimate_message_tokens(m) for m in unconsolidated)
@@ -466,15 +541,16 @@ class AgentLoop:
         budget = int(context_window * (1 - _RESERVED_FRACTION))
 
         if history_tokens < budget * _CONSOLIDATION_THRESHOLD:
+            _record("skipped", "history_below_threshold")
             return  # Not enough to warrant consolidation
 
         # Consolidate the oldest chunk
         chunk_end = min(_CONSOLIDATION_CHUNK_SIZE, len(unconsolidated) - 2)
         if chunk_end < 2:
+            _record("skipped", "not_enough_messages")
             return  # Need at least a couple messages to consolidate
 
         chunk = unconsolidated[:chunk_end]
-        person = history_key.split("-")[0] if "-" in history_key else history_key
 
         # Use a shallow copy of the provider so we can set the cheap model
         # without mutating the shared instance (which may be mid-request).
@@ -490,12 +566,14 @@ class AgentLoop:
 
         if "error" in result:
             logger.warning("Consolidation failed for '%s': %s — will retry next cycle", history_key, result["error"])
+            _record("failed", f"provider_error:{result['error']}", chunk_size=len(chunk))
             return  # Don't advance pointer — retry next cycle
 
         # Save extracted memories
         entries = result.get("memory_entries", [])
         if not entries:
             logger.info("Consolidation returned no memory entries for '%s' — will retry", history_key)
+            _record("failed", "no_memory_entries", chunk_size=len(chunk))
             return  # Don't advance pointer — LLM likely returned bad JSON
 
         saved = await save_consolidated_memories(entries, person, self._workspaces)
@@ -503,6 +581,7 @@ class AgentLoop:
 
         # Only advance the pointer after successfully extracting memories
         _advance_consolidation_pointer(self._workspaces, history_key, last_consolidated + chunk_end)
+        _record("succeeded", "ok", chunk_size=len(chunk), saved_entries=saved)
 
     async def run(
         self,
@@ -578,23 +657,7 @@ class AgentLoop:
             model=model_name,
             is_admin=self._admin_check(person),
         )
-        system = SYSTEM_PROMPT.format(context=context)
-
-        # Inject note-taking level guidance
-        level = self._note_detail_level
-        if level == "minimal":
-            system += (
-                "\n\nNote-taking level: MINIMAL. Only save notes for truly significant events "
-                "— major decisions, important plans, health emergencies. Skip routine daily activities."
-            )
-        elif level == "detailed":
-            system += (
-                "\n\nNote-taking level: DETAILED. Save notes aggressively for almost everything "
-                "mentioned — meals, activities, moods, weather observations, conversations, "
-                "purchases, plans, ideas, health, exercise, chores. The household wants a rich, "
-                "comprehensive daily journal. When in doubt, always save."
-            )
-        # "normal" gets no extra injection — the base prompt covers it
+        system, prompt_sections = _build_system_prompt(context, self._note_detail_level)
 
         history = _load_history(self._workspaces, history_key)
 
@@ -632,6 +695,18 @@ class AgentLoop:
             suffix = " (vision)" if has_images and self._vision_provider else ""
             logger.debug("Routed %s → %s%s", call_type.value, model, suffix)
         self._current_model = model
+        if self._runtime_observability is not None:
+            self._runtime_observability.record_prompt_snapshot(PromptSnapshot(
+                history_key=history_key,
+                person=person,
+                channel=channel,
+                call_type=call_type.value,
+                model=model,
+                tool_count=len(tools),
+                system_token_estimate=system_tokens,
+                sections=prompt_sections,
+                captured_at=now_utc(),
+            ))
 
         for _ in range(MAX_TOOL_ROUNDS):
             token_limit = max_tokens_for(current_call_type, self._routing) if self._routing else None
@@ -730,6 +805,7 @@ class AgentLoop:
                 metadata.update(
                     model=self._current_model, tools=tool_names_used,
                     tool_rounds=tool_rounds,
+                    prompt_sections=[section.name for section in prompt_sections],
                     duration_ms=int((time.monotonic() - t0) * 1000),
                 )
             return (
@@ -754,6 +830,7 @@ class AgentLoop:
             metadata.update(
                 model=self._current_model, tools=tool_names_used,
                 tool_rounds=tool_rounds,
+                prompt_sections=[section.name for section in prompt_sections],
                 duration_ms=int((time.monotonic() - t0) * 1000),
             )
 
