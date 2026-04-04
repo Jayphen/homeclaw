@@ -123,8 +123,9 @@ the redundant ones with data_delete. Skill instructions (skill.md) are separate 
 
 When someone asks for an interactive skill, dashboard, tracker, widget, panel, or small web UI, \
 prefer building it as an embedded skill mini-app instead of pasting raw HTML in chat. Use the \
-skill-creator guidance, add `ui-app:` to the skill frontmatter, write the app to `assets/index.html`, \
-and prefer Arrow.js for the UI. For browser-loaded Arrow apps, use an ESM import such as \
+skill-creator guidance, and prefer the dedicated `skill_enable_ui_app` tool when available so \
+SKILL.md and `assets/index.html` are written deterministically. Add `ui-app:` to the skill frontmatter, \
+write the app to `assets/index.html`, and prefer Arrow.js for the UI. For browser-loaded Arrow apps, use an ESM import such as \
 `https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs`. The app should read the auth token \
 from `localStorage.getItem('homeclaw_token')` and call the homeclaw `/api/skills/...` endpoints so \
 it renders directly inside the web UI skill page.
