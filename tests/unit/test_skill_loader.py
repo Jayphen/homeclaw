@@ -297,7 +297,8 @@ async def test_skill_plugin_handle_tool_unknown(tmp_path: Path) -> None:
 def test_discover_skills_finds_household_and_private(tmp_path: Path) -> None:
     make_skill_dir(tmp_path / "household" / "skills", "weather", WEATHER_SKILL)
     make_skill_dir(
-        tmp_path / "alice" / "skills", "notes",
+        tmp_path / "alice" / "skills",
+        "notes",
         MINIMAL_SKILL.replace("minimal", "notes"),
     )
 
@@ -344,11 +345,13 @@ def test_discover_skills_empty(tmp_path: Path) -> None:
 
 def test_discover_skills_household_before_personal(tmp_path: Path) -> None:
     make_skill_dir(
-        tmp_path / "alice" / "skills", "aaa",
+        tmp_path / "alice" / "skills",
+        "aaa",
         MINIMAL_SKILL.replace("minimal", "aaa"),
     )
     make_skill_dir(
-        tmp_path / "household" / "skills", "zzz",
+        tmp_path / "household" / "skills",
+        "zzz",
         MINIMAL_SKILL.replace("minimal", "zzz"),
     )
 
@@ -463,7 +466,8 @@ def test_load_all_skills_loads_household_and_private(tmp_path: Path) -> None:
 
 def test_load_all_skills_other_person_cannot_see_private(tmp_path: Path) -> None:
     make_skill_dir(
-        tmp_path / "alice" / "skills", "secret",
+        tmp_path / "alice" / "skills",
+        "secret",
         MINIMAL_SKILL.replace("minimal", "secret"),
     )
 
@@ -512,7 +516,8 @@ def test_build_skill_catalog_empty(tmp_path: Path) -> None:
 def test_build_skill_catalog_mixed_scopes(tmp_path: Path) -> None:
     make_skill_dir(tmp_path / "household" / "skills", "weather", WEATHER_SKILL)
     make_skill_dir(
-        tmp_path / "alice" / "skills", "budget",
+        tmp_path / "alice" / "skills",
+        "budget",
         MINIMAL_SKILL.replace("minimal", "budget"),
     )
 
