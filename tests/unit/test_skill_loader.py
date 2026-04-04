@@ -6,13 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from homeclaw.agent.providers.base import ToolDefinition
 from homeclaw.agent.tools import ToolRegistry
 from homeclaw.plugins.interface import Plugin
-from homeclaw.plugins.registry import PluginEntry, PluginRegistry, PluginType
+from homeclaw.plugins.registry import PluginRegistry, PluginType
 from homeclaw.plugins.skills.loader import (
-    SkillCatalogEntry,
-    SkillLocation,
     SkillPlugin,
     build_skill_catalog,
     discover_skills,
@@ -133,6 +130,38 @@ def test_parse_skill_md_all_fields() -> None:
     assert fm.metadata == {"currency": "AUD"}
     assert fm.allowed_tools == ["data_read", "data_write"]
     assert "## Usage" in body
+
+
+def test_parse_skill_md_normalizes_ui_app_entry_under_assets_dir() -> None:
+    content = """\
+---
+name: embedded-app
+description: Generated embedded app skill
+ui-app:
+  entry: assets/index.html
+  title: Embedded App
+---
+Open the UI app when asked.
+"""
+    fm, body = parse_skill_md(content)
+    assert fm.ui_app is not None
+    assert fm.ui_app.entry == "index.html"
+    assert fm.ui_app.title == "Embedded App"
+    assert body == "Open the UI app when asked."
+
+
+def test_parse_skill_md_ui_app_true_uses_index_html_default() -> None:
+    content = """\
+---
+name: embedded-app
+description: Generated embedded app skill
+ui-app: true
+---
+Open the UI app when asked.
+"""
+    fm, _ = parse_skill_md(content)
+    assert fm.ui_app is not None
+    assert fm.ui_app.entry == "index.html"
 
 
 def test_parse_skill_md_missing_frontmatter() -> None:
@@ -268,7 +297,8 @@ async def test_skill_plugin_handle_tool_unknown(tmp_path: Path) -> None:
 def test_discover_skills_finds_household_and_private(tmp_path: Path) -> None:
     make_skill_dir(tmp_path / "household" / "skills", "weather", WEATHER_SKILL)
     make_skill_dir(
-        tmp_path / "alice" / "skills", "notes",
+        tmp_path / "alice" / "skills",
+        "notes",
         MINIMAL_SKILL.replace("minimal", "notes"),
     )
 
@@ -315,11 +345,13 @@ def test_discover_skills_empty(tmp_path: Path) -> None:
 
 def test_discover_skills_household_before_personal(tmp_path: Path) -> None:
     make_skill_dir(
-        tmp_path / "alice" / "skills", "aaa",
+        tmp_path / "alice" / "skills",
+        "aaa",
         MINIMAL_SKILL.replace("minimal", "aaa"),
     )
     make_skill_dir(
-        tmp_path / "household" / "skills", "zzz",
+        tmp_path / "household" / "skills",
+        "zzz",
         MINIMAL_SKILL.replace("minimal", "zzz"),
     )
 
@@ -434,7 +466,8 @@ def test_load_all_skills_loads_household_and_private(tmp_path: Path) -> None:
 
 def test_load_all_skills_other_person_cannot_see_private(tmp_path: Path) -> None:
     make_skill_dir(
-        tmp_path / "alice" / "skills", "secret",
+        tmp_path / "alice" / "skills",
+        "secret",
         MINIMAL_SKILL.replace("minimal", "secret"),
     )
 
@@ -483,7 +516,8 @@ def test_build_skill_catalog_empty(tmp_path: Path) -> None:
 def test_build_skill_catalog_mixed_scopes(tmp_path: Path) -> None:
     make_skill_dir(tmp_path / "household" / "skills", "weather", WEATHER_SKILL)
     make_skill_dir(
-        tmp_path / "alice" / "skills", "budget",
+        tmp_path / "alice" / "skills",
+        "budget",
         MINIMAL_SKILL.replace("minimal", "budget"),
     )
 

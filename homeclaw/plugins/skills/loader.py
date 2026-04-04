@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class SkillUiApp(BaseModel):
     """Embedded web app declaration for a skill."""
 
-    entry: str = "assets/index.html"
+    entry: str = "index.html"
     title: str | None = None
 
 
@@ -122,6 +122,30 @@ def _normalize_string_list_field(value: Any, *, field_name: str) -> list[str]:
     )
 
 
+def _normalize_ui_app_entry(value: Any) -> str:
+    """Normalize a ui-app entry path relative to the skill's assets directory.
+
+    Public SKILL.md examples use ``assets/index.html`` while the asset route
+    already scopes requests to ``assets/``. Strip one leading ``assets/``
+    segment so consumers can safely build ``/assets/{entry}`` URLs.
+    """
+    if not value:
+        return "index.html"
+    if not isinstance(value, str):
+        raise ValueError(
+            f"Invalid ui_app.entry frontmatter: expected string, got {type(value).__name__}"
+        )
+
+    entry = value.strip().lstrip("/")
+    if not entry:
+        return "index.html"
+    if entry == "assets":
+        return "index.html"
+    if entry.startswith("assets/"):
+        return entry.removeprefix("assets/")
+    return entry
+
+
 def parse_skill_md(content: str) -> tuple[SkillFrontmatter, str]:
     """Parse a SKILL.md file into frontmatter and markdown body.
 
@@ -133,7 +157,7 @@ def parse_skill_md(content: str) -> tuple[SkillFrontmatter, str]:
         raise ValueError("SKILL.md missing YAML frontmatter (--- delimiters)")
 
     raw_yaml = match.group(1)
-    body = content[match.end():]
+    body = content[match.end() :]
 
     try:
         data = yaml.safe_load(raw_yaml) or {}
@@ -165,7 +189,7 @@ def parse_skill_md(content: str) -> tuple[SkillFrontmatter, str]:
     ui_app: SkillUiApp | None = None
     if isinstance(ui_app_raw, dict):
         ui_app = SkillUiApp(
-            entry=ui_app_raw.get("entry", "assets/index.html"),
+            entry=_normalize_ui_app_entry(ui_app_raw.get("entry", "assets/index.html")),
             title=ui_app_raw.get("title"),
         )
     elif ui_app_raw is True:
@@ -267,11 +291,6 @@ def _load_skill_env(skill_dir: Path) -> dict[str, str]:
                 if key:
                     env[key] = value
 
-    # Also pull from os.environ for keys the skill declares it needs
-    import os
-    for key in list(env.keys()):
-        # .env file takes precedence, but fill gaps from os.environ
-        pass
     return env
 
 
@@ -358,17 +377,13 @@ class SkillPlugin:
             ),
             ToolDefinition(
                 name="data_read",
-                description=(
-                    f"Read a data file from the '{self.name}' skill directory."
-                ),
+                description=(f"Read a data file from the '{self.name}' skill directory."),
                 parameters={
                     "type": "object",
                     "properties": {
                         "filename": {
                             "type": "string",
-                            "description": (
-                                "Name of the file to read (e.g. 'spending.md')"
-                            ),
+                            "description": ("Name of the file to read (e.g. 'spending.md')"),
                         },
                     },
                     "required": ["filename"],
@@ -388,9 +403,7 @@ class SkillPlugin:
                     "properties": {
                         "filename": {
                             "type": "string",
-                            "description": (
-                                "Name of the file to write (e.g. 'spending.md')"
-                            ),
+                            "description": ("Name of the file to write (e.g. 'spending.md')"),
                         },
                         "content": {
                             "type": "string",
@@ -411,9 +424,7 @@ class SkillPlugin:
                     "properties": {
                         "filename": {
                             "type": "string",
-                            "description": (
-                                "Name of the file to delete"
-                            ),
+                            "description": ("Name of the file to delete"),
                         },
                     },
                     "required": ["filename"],
@@ -431,8 +442,11 @@ class SkillPlugin:
                 description=(
                     f"Get an environment variable from the '{self.name}' "
                     f"skill's .env file. "
-                    + (f"Available vars: {', '.join(env_keys)}. " if env_keys else
-                       "No .env file yet — create one with skill_edit_file. ")
+                    + (
+                        f"Available vars: {', '.join(env_keys)}. "
+                        if env_keys
+                        else "No .env file yet — create one with skill_edit_file. "
+                    )
                     + "You can also use ${VAR_NAME} in http_call URLs, "
                     "headers, and body — they get substituted automatically."
                 ),
@@ -470,7 +484,11 @@ class SkillPlugin:
                             "method": {
                                 "type": "string",
                                 "enum": [
-                                    "GET", "POST", "PUT", "DELETE", "PATCH",
+                                    "GET",
+                                    "POST",
+                                    "PUT",
+                                    "DELETE",
+                                    "PATCH",
                                 ],
                                 "description": "HTTP method (default GET)",
                             },
@@ -480,9 +498,7 @@ class SkillPlugin:
                             },
                             "body": {
                                 "type": "string",
-                                "description": (
-                                    "Request body (for POST/PUT/PATCH)"
-                                ),
+                                "description": ("Request body (for POST/PUT/PATCH)"),
                             },
                         },
                         "required": ["url"],
@@ -507,7 +523,8 @@ class SkillPlugin:
             return self._handle_data_read(args.get("filename", ""))
         if name == "data_write":
             return self._handle_data_write(
-                args.get("filename", ""), args.get("content", ""),
+                args.get("filename", ""),
+                args.get("content", ""),
             )
         if name == "data_delete":
             return self._handle_data_delete(args.get("filename", ""))
@@ -529,15 +546,12 @@ class SkillPlugin:
                         raw_headers = None
                 if isinstance(raw_headers, dict):
                     resolved_headers = {
-                        k: _substitute_env(str(v), env)
-                        for k, v in raw_headers.items()
+                        k: _substitute_env(str(v), env) for k, v in raw_headers.items()
                     }
             body = _substitute_env(raw_body, env) if raw_body else raw_body
             # Resolve env vars in allowed-domains so authors can use
             # ${HOST} placeholders in the frontmatter.
-            resolved_domains = [
-                _substitute_env(d, env) for d in self._config.allowed_domains
-            ]
+            resolved_domains = [_substitute_env(d, env) for d in self._config.allowed_domains]
             config = HttpCallConfig(
                 allowed_domains=resolved_domains,
                 log_dir=self._config.log_dir,
@@ -574,7 +588,9 @@ class SkillPlugin:
         return {"filename": filename, "content": path.read_text()}
 
     def _handle_data_write(
-        self, filename: str, content: str,
+        self,
+        filename: str,
+        content: str,
     ) -> dict[str, Any]:
         if not filename:
             return {"error": "filename is required"}
@@ -601,6 +617,7 @@ class SkillPlugin:
 
     def _handle_get_env(self, key: str) -> dict[str, Any]:
         import os
+
         if not key:
             return {"error": "key is required"}
         value = self.env.get(key, os.environ.get(key))
@@ -668,9 +685,13 @@ def discover_skills(
                 continue
             if _find_skill_file(child) and child.name not in seen_names:
                 seen_names.add(child.name)
-                found.append(SkillLocation(
-                    name=child.name, scope=scope, skill_dir=child,
-                ))
+                found.append(
+                    SkillLocation(
+                        name=child.name,
+                        scope=scope,
+                        skill_dir=child,
+                    )
+                )
 
     # Sort: builtin first, then household, then personal
     scope_order = {"builtin": 0, "household": 1}
@@ -691,10 +712,7 @@ def _migrate_skill_data(skill_dir: Path) -> None:
 
     # Only migrate data files — leave .env and SKILL.md in the skill root.
     _KEEP_IN_ROOT = {"SKILL.md", ".env"}
-    files_to_move = [
-        f for f in skill_dir.iterdir()
-        if f.is_file() and f.name not in _KEEP_IN_ROOT
-    ]
+    files_to_move = [f for f in skill_dir.iterdir() if f.is_file() and f.name not in _KEEP_IN_ROOT]
     if not files_to_move:
         return
 
@@ -704,7 +722,8 @@ def _migrate_skill_data(skill_dir: Path) -> None:
         f.rename(dest)
     logger.info(
         "Migrated %d data files into %s",
-        len(files_to_move), data_dir,
+        len(files_to_move),
+        data_dir,
     )
 
 
@@ -783,16 +802,18 @@ def build_skill_catalog(
             admin_only = _is_admin_only(defn)
             if admin_only and not is_admin:
                 continue
-            catalog.append(SkillCatalogEntry(
-                name=defn.name,
-                description=defn.description,
-                scope=loc.scope,
-                has_scripts=(loc.skill_dir / "scripts").is_dir(),
-                has_references=(loc.skill_dir / "references").is_dir(),
-                has_data=(loc.skill_dir / "data").is_dir(),
-                has_http=bool(defn.allowed_domains),
-                admin_only=admin_only,
-            ))
+            catalog.append(
+                SkillCatalogEntry(
+                    name=defn.name,
+                    description=defn.description,
+                    scope=loc.scope,
+                    has_scripts=(loc.skill_dir / "scripts").is_dir(),
+                    has_references=(loc.skill_dir / "references").is_dir(),
+                    has_data=(loc.skill_dir / "data").is_dir(),
+                    has_http=bool(defn.allowed_domains),
+                    admin_only=admin_only,
+                )
+            )
         except Exception:
             logger.warning("Skipping skill '%s' in catalog — parse failed", loc.name)
 

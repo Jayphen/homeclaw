@@ -774,3 +774,5 @@ def test_skill_creator_builtin_instructions_cover_existing_skill_mini_apps() -> 
     assert "If the skill already exists, do NOT call `skill_create` again." in skill_md
     assert "Do NOT return raw HTML to the user" in skill_md
     assert "assets/index.html" in skill_md
+    assert "https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs" in skill_md
+    assert "dist/index.js" not in skill_md

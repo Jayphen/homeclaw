@@ -263,7 +263,7 @@ tiny (~5KB). Load it from CDN or vendor it into `assets/`:
 </head>
 <body>
 <script type="module">
-  import { reactive, html } from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.js'
+  import { reactive, html } from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs'
 
   // Read the auth token from localStorage (same origin as homeclaw)
   const token = localStorage.getItem('homeclaw_token') ?? ''
