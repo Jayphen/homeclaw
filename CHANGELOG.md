@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.25.2](https://github.com/Jayphen/homeclaw/compare/v0.25.1...v0.25.2) (2026-04-04)
+
+
+### Bug Fixes
+
+* normalize embedded skill ui app asset paths ([#127](https://github.com/Jayphen/homeclaw/issues/127)) ([06b5799](https://github.com/Jayphen/homeclaw/commit/06b579927216e3f6e0950d8c63a7023a87ed008f))
+* steer interactive skill requests toward embedded ui-apps ([#126](https://github.com/Jayphen/homeclaw/issues/126)) ([6155acd](https://github.com/Jayphen/homeclaw/commit/6155acd3b29e7a51f90581b0917012e2a1af28c4))
+
 ## [0.25.1](https://github.com/Jayphen/homeclaw/compare/v0.25.0...v0.25.1) (2026-04-03)
 
 
