@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.3](https://github.com/Jayphen/homeclaw/compare/v0.25.2...v0.25.3) (2026-04-04)
+
+
+### Bug Fixes
+
+* make embedded skill ui creation deterministic ([#129](https://github.com/Jayphen/homeclaw/issues/129)) ([7ed19a3](https://github.com/Jayphen/homeclaw/commit/7ed19a394552c7ca8095b3a71066ad918bdba9fe))
+
 ## [0.25.2](https://github.com/Jayphen/homeclaw/compare/v0.25.1...v0.25.2) (2026-04-04)
 
 
