@@ -229,12 +229,15 @@ panel on the skill's detail page, with a link to open in a new tab.
 
 If the skill already exists, do NOT call `skill_create` again. Instead:
 1. Call `read_skill` to inspect the existing skill and its files
-2. Use `skill_edit_file` to update `SKILL.md` and add a `ui-app:` block
-3. Write the app to `assets/index.html` with `skill_edit_file`
-4. Keep the app inside the skill's `assets/` directory so the web UI can render it
+2. Prefer `skill_enable_ui_app` to deterministically update `SKILL.md` and create `assets/index.html`
+3. If you must edit manually, use `skill_edit_file` to update `SKILL.md` and add a top-level `ui-app:` block
+4. Write the app to `assets/index.html` with `skill_edit_file`
+5. Keep the app inside the skill's `assets/` directory so the web UI can render it
 
 Do NOT return raw HTML to the user and tell them to save or run it manually.
 For embedded apps, the goal is a live skill panel in homeclaw, not a pasted HTML blob.
+Never use `{name}__data_write` for `SKILL.md` or `assets/index.html` — `data_write`
+only manages files inside `data/`.
 
 **SKILL.md frontmatter:**
 ```yaml

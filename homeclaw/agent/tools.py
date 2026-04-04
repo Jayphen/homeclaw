@@ -41,22 +41,41 @@ MAX_CONTENT_LENGTH = 100_000
 
 # Image validation constants — used by image_send tool.
 _MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
-_ALLOWED_CONTENT_TYPES = frozenset({
-    "image/jpeg", "image/png", "image/gif", "image/webp",
-    "image/svg+xml", "image/bmp", "image/tiff",
-})
-_ALLOWED_EXTENSIONS = frozenset({
-    ".jpg", ".jpeg", ".png", ".gif", ".webp",
-    ".svg", ".bmp", ".tiff", ".tif",
-})
+_ALLOWED_CONTENT_TYPES = frozenset(
+    {
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+        "image/bmp",
+        "image/tiff",
+    }
+)
+_ALLOWED_EXTENSIONS = frozenset(
+    {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".svg",
+        ".bmp",
+        ".tiff",
+        ".tif",
+    }
+)
 _IMAGE_MAGIC_BYTES: tuple[bytes, ...] = (
-    b"\xff\xd8\xff",      # JPEG
-    b"\x89PNG\r\n\x1a\n", # PNG
-    b"GIF87a", b"GIF89a", # GIF
-    b"RIFF",              # WebP (RIFF....WEBP)
-    b"BM",                # BMP
-    b"II", b"MM",         # TIFF (little/big endian)
-    b"<?xml", b"<svg",    # SVG
+    b"\xff\xd8\xff",  # JPEG
+    b"\x89PNG\r\n\x1a\n",  # PNG
+    b"GIF87a",
+    b"GIF89a",  # GIF
+    b"RIFF",  # WebP (RIFF....WEBP)
+    b"BM",  # BMP
+    b"II",
+    b"MM",  # TIFF (little/big endian)
+    b"<?xml",
+    b"<svg",  # SVG
 )
 
 # Scope vocabularies — skill tools use "private", decision tools use "personal".
@@ -163,8 +182,12 @@ def register_builtin_tools(
         contacts = list_contacts(workspaces)
         return {
             "contacts": [
-                {"id": c.id, "name": c.name, "relationship": c.relationship,
-                 "nicknames": c.nicknames}
+                {
+                    "id": c.id,
+                    "name": c.name,
+                    "relationship": c.relationship,
+                    "nicknames": c.nicknames,
+                }
                 for c in contacts
             ]
         }
@@ -180,13 +203,19 @@ def register_builtin_tools(
             return {"error": f"Contact '{id}' not found"}
         return contact.model_dump(mode="json")
 
-    @_reg(name="contact_update", description="Create or update a contact. Provide fields to change.")
+    @_reg(
+        name="contact_update", description="Create or update a contact. Provide fields to change."
+    )
     async def contact_update(
         *,
         id: Annotated[str, Desc("Contact ID")],
         name: Annotated[str | None, Desc("Contact name")] = None,
-        nicknames: Annotated[list[str] | None, Desc("Nicknames or shortened names for this person")] = None,
-        relationship: Annotated[str | None, Desc("Relationship (e.g. 'wife', 'mother', 'friend', 'pet')")] = None,
+        nicknames: Annotated[
+            list[str] | None, Desc("Nicknames or shortened names for this person")
+        ] = None,
+        relationship: Annotated[
+            str | None, Desc("Relationship (e.g. 'wife', 'mother', 'friend', 'pet')")
+        ] = None,
         **_: Any,
     ) -> dict[str, Any]:
         contact = get_contact(workspaces, id)
@@ -220,7 +249,9 @@ def register_builtin_tools(
         *,
         contact_id: Annotated[str, Desc("Contact ID")],
         content: Annotated[str, Desc("The note to add about this contact")],
-        person: Annotated[str | None, Desc("Member name for a private note, or omit for shared")] = None,
+        person: Annotated[
+            str | None, Desc("Member name for a private note, or omit for shared")
+        ] = None,
         **_: Any,
     ) -> dict[str, Any]:
         if err := _check_content_length(content):
@@ -229,7 +260,11 @@ def register_builtin_tools(
         if contact is None:
             return {"error": f"Contact '{contact_id}' not found"}
 
-        base = workspaces / person if person and person != HOUSEHOLD_WORKSPACE else workspaces / HOUSEHOLD_WORKSPACE
+        base = (
+            workspaces / person
+            if person and person != HOUSEHOLD_WORKSPACE
+            else workspaces / HOUSEHOLD_WORKSPACE
+        )
         notes_dir = base / "contacts" / "notes"
         notes_dir.mkdir(parents=True, exist_ok=True)
         safe_id = safe_slug(contact.id)
@@ -259,18 +294,14 @@ def register_builtin_tools(
         contact = get_contact(workspaces, contact_id)
         if not contact:
             return {"error": f"Contact '{contact_id}' not found"}
-        interaction = Interaction(
-            date=datetime.now(UTC), type=type, notes=notes
-        )
+        interaction = Interaction(date=datetime.now(UTC), type=type, notes=notes)
         contact.interactions.append(interaction)
         # Advance recurring reminders based on the new interaction date
         for reminder in contact.reminders:
             if reminder.interval_days and reminder.next_date:
                 today = interaction.date.date()
                 while reminder.next_date <= today:
-                    reminder.next_date = reminder.next_date + timedelta(
-                        days=reminder.interval_days
-                    )
+                    reminder.next_date = reminder.next_date + timedelta(days=reminder.interval_days)
         await save_contact_safe(workspaces, contact)
         return {"status": "logged", "contact": contact_id}
 
@@ -340,7 +371,9 @@ def register_builtin_tools(
     async def note_save(
         *,
         person: Annotated[str, Desc("Household member name")],
-        content: Annotated[str, Desc("The note content — can be a sentence or multiple paragraphs")],
+        content: Annotated[
+            str, Desc("The note content — can be a sentence or multiple paragraphs")
+        ],
         **_: Any,
     ) -> dict[str, Any]:
         if err := _check_content_length(content):
@@ -364,7 +397,11 @@ def register_builtin_tools(
             path.write_text(f"{entry}\n")
         return {"status": "saved", "path": str(path)}
 
-    @_reg(name="note_get", description="Read a note for a household member. Defaults to today.", policy=ToolPolicy(access="read", scope="personal"))
+    @_reg(
+        name="note_get",
+        description="Read a note for a household member. Defaults to today.",
+        policy=ToolPolicy(access="read", scope="personal"),
+    )
     async def note_get(
         *,
         person: Annotated[str, Desc("Household member name")],
@@ -403,8 +440,12 @@ def register_builtin_tools(
         *,
         person: Annotated[str, Desc("Household member name")],
         note: Annotated[str, Desc("Reminder text")],
-        date: Annotated[str | None, Desc("Due date in YYYY-MM-DD (for one-shot or start date)")] = None,
-        interval_days: Annotated[int | None, Desc("Repeat every N days (e.g. 7 for weekly, 14 for biweekly)")] = None,
+        date: Annotated[
+            str | None, Desc("Due date in YYYY-MM-DD (for one-shot or start date)")
+        ] = None,
+        interval_days: Annotated[
+            int | None, Desc("Repeat every N days (e.g. 7 for weekly, 14 for biweekly)")
+        ] = None,
         **_: Any,
     ) -> dict[str, Any]:
         from datetime import date as date_type
@@ -437,7 +478,11 @@ def register_builtin_tools(
             "next_due": str(reminder.next_due),
         }
 
-    @_reg(name="reminder_list", description="List active reminders for a household member.", policy=ToolPolicy(access="read", scope="personal"))
+    @_reg(
+        name="reminder_list",
+        description="List active reminders for a household member.",
+        policy=ToolPolicy(access="read", scope="personal"),
+    )
     async def reminder_list(
         *,
         person: Annotated[str, Desc("Household member name")],
@@ -484,7 +529,11 @@ def register_builtin_tools(
             "next_due": str(result.next_due) if result.next_due else None,
         }
 
-    @_reg(name="reminder_delete", description="Permanently delete a reminder.", policy=ToolPolicy(access="write", scope="personal"))
+    @_reg(
+        name="reminder_delete",
+        description="Permanently delete a reminder.",
+        policy=ToolPolicy(access="write", scope="personal"),
+    )
     async def reminder_delete(
         *,
         person: Annotated[str, Desc("Household member name")],
@@ -509,9 +558,13 @@ def register_builtin_tools(
     async def bookmark_save(
         *,
         title: Annotated[str, Desc("Name of the place or recipe")],
-        category: Annotated[str, Desc("Category (e.g. 'place', 'recipe', 'book', 'article')")] = "other",
+        category: Annotated[
+            str, Desc("Category (e.g. 'place', 'recipe', 'book', 'article')")
+        ] = "other",
         url: Annotated[str | None, Desc("URL if one was shared")] = None,
-        tags: Annotated[list[str] | str | None, Desc("Tags (e.g. 'italian', 'rooftop', 'brunch', 'vegan')")] = None,
+        tags: Annotated[
+            list[str] | str | None, Desc("Tags (e.g. 'italian', 'rooftop', 'brunch', 'vegan')")
+        ] = None,
         person: Annotated[str, Desc("Who saved this")] = "",
         **_: Any,
     ) -> dict[str, Any]:
@@ -539,7 +592,9 @@ def register_builtin_tools(
     )
     async def bookmark_list(
         *,
-        category: Annotated[str | None, Desc("Filter by category (e.g. 'place', 'recipe', 'book')")] = None,
+        category: Annotated[
+            str | None, Desc("Filter by category (e.g. 'place', 'recipe', 'book')")
+        ] = None,
         tag: Annotated[str | None, Desc("Filter by tag")] = None,
         **_: Any,
     ) -> dict[str, Any]:
@@ -594,7 +649,9 @@ def register_builtin_tools(
         tags: Annotated[list[str] | None, Desc("New tags (replaces existing tags)")] = None,
         **_: Any,
     ) -> dict[str, Any]:
-        result = await update_bookmark_safe(workspaces, id, url=url, title=title, category=category, tags=tags)
+        result = await update_bookmark_safe(
+            workspaces, id, url=url, title=title, category=category, tags=tags
+        )
         if result is None:
             return {"error": f"Bookmark '{id}' not found"}
         return {"status": "updated", "id": result.id, "title": result.title, "url": result.url}
@@ -651,7 +708,9 @@ def register_builtin_tools(
     async def bookmark_note_edit(
         *,
         bookmark_id: Annotated[str, Desc("ID of the bookmark whose note to edit")],
-        note_index: Annotated[int, Desc("1-based index of the note to edit (in chronological order)")],
+        note_index: Annotated[
+            int, Desc("1-based index of the note to edit (in chronological order)")
+        ],
         content: Annotated[str, Desc("New content to replace the existing note")],
         **_: Any,
     ) -> dict[str, Any]:
@@ -673,8 +732,7 @@ def register_builtin_tools(
         if note_index < 1 or note_index > len(note_indices):
             return {
                 "error": (
-                    f"Invalid note_index {note_index}; "
-                    f"bookmark has {len(note_indices)} note(s)"
+                    f"Invalid note_index {note_index}; bookmark has {len(note_indices)} note(s)"
                 )
             }
 
@@ -698,7 +756,9 @@ def register_builtin_tools(
     async def bookmark_note_delete(
         *,
         bookmark_id: Annotated[str, Desc("ID of the bookmark whose note to delete")],
-        note_index: Annotated[int, Desc("1-based index of the note to delete (in chronological order)")],
+        note_index: Annotated[
+            int, Desc("1-based index of the note to delete (in chronological order)")
+        ],
         **_: Any,
     ) -> dict[str, Any]:
         notes_dir = workspaces / HOUSEHOLD_WORKSPACE / "bookmarks" / "notes"
@@ -718,8 +778,7 @@ def register_builtin_tools(
         if note_index < 1 or note_index > len(note_indices):
             return {
                 "error": (
-                    f"Invalid note_index {note_index}; "
-                    f"bookmark has {len(note_indices)} note(s)"
+                    f"Invalid note_index {note_index}; bookmark has {len(note_indices)} note(s)"
                 )
             }
 
@@ -771,7 +830,10 @@ def register_builtin_tools(
         fallback = config.web_read_fallback if config else None
 
         result = await web_providers.read(
-            url, primary, fallback, content_looks_bad=_content_looks_bad,
+            url,
+            primary,
+            fallback,
+            content_looks_bad=_content_looks_bad,
         )
 
         if "error" in result:
@@ -847,7 +909,7 @@ def register_builtin_tools(
             "Provide a URL and optional headers — the tool fetches the image "
             "server-side, so you do NOT need to download it yourself first. "
             "For authenticated APIs (e.g. Immich), pass the auth header "
-            "directly (e.g. headers={\"x-api-key\": \"...\"}). "
+            'directly (e.g. headers={"x-api-key": "..."}). '
             "Use file_path for images on disk, or base64 for inline data "
             "(raw base64 or data:image/...;base64,... URI). "
             "Max image size: 10 MB."
@@ -936,14 +998,14 @@ def register_builtin_tools(
                     chunks: list[bytes] = []
                     total = 0
                     async with client.stream(
-                        "GET", url, headers=headers or {}, timeout=30,
+                        "GET",
+                        url,
+                        headers=headers or {},
+                        timeout=30,
                     ) as resp:
                         resp.raise_for_status()
                         # Re-check content-type from GET response
-                        get_ct = (
-                            resp.headers.get("content-type", "")
-                            .split(";")[0].strip().lower()
-                        )
+                        get_ct = resp.headers.get("content-type", "").split(";")[0].strip().lower()
                         if get_ct and get_ct not in _ALLOWED_CONTENT_TYPES:
                             return {
                                 "error": f"URL is not an image (content-type: {get_ct}).",
@@ -965,22 +1027,25 @@ def register_builtin_tools(
             return {"status": "queued", "person": person, "url": url or file_path}
         if group:
             return await dispatcher.send_group_image(
-                "", url or "", caption, image_data=image_data,
+                "",
+                url or "",
+                caption,
+                image_data=image_data,
             )
         if not person:
             return {"error": "Either 'person' or 'group: true' is required."}
         return await dispatcher.send_image(
-            person, url or "", caption, image_data=image_data,
+            person,
+            url or "",
+            caption,
+            image_data=image_data,
         )
 
     # --- Channel preference tool ---
 
     @_reg(
         name="channel_preference_set",
-        description=(
-            "Set a household member's preferred messaging channel "
-            "for scheduled updates."
-        ),
+        description=("Set a household member's preferred messaging channel for scheduled updates."),
     )
     async def channel_preference_set(
         *,
@@ -1048,21 +1113,27 @@ def register_builtin_tools(
     async def routine_add(
         *,
         title: Annotated[str, Desc("Short name for the routine (e.g. 'Weekly grocery check')")],
-        schedule: Annotated[str, Desc(
-            "When to run. Natural language examples: 'Every weekday at 7:30am', "
-            "'Every Sunday at 10:00am', 'Every 3 days', 'Every other Tuesday at 9am', "
-            "'Monthly on the 1st at 10am', '1st Monday of the month at 9am', "
-            "'Last Friday of the month at 3pm'. "
-            "For complex schedules, use a 5-field cron expression: 'minute hour day month day_of_week' "
-            "(e.g. '30 7 * * 1-5' for weekdays at 7:30am, '0 9 1 * *' for 1st of month at 9am)."
-        )],
+        schedule: Annotated[
+            str,
+            Desc(
+                "When to run. Natural language examples: 'Every weekday at 7:30am', "
+                "'Every Sunday at 10:00am', 'Every 3 days', 'Every other Tuesday at 9am', "
+                "'Monthly on the 1st at 10am', '1st Monday of the month at 9am', "
+                "'Last Friday of the month at 3pm'. "
+                "For complex schedules, use a 5-field cron expression: 'minute hour day month day_of_week' "
+                "(e.g. '30 7 * * 1-5' for weekdays at 7:30am, '0 9 1 * *' for 1st of month at 9am)."
+            ),
+        ],
         action: Annotated[str, Desc("What the routine should do")],
-        target: Annotated[str | None, Desc(
-            "Who receives this routine's output. "
-            "A person's name (e.g. 'stephen') sends it as a private DM. "
-            "'each_member' runs it once per household member and DMs each. "
-            "'household' sends it to the shared group chat."
-        )] = None,
+        target: Annotated[
+            str | None,
+            Desc(
+                "Who receives this routine's output. "
+                "A person's name (e.g. 'stephen') sends it as a private DM. "
+                "'each_member' runs it once per household member and DMs each. "
+                "'household' sends it to the shared group chat."
+            ),
+        ] = None,
         person: Annotated[str, Desc("Caller")] = "",
         **_: Any,
     ) -> dict[str, Any]:
@@ -1091,7 +1162,12 @@ def register_builtin_tools(
             return {"error": str(e)}
         if on_routines_changed:
             on_routines_changed()
-        return {"status": "added", "title": title, "schedule": schedule, "target": target or "household"}
+        return {
+            "status": "added",
+            "title": title,
+            "schedule": schedule,
+            "target": target or "household",
+        }
 
     @_reg(
         name="routine_update",
@@ -1105,16 +1181,24 @@ def register_builtin_tools(
     async def routine_update(
         *,
         name: Annotated[str, Desc("The routine slug name (e.g. 'morning_briefing')")],
-        schedule: Annotated[str | None, Desc("New schedule (optional — omit to keep current)")] = None,
-        action: Annotated[str | None, Desc("New action description (optional — omit to keep current)")] = None,
+        schedule: Annotated[
+            str | None, Desc("New schedule (optional — omit to keep current)")
+        ] = None,
+        action: Annotated[
+            str | None, Desc("New action description (optional — omit to keep current)")
+        ] = None,
         title: Annotated[str | None, Desc("New title (optional — omit to keep current)")] = None,
-        target: Annotated[str | None, Desc(
-            "New delivery target (optional — omit to keep current). "
-            "A person name for private DM, 'each_member' for all, 'household' for group chat."
-        )] = ...,  # type: ignore[assignment]  # sentinel
+        target: Annotated[
+            str | None,
+            Desc(
+                "New delivery target (optional — omit to keep current). "
+                "A person name for private DM, 'each_member' for all, 'household' for group chat."
+            ),
+        ] = ...,  # type: ignore[assignment]  # sentinel
         **_: Any,
     ) -> dict[str, Any]:
         from homeclaw.scheduler.routines import update_routine
+
         # Normalise target when explicitly provided
         real_target: str | None | EllipsisType = ...
         if target is not ...:
@@ -1123,7 +1207,11 @@ def register_builtin_tools(
             else:
                 real_target = target.lower() if target else target
         updated = update_routine(
-            workspaces, name, schedule=schedule, action=action, title=title,
+            workspaces,
+            name,
+            schedule=schedule,
+            action=action,
+            title=title,
             target=real_target,  # type: ignore[arg-type]
         )
         if not updated:
@@ -1169,9 +1257,15 @@ def register_builtin_tools(
             return {"error": "Scheduler not available"}
         result = await on_routine_run(name)
         if result is None:
-            return {"error": f"Routine '{name}' not found — use routine_list to see available names"}
+            return {
+                "error": f"Routine '{name}' not found — use routine_list to see available names"
+            }
         if not result:
-            return {"status": "error", "name": name, "detail": "Routine ran but produced no output — check logs for errors"}
+            return {
+                "status": "error",
+                "name": name,
+                "detail": "Routine ran but produced no output — check logs for errors",
+            }
         return {"status": "completed", "name": name, "result": result}
 
     # --- Skill tools ---
@@ -1203,12 +1297,14 @@ def register_builtin_tools(
                 defn = skill_md_to_definition((loc.skill_dir / "SKILL.md").read_text())
                 if _is_admin_only(defn) and not is_admin:
                     continue
-                skills.append({
-                    "name": loc.name,
-                    "scope": loc.scope,
-                    "description": defn.description,
-                    "allowed_domains": defn.allowed_domains,
-                })
+                skills.append(
+                    {
+                        "name": loc.name,
+                        "scope": loc.scope,
+                        "description": defn.description,
+                        "allowed_domains": defn.allowed_domains,
+                    }
+                )
             except Exception:
                 skills.append({"name": loc.name, "scope": loc.scope, "error": "failed to parse"})
         return {"skills": skills, "count": len(skills)}
@@ -1310,24 +1406,35 @@ def register_builtin_tools(
         person: Annotated[str, Desc("Household member creating the skill")],
         name: Annotated[str, Desc("Skill name (slug-style, e.g. 'weather', 'my_calendar')")],
         description: Annotated[str, Desc("Short description of what the skill does")],
-        scope: Annotated[SkillScope, Desc(
-            "Who can use this skill and see its data. "
-            "'household' = shared with all members; "
-            "'private' = only accessible to this person."
-        )],
-        allowed_domains: Annotated[list[str] | None, Desc(
-            "Domains the skill is allowed to reach via HTTP. "
-            "Setting this automatically registers a "
-            "{name}__http_call tool for the skill. "
-            "Example: ['api.openweathermap.org']"
-        )] = None,
-        instructions: Annotated[str, Desc("Instructions for how to use this skill, injected into the agent's context")] = "",
+        scope: Annotated[
+            SkillScope,
+            Desc(
+                "Who can use this skill and see its data. "
+                "'household' = shared with all members; "
+                "'private' = only accessible to this person."
+            ),
+        ],
+        allowed_domains: Annotated[
+            list[str] | None,
+            Desc(
+                "Domains the skill is allowed to reach via HTTP. "
+                "Setting this automatically registers a "
+                "{name}__http_call tool for the skill. "
+                "Example: ['api.openweathermap.org']"
+            ),
+        ] = None,
+        instructions: Annotated[
+            str, Desc("Instructions for how to use this skill, injected into the agent's context")
+        ] = "",
         initial_files: list[dict[str, Any]] | None = None,
-        source_notes: Annotated[list[str] | None, Desc(
-            "Memory topic names to copy into the skill's data directory "
-            "(e.g. ['recipes', 'restaurant-notes']). Checks person's memory first, "
-            "then household memory."
-        )] = None,
+        source_notes: Annotated[
+            list[str] | None,
+            Desc(
+                "Memory topic names to copy into the skill's data directory "
+                "(e.g. ['recipes', 'restaurant-notes']). Checks person's memory first, "
+                "then household memory."
+            ),
+        ] = None,
         source_bookmarks: dict[str, Any] | None = None,
         **_: Any,
     ) -> dict[str, Any]:
@@ -1412,7 +1519,8 @@ def register_builtin_tools(
             else:
                 _logger.warning(
                     "skill_create: topic '%s' not found for %s or household",
-                    topic, person,
+                    topic,
+                    person,
                 )
 
         # Export source_bookmarks as markdown into data/
@@ -1477,7 +1585,11 @@ def register_builtin_tools(
             "skill_dir": str(skill_dir),
             "seeded_files": seeded,
             "loaded": loaded,
-            **({"note": "Restart required to activate skill — no plugin registry available"} if not loaded else {}),
+            **(
+                {"note": "Restart required to activate skill — no plugin registry available"}
+                if not loaded
+                else {}
+            ),
             **({"warning": warning} if warning else {}),
             **_verify_skill(
                 skill_dir=skill_dir,
@@ -1547,9 +1659,15 @@ def register_builtin_tools(
         person: Annotated[str, Desc("Household member requesting the update")],
         name: Annotated[str, Desc("Skill name to update")],
         owner: Annotated[str, Desc("Who owns the skill: 'household' or a person's name")],
-        instructions: Annotated[str | None, Desc("New instructions (replaces existing). Omit to keep current.")] = None,
-        description: Annotated[str | None, Desc("New description (replaces existing). Omit to keep current.")] = None,
-        allowed_domains: Annotated[list[str] | None, Desc("New allowed domains for http_call. Omit to keep current.")] = None,
+        instructions: Annotated[
+            str | None, Desc("New instructions (replaces existing). Omit to keep current.")
+        ] = None,
+        description: Annotated[
+            str | None, Desc("New description (replaces existing). Omit to keep current.")
+        ] = None,
+        allowed_domains: Annotated[
+            list[str] | None, Desc("New allowed domains for http_call. Omit to keep current.")
+        ] = None,
         **_: Any,
     ) -> dict[str, Any]:
         from homeclaw.plugins.registry import PluginType
@@ -1623,7 +1741,10 @@ def register_builtin_tools(
         name: Annotated[str, Desc("Skill name to migrate")],
         current_owner: Annotated[str, Desc("Current owner: 'household' or a person's name")],
         to_scope: Annotated[SkillScope, Desc("Target scope")],
-        to_person: Annotated[str | None, Desc("Required when to_scope is 'private' — which person to move the skill to")] = None,
+        to_person: Annotated[
+            str | None,
+            Desc("Required when to_scope is 'private' — which person to move the skill to"),
+        ] = None,
         **_: Any,
     ) -> dict[str, Any]:
         import shutil
@@ -1711,12 +1832,14 @@ def register_builtin_tools(
                 continue
             try:
                 defn = skill_md_to_definition(skill_path.read_text())
-                skills.append({
-                    "name": defn.name,
-                    "description": defn.description,
-                    "requested_by": defn.metadata.get("requested_by", "unknown"),
-                    "requested_scope": defn.metadata.get("requested_scope", "household"),
-                })
+                skills.append(
+                    {
+                        "name": defn.name,
+                        "description": defn.description,
+                        "requested_by": defn.metadata.get("requested_by", "unknown"),
+                        "requested_scope": defn.metadata.get("requested_scope", "household"),
+                    }
+                )
             except Exception:
                 skills.append({"name": child.name, "error": "failed to parse"})
         return {"pending": skills, "count": len(skills)}
@@ -1785,7 +1908,11 @@ def register_builtin_tools(
             ),
         }
 
-    @_reg(name="skill_reject", description="Reject and delete a pending skill. Admin only.", policy=ToolPolicy(access="action", admin_only=True))
+    @_reg(
+        name="skill_reject",
+        description="Reject and delete a pending skill. Admin only.",
+        policy=ToolPolicy(access="action", admin_only=True),
+    )
     async def skill_reject(
         *,
         person: Annotated[str, Desc("Admin member name")],
@@ -1865,6 +1992,7 @@ def register_builtin_tools(
         fetched_extras: list[str] = []
         if is_github_repo:
             from homeclaw.plugins.skills.github import download_skill_repo
+
             fetched_extras = await download_skill_repo(url, skill_dir)
 
         if pending:
@@ -1888,7 +2016,9 @@ def register_builtin_tools(
         if plugin_registry is not None:
             try:
                 plugin = load_skill(
-                    skill_dir, owner, allow_local_network=_skill_allow_local(),
+                    skill_dir,
+                    owner,
+                    allow_local_network=_skill_allow_local(),
                 )
                 plugin_registry.register(plugin, PluginType.SKILL)
                 loaded = True
@@ -1929,11 +2059,13 @@ def register_builtin_tools(
     async def skill_install(
         *,
         person: Annotated[str, Desc("Household member name")],
-        url: Annotated[str, Desc(
-            "URL to install from — GitHub repo/subpath URL or "
-            "direct link to a SKILL.md file"
-        )],
-        scope: Annotated[SkillScope, Desc("Who can use this skill (default: household)")] = "household",
+        url: Annotated[
+            str,
+            Desc("URL to install from — GitHub repo/subpath URL or direct link to a SKILL.md file"),
+        ],
+        scope: Annotated[
+            SkillScope, Desc("Who can use this skill (default: household)")
+        ] = "household",
         install_all: Annotated[bool, Desc("Install all skills from a multi-skill repo")] = False,
         **_: Any,
     ) -> dict[str, Any]:
@@ -1966,9 +2098,13 @@ def register_builtin_tools(
             if not is_github_repo:
                 skill_md_url = normalize_gist_url(url) or url
             return await _install_single_skill(
-                person=person, url=url, skill_md_url=skill_md_url or url,
-                is_github_repo=is_github_repo, scope=scope,
-                workspaces=workspaces, plugin_registry=plugin_registry,
+                person=person,
+                url=url,
+                skill_md_url=skill_md_url or url,
+                is_github_repo=is_github_repo,
+                scope=scope,
+                workspaces=workspaces,
+                plugin_registry=plugin_registry,
             )
 
         # Multi-skill: discover subdirectories
@@ -1990,10 +2126,13 @@ def register_builtin_tools(
             sub_url = skill_subpath_url(url, skill_info["path"])
             sub_skill_md_url = raw_skill_md_url(sub_url)
             r = await _install_single_skill(
-                person=person, url=sub_url,
+                person=person,
+                url=sub_url,
                 skill_md_url=sub_skill_md_url or sub_url,
-                is_github_repo=True, scope=scope,
-                workspaces=workspaces, plugin_registry=plugin_registry,
+                is_github_repo=True,
+                scope=scope,
+                workspaces=workspaces,
+                plugin_registry=plugin_registry,
             )
             results.append(r)
 
@@ -2007,6 +2146,86 @@ def register_builtin_tools(
         }
 
     # --- Skill file editing ---
+
+    def _resolve_editable_skill_location(
+        *,
+        person: str,
+        name: str,
+        owner: str | None = None,
+    ) -> tuple[Any | None, dict[str, Any] | None]:
+        from homeclaw.plugins.skills.loader import discover_skills
+
+        locations = [sk for sk in discover_skills(workspaces, person) if sk.name == name]
+        if owner is not None:
+            locations = [sk for sk in locations if sk.scope == owner]
+        locations = [sk for sk in locations if sk.scope != "builtin"]
+
+        if not locations:
+            return None, {
+                "error": f"Skill '{name}' not found"
+                if owner is None
+                else f"Skill '{name}' not found under '{owner}'"
+            }
+        if len(locations) > 1:
+            owners = ", ".join(sorted(sk.scope for sk in locations))
+            return None, {
+                "error": (
+                    f"Multiple editable skills named '{name}' found ({owners}). "
+                    "Pass owner='household' or the person's name."
+                )
+            }
+        return locations[0], None
+
+    def _default_ui_app_html(*, owner: str, skill_name: str, title: str) -> str:
+        data_url = f"/api/skills/{owner}/{skill_name}/files/data/state.json"
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{title}</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 1rem; }}
+    .status {{ color: #666; font-size: 0.9rem; }}
+  </style>
+</head>
+<body>
+<script type="module">
+  import {{ reactive, html }} from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs'
+
+  const token = localStorage.getItem('homeclaw_token') ?? ''
+  const headers = token ? {{ Authorization: `Bearer ${{token}}` }} : {{}}
+  const state = reactive({{ loading: true, message: 'Loading…', data: null }})
+
+  fetch('{data_url}', {{ headers }})
+    .then(async (r) => {{
+      if (!r.ok) throw new Error(`HTTP ${{r.status}}`)
+      return r.json()
+    }})
+    .then((data) => {{
+      state.data = data
+      state.message = 'Live'
+      state.loading = false
+    }})
+    .catch((err) => {{
+      state.message = `Could not load data: ${{err.message}}`
+      state.loading = false
+    }})
+
+  html`
+    <h1>{title}</h1>
+    ${{() => state.loading
+      ? html`<p class="status">${{() => state.message}}</p>`
+      : html`
+          <pre>${{() => JSON.stringify(state.data, null, 2)}}</pre>
+          <p class="status">${{() => state.message}}</p>
+        `
+    }}
+  `(document.body)
+</script>
+</body>
+</html>
+"""
 
     @_reg(
         name="skill_edit_file",
@@ -2025,20 +2244,26 @@ def register_builtin_tools(
         *,
         person: Annotated[str, Desc("Household member name")],
         name: Annotated[str, Desc("Skill name")],
-        file: Annotated[str, Desc("File path relative to skill dir (e.g. 'SKILL.md', 'scripts/check.sh')")],
-        content: Annotated[str | None, Desc("Full file content (write mode — overwrites the file)")] = None,
+        file: Annotated[
+            str, Desc("File path relative to skill dir (e.g. 'SKILL.md', 'scripts/check.sh')")
+        ],
+        content: Annotated[
+            str | None, Desc("Full file content (write mode — overwrites the file)")
+        ] = None,
         find: Annotated[str | None, Desc("Text to find (find/replace mode)")] = None,
         replace: Annotated[str | None, Desc("Replacement text (find/replace mode)")] = None,
         **_: Any,
     ) -> dict[str, Any]:
-        from homeclaw.plugins.skills.loader import discover_skills
+        from homeclaw.plugins.skills.loader import skill_md_to_definition
 
-        locations = discover_skills(workspaces, person)
-        loc = next((sk for sk in locations if sk.name == name), None)
-        if loc is None:
-            return {"error": f"Skill '{name}' not found"}
+        loc, err = _resolve_editable_skill_location(person=person, name=name)
+        if err is not None:
+            return err
+        assert loc is not None
         if loc.scope == "builtin":
-            return {"error": f"Cannot edit built-in skill '{name}'. Install a copy to household or personal skills first."}
+            return {
+                "error": f"Cannot edit built-in skill '{name}'. Install a copy to household or personal skills first."
+            }
 
         # Resolve and validate path
         path = (loc.skill_dir / file).resolve()
@@ -2072,6 +2297,17 @@ def register_builtin_tools(
         if content is not None:
             if err := _check_content_length(content):
                 return err
+            if file == "SKILL.md":
+                try:
+                    skill_md_to_definition(content)
+                except ValueError as exc:
+                    return {
+                        "error": f"Invalid SKILL.md: {exc}",
+                        "hint": (
+                            "For embedded UIs, declare ui-app as a top-level frontmatter key "
+                            "and use skill_enable_ui_app to create assets/index.html."
+                        ),
+                    }
             # Safety: warn if overwriting a large file with much shorter content
             if path.is_file():
                 old_size = path.stat().st_size
@@ -2089,6 +2325,126 @@ def register_builtin_tools(
             return {"file": file, "status": "written", "size": len(content)}
 
         return {"error": "Provide content (write), or find+replace (edit), or nothing (read)"}
+
+    @_reg(
+        name="skill_enable_ui_app",
+        description=(
+            "Deterministically enable an embedded web UI for an existing skill. "
+            "This updates SKILL.md with a top-level ui-app declaration and creates or "
+            "overwrites assets/index.html with the provided content (or a default Arrow.js scaffold). "
+            "Use this instead of data_write for SKILL.md or assets files."
+        ),
+        policy=ToolPolicy(access="write", scope="personal"),
+    )
+    async def skill_enable_ui_app(
+        *,
+        person: Annotated[str, Desc("Household member name")],
+        name: Annotated[str, Desc("Skill name")],
+        owner: Annotated[
+            str | None,
+            Desc(
+                "Who owns the skill: 'household' or a person's name. Required if the name is ambiguous."
+            ),
+        ] = None,
+        title: Annotated[str | None, Desc("Display title for the embedded UI panel")] = None,
+        entry: Annotated[
+            str, Desc("Entry file for the embedded UI, relative to assets/")
+        ] = "assets/index.html",
+        html_content: Annotated[
+            str | None,
+            Desc("Full HTML content for the UI. Omit to create a default Arrow.js scaffold."),
+        ] = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        from homeclaw.plugins.registry import PluginType
+        from homeclaw.plugins.skills.loader import (
+            SkillUiApp,
+            _normalize_ui_app_entry,
+            load_skill,
+            render_skill_md,
+            skill_md_to_definition,
+        )
+
+        loc, err = _resolve_editable_skill_location(person=person, name=name, owner=owner)
+        if err is not None:
+            return err
+        assert loc is not None
+
+        skill_md_path = loc.skill_dir / "SKILL.md"
+        if not skill_md_path.is_file():
+            return {"error": f"Skill '{name}' has no SKILL.md"}
+
+        try:
+            defn = skill_md_to_definition(skill_md_path.read_text())
+        except ValueError as exc:
+            return {"error": f"Invalid SKILL.md: {exc}"}
+
+        resolved_title = title or (defn.ui_app.title if defn.ui_app else None)
+        ui_app = SkillUiApp(
+            entry=_normalize_ui_app_entry(entry),
+            title=resolved_title,
+        )
+        if ui_app.title is None:
+            ui_app.title = title or defn.name.replace("-", " ").replace("_", " ").title()
+
+        updated_md = render_skill_md(
+            name=defn.name,
+            description=defn.description,
+            allowed_domains=defn.allowed_domains or None,
+            instructions=defn.instructions,
+            metadata=defn.metadata or None,
+            ui_app=ui_app,
+        )
+        skill_md_path.write_text(updated_md)
+
+        asset_rel = ui_app.entry
+        asset_path = loc.skill_dir / "assets" / asset_rel
+        asset_path.parent.mkdir(parents=True, exist_ok=True)
+        final_html = html_content or _default_ui_app_html(
+            owner=loc.scope,
+            skill_name=defn.name,
+            title=ui_app.title,
+        )
+        if err := _check_content_length(final_html, field="html_content"):
+            return err
+        asset_path.write_text(final_html)
+
+        loaded = False
+        warning: str | None = None
+        if plugin_registry is not None:
+            plugin_registry.unregister(defn.name)
+            try:
+                plugin = load_skill(
+                    loc.skill_dir, loc.scope, allow_local_network=_skill_allow_local()
+                )
+                plugin_registry.register(plugin, PluginType.SKILL)
+                loaded = True
+            except Exception as exc:
+                _logger.exception("skill_enable_ui_app: failed to reload skill '%s'", defn.name)
+                warning = f"UI files were written but the skill failed to reload: {exc}"
+
+        result: dict[str, Any] = {
+            "status": "ui_app_enabled",
+            "name": defn.name,
+            "owner": loc.scope,
+            "ui_app": ui_app.model_dump(exclude_none=True),
+            "skill_md": "updated",
+            "asset_file": f"assets/{asset_rel}",
+            "asset_status": "written",
+            "loaded": loaded,
+        }
+        if warning:
+            result["warning"] = warning
+        result.update(
+            _verify_skill(
+                skill_dir=loc.skill_dir,
+                owner=loc.scope,
+                scope=loc.scope,
+                source="skill_enable_ui_app",
+                expect_registered=loaded,
+            )
+        )
+        return result
 
     @_reg(
         name="read_skill",
@@ -2138,13 +2494,15 @@ def register_builtin_tools(
         already_loaded = name in activated_skills
         activated_skills.add(name)
         if runtime_observability is not None and not already_loaded:
-            runtime_observability.record_skill_activation(SkillActivationEvent(
-                skill_name=name,
-                person=person,
-                reason="read_skill",
-                tool_name=None,
-                activated_at=now_utc(),
-            ))
+            runtime_observability.record_skill_activation(
+                SkillActivationEvent(
+                    skill_name=name,
+                    person=person,
+                    reason="read_skill",
+                    tool_name=None,
+                    activated_at=now_utc(),
+                )
+            )
 
         # List registered plugin tools for this skill (e.g. weather__http_call)
         available_tools: list[str] = []
@@ -2264,9 +2622,12 @@ def register_builtin_tools(
         *,
         person: Annotated[str, Desc("Who made or reported this decision")],
         decision: Annotated[str, Desc("The decision that was made")],
-        scope: Annotated[DecisionScope, Desc(
-            "Whether this applies to the whole household or just this person (default: household)"
-        )] = "household",
+        scope: Annotated[
+            DecisionScope,
+            Desc(
+                "Whether this applies to the whole household or just this person (default: household)"
+            ),
+        ] = "household",
         **_: Any,
     ) -> dict[str, Any]:
         if err := _check_content_length(decision, "decision"):
@@ -2291,7 +2652,9 @@ def register_builtin_tools(
     )
     async def decision_list(
         *,
-        scope: Annotated[DecisionScope, Desc("Which decisions to list (default: household)")] = "household",
+        scope: Annotated[
+            DecisionScope, Desc("Which decisions to list (default: household)")
+        ] = "household",
         person: Annotated[str, Desc("Person name (required for personal scope)")] = "",
         **_: Any,
     ) -> dict[str, Any]:
@@ -2300,10 +2663,7 @@ def register_builtin_tools(
         path = _decisions_path(scope, person)
         if not path.exists():
             return {"decisions": [], "scope": scope}
-        lines = [
-            ln.strip() for ln in path.read_text().splitlines()
-            if ln.strip().startswith("- [")
-        ]
+        lines = [ln.strip() for ln in path.read_text().splitlines() if ln.strip().startswith("- [")]
         return {"decisions": lines, "scope": scope, "count": len(lines)}
 
     # --- Settings tools ---
@@ -2336,16 +2696,20 @@ def register_builtin_tools(
         *,
         person: Annotated[str, Desc("Household member name")],
         level: Annotated[
-            str, Desc("Filter by level: DEBUG, INFO, WARNING, ERROR"),
+            str,
+            Desc("Filter by level: DEBUG, INFO, WARNING, ERROR"),
         ] = "",
         search: Annotated[
-            str, Desc("Text search in message or logger name"),
+            str,
+            Desc("Text search in message or logger name"),
         ] = "",
         hours: Annotated[
-            int, Desc("How many hours back to search (default 24)"),
+            int,
+            Desc("How many hours back to search (default 24)"),
         ] = 24,
         limit: Annotated[
-            int, Desc("Max entries to return (default 100)"),
+            int,
+            Desc("Max entries to return (default 100)"),
         ] = 100,
         **_: Any,
     ) -> dict[str, Any]:

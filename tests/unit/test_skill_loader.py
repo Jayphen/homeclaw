@@ -164,6 +164,20 @@ Open the UI app when asked.
     assert fm.ui_app.entry == "index.html"
 
 
+def test_parse_skill_md_rejects_ui_app_inside_metadata() -> None:
+    content = """\
+---
+name: embedded-app
+description: Generated embedded app skill
+metadata:
+  ui-app: true
+---
+Open the UI app when asked.
+"""
+    with pytest.raises(ValueError, match="ui-app must be declared as a top-level"):
+        parse_skill_md(content)
+
+
 def test_parse_skill_md_missing_frontmatter() -> None:
     with pytest.raises(ValueError, match="missing YAML frontmatter"):
         parse_skill_md("# Just a markdown file\nNo frontmatter here.")
@@ -224,6 +238,18 @@ def test_render_skill_md_with_metadata() -> None:
     )
     defn = skill_md_to_definition(rendered)
     assert defn.metadata == {"key": "value"}
+
+
+def test_render_skill_md_with_ui_app_roundtrip() -> None:
+    rendered = render_skill_md(
+        name="ui-skill",
+        description="With UI",
+        ui_app={"entry": "assets/index.html", "title": "UI Skill"},
+    )
+    defn = skill_md_to_definition(rendered)
+    assert defn.ui_app is not None
+    assert defn.ui_app.entry == "index.html"
+    assert defn.ui_app.title == "UI Skill"
 
 
 # ---------------------------------------------------------------------------

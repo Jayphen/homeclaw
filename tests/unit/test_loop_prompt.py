@@ -8,6 +8,7 @@ def test_system_prompt_steers_interactive_skill_requests_toward_embedded_ui_apps
 
     assert sections[0].name == "base_system_prompt"
     assert "prefer building it as an embedded skill mini-app" in system
+    assert "`skill_enable_ui_app`" in system
     assert "`ui-app:`" in system
     assert "`assets/index.html`" in system
     assert "Arrow.js" in system

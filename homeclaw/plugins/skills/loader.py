@@ -19,6 +19,14 @@ from homeclaw.plugins.skills.http_call import HttpCallConfig, http_call
 
 logger = logging.getLogger(__name__)
 
+_RESERVED_DATA_WRITE_PATTERNS = (
+    "SKILL.md",
+    ".env",
+    "assets/",
+    "scripts/",
+    "references/",
+)
+
 
 # ---------------------------------------------------------------------------
 # Models
@@ -146,6 +154,25 @@ def _normalize_ui_app_entry(value: Any) -> str:
     return entry
 
 
+def _parse_ui_app(value: Any) -> SkillUiApp | None:
+    """Parse a ui-app declaration from YAML frontmatter."""
+    if value is None:
+        return None
+    if isinstance(value, SkillUiApp):
+        return SkillUiApp(
+            entry=_normalize_ui_app_entry(value.entry),
+            title=value.title,
+        )
+    if value is True:
+        return SkillUiApp()
+    if isinstance(value, dict):
+        return SkillUiApp(
+            entry=_normalize_ui_app_entry(value.get("entry", "assets/index.html")),
+            title=value.get("title"),
+        )
+    raise ValueError("Invalid ui-app frontmatter: expected true or a mapping with entry/title")
+
+
 def parse_skill_md(content: str) -> tuple[SkillFrontmatter, str]:
     """Parse a SKILL.md file into frontmatter and markdown body.
 
@@ -184,23 +211,25 @@ def parse_skill_md(content: str) -> tuple[SkillFrontmatter, str]:
         field_name="allowed_domains",
     )
 
+    metadata = data.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        raise ValueError("Invalid metadata frontmatter: expected a mapping")
+
+    if any(key in metadata for key in ("ui-app", "ui_app")):
+        raise ValueError(
+            "ui-app must be declared as a top-level frontmatter key, not inside metadata"
+        )
+
     # Parse ui-app declaration (homeclaw extension)
     ui_app_raw = data.pop("ui-app", None) or data.pop("ui_app", None)
-    ui_app: SkillUiApp | None = None
-    if isinstance(ui_app_raw, dict):
-        ui_app = SkillUiApp(
-            entry=_normalize_ui_app_entry(ui_app_raw.get("entry", "assets/index.html")),
-            title=ui_app_raw.get("title"),
-        )
-    elif ui_app_raw is True:
-        ui_app = SkillUiApp()
+    ui_app = _parse_ui_app(ui_app_raw)
 
     frontmatter = SkillFrontmatter(
         name=data.get("name", ""),
         description=data.get("description", ""),
         license=data.get("license"),
         compatibility=data.get("compatibility"),
-        metadata=data.get("metadata") or {},
+        metadata=metadata,
         allowed_tools=allowed_tools,
         allowed_domains=allowed_domains,
         ui_app=ui_app,
@@ -247,6 +276,7 @@ def render_skill_md(
     allowed_domains: list[str] | None = None,
     instructions: str = "",
     metadata: dict[str, Any] | None = None,
+    ui_app: SkillUiApp | dict[str, Any] | bool | None = None,
 ) -> str:
     """Render a SKILL.md file with YAML frontmatter + markdown body."""
     fm: dict[str, Any] = {"name": name, "description": description}
@@ -254,6 +284,9 @@ def render_skill_md(
         fm["allowed-domains"] = allowed_domains
     if metadata:
         fm["metadata"] = metadata
+    parsed_ui_app = _parse_ui_app(ui_app)
+    if parsed_ui_app is not None:
+        fm["ui-app"] = parsed_ui_app.model_dump(exclude_none=True)
     yaml_str = yaml.dump(fm, default_flow_style=False, sort_keys=False, allow_unicode=True)
     lines = ["---", yaml_str.rstrip(), "---", ""]
     if instructions:
@@ -594,12 +627,31 @@ class SkillPlugin:
     ) -> dict[str, Any]:
         if not filename:
             return {"error": "filename is required"}
-        path = self._safe_path(filename)
+        normalized = filename.strip().lstrip("/")
+        if normalized == "data":
+            return {"error": "filename must be a file, not the data directory"}
+        if normalized.startswith("data/"):
+            normalized = normalized.removeprefix("data/")
+        if normalized in _RESERVED_DATA_WRITE_PATTERNS or normalized.startswith(
+            ("assets/", "scripts/", "references/")
+        ):
+            return {
+                "error": (
+                    f"'{filename}' is not a data file. "
+                    "Use skill_edit_file for SKILL.md, .env, assets/, scripts/, and references/."
+                ),
+                "hint": (
+                    "data_write only manages files inside the skill's data/ directory. "
+                    "For embedded UI files, write SKILL.md and assets/index.html with skill_edit_file."
+                ),
+            }
+        path = self._safe_path(normalized)
         if path is None:
             return {"error": f"Invalid filename: {filename}"}
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content)
         return {
-            "filename": filename,
+            "filename": normalized,
             "size": len(content),
             "status": "written",
         }

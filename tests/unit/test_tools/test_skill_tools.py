@@ -10,7 +10,6 @@ from homeclaw.agent.runtime_state import InMemoryRuntimeObservability
 from homeclaw.agent.tools import ToolRegistry, activated_skills, register_builtin_tools
 from homeclaw.plugins.registry import PluginRegistry
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -80,9 +79,7 @@ async def test_skill_list_empty(registry: ToolRegistry) -> None:
 
 
 @pytest.mark.asyncio
-async def test_skill_list_household_skill(
-    registry: ToolRegistry, workspaces: Path
-) -> None:
+async def test_skill_list_household_skill(registry: ToolRegistry, workspaces: Path) -> None:
     make_skill(workspaces, "household", "weather", WEATHER_SKILL_MD)
     result = await registry.get_handler("skill_list")(person="alice")  # type: ignore[misc]
     assert result["count"] == 1
@@ -93,9 +90,7 @@ async def test_skill_list_household_skill(
 
 
 @pytest.mark.asyncio
-async def test_skill_list_private_skill(
-    registry: ToolRegistry, workspaces: Path
-) -> None:
+async def test_skill_list_private_skill(registry: ToolRegistry, workspaces: Path) -> None:
     make_skill(workspaces, "alice", "myskill", WEATHER_SKILL_MD.replace("weather", "myskill"))
     result = await registry.get_handler("skill_list")(person="alice")  # type: ignore[misc]
     assert result["count"] == 1
@@ -103,9 +98,7 @@ async def test_skill_list_private_skill(
 
 
 @pytest.mark.asyncio
-async def test_skill_list_isolates_private_skills(
-    registry: ToolRegistry, workspaces: Path
-) -> None:
+async def test_skill_list_isolates_private_skills(registry: ToolRegistry, workspaces: Path) -> None:
     make_skill(workspaces, "alice", "secret", WEATHER_SKILL_MD)
     # bob cannot see alice's private skill
     result = await registry.get_handler("skill_list")(person="bob")  # type: ignore[misc]
@@ -113,9 +106,7 @@ async def test_skill_list_isolates_private_skills(
 
 
 @pytest.mark.asyncio
-async def test_skill_list_household_and_private(
-    registry: ToolRegistry, workspaces: Path
-) -> None:
+async def test_skill_list_household_and_private(registry: ToolRegistry, workspaces: Path) -> None:
     make_skill(workspaces, "household", "weather", WEATHER_SKILL_MD)
     make_skill(workspaces, "alice", "personal", WEATHER_SKILL_MD.replace("weather", "personal"))
     result = await registry.get_handler("skill_list")(person="alice")  # type: ignore[misc]
@@ -143,9 +134,20 @@ async def test_skill_create_household(
         scope="household",
         allowed_domains=["api.openweathermap.org"],
         instructions="Use this to answer weather questions.",
-        tools=[{"name": "get_weather", "description": "Get weather", "params": [
-            {"name": "location", "type": "string", "required": True, "description": "City name"}
-        ]}],
+        tools=[
+            {
+                "name": "get_weather",
+                "description": "Get weather",
+                "params": [
+                    {
+                        "name": "location",
+                        "type": "string",
+                        "required": True,
+                        "description": "City name",
+                    }
+                ],
+            }
+        ],
     )
     assert result["status"] == "created"
     assert result["name"] == "weather"
@@ -181,9 +183,7 @@ async def test_skill_create_private(
 
 
 @pytest.mark.asyncio
-async def test_skill_create_slugifies_name(
-    registry: ToolRegistry, workspaces: Path
-) -> None:
+async def test_skill_create_slugifies_name(registry: ToolRegistry, workspaces: Path) -> None:
     result = await registry.get_handler("skill_create")(  # type: ignore[misc]
         person="alice",
         name="My Weather Tool",
@@ -223,9 +223,7 @@ async def test_skill_create_invalid_scope_error(registry: ToolRegistry) -> None:
 
 
 @pytest.mark.asyncio
-async def test_skill_create_duplicate_error(
-    registry: ToolRegistry, workspaces: Path
-) -> None:
+async def test_skill_create_duplicate_error(registry: ToolRegistry, workspaces: Path) -> None:
     make_skill(workspaces, "household", "weather", WEATHER_SKILL_MD)
     result = await registry.get_handler("skill_create")(  # type: ignore[misc]
         person="alice",
@@ -259,9 +257,7 @@ def test_skill_create_schema_uses_arrays_for_optional_lists(
 
 
 @pytest.mark.asyncio
-async def test_skill_create_with_initial_files(
-    registry: ToolRegistry, workspaces: Path
-) -> None:
+async def test_skill_create_with_initial_files(registry: ToolRegistry, workspaces: Path) -> None:
     result = await registry.get_handler("skill_create")(  # type: ignore[misc]
         person="alice",
         name="recipes",
@@ -311,9 +307,7 @@ async def test_skill_create_initial_files_strips_path(
 
 
 @pytest.mark.asyncio
-async def test_skill_create_with_source_notes(
-    registry: ToolRegistry, workspaces: Path
-) -> None:
+async def test_skill_create_with_source_notes(registry: ToolRegistry, workspaces: Path) -> None:
     # Seed person's memory
     memory_dir = workspaces / "alice" / "memory"
     memory_dir.mkdir(parents=True)
@@ -382,12 +376,11 @@ async def test_skill_create_source_notes_missing_topic_skipped(
 
 
 @pytest.mark.asyncio
-async def test_skill_create_with_source_bookmarks(
-    registry: ToolRegistry, workspaces: Path
-) -> None:
+async def test_skill_create_with_source_bookmarks(registry: ToolRegistry, workspaces: Path) -> None:
+    from datetime import datetime, timezone
+
     from homeclaw.bookmarks.models import Bookmark
     from homeclaw.bookmarks.store import save_bookmark
-    from datetime import datetime, timezone
 
     bm = Bookmark(
         id="abc123",
@@ -422,12 +415,23 @@ async def test_skill_create_with_source_bookmarks(
 async def test_skill_create_source_bookmarks_by_ids(
     registry: ToolRegistry, workspaces: Path
 ) -> None:
-    from homeclaw.bookmarks.models import Bookmark
-    from homeclaw.bookmarks.store import save_bookmark
     from datetime import datetime, timezone
 
-    save_bookmark(workspaces, Bookmark(id="keep1", title="Keep This", category="place", saved_at=datetime.now(timezone.utc)))
-    save_bookmark(workspaces, Bookmark(id="skip2", title="Skip This", category="place", saved_at=datetime.now(timezone.utc)))
+    from homeclaw.bookmarks.models import Bookmark
+    from homeclaw.bookmarks.store import save_bookmark
+
+    save_bookmark(
+        workspaces,
+        Bookmark(
+            id="keep1", title="Keep This", category="place", saved_at=datetime.now(timezone.utc)
+        ),
+    )
+    save_bookmark(
+        workspaces,
+        Bookmark(
+            id="skip2", title="Skip This", category="place", saved_at=datetime.now(timezone.utc)
+        ),
+    )
 
     result = await registry.get_handler("skill_create")(  # type: ignore[misc]
         person="alice",
@@ -490,7 +494,8 @@ class FakeConfig:
 
 @pytest.fixture
 def approval_registry(
-    workspaces: Path, plugin_reg: PluginRegistry,
+    workspaces: Path,
+    plugin_reg: PluginRegistry,
 ) -> ToolRegistry:
     """Registry with skill_approval_required=True and alice as admin."""
     reg = ToolRegistry()
@@ -501,7 +506,8 @@ def approval_registry(
 
 @pytest.fixture
 def no_approval_registry(
-    workspaces: Path, plugin_reg: PluginRegistry,
+    workspaces: Path,
+    plugin_reg: PluginRegistry,
 ) -> ToolRegistry:
     """Registry with skill_approval_required=False."""
     reg = ToolRegistry()
@@ -512,7 +518,8 @@ def no_approval_registry(
 
 @pytest.mark.asyncio
 async def test_non_admin_skill_create_goes_to_pending(
-    approval_registry: ToolRegistry, workspaces: Path,
+    approval_registry: ToolRegistry,
+    workspaces: Path,
 ) -> None:
     result = await approval_registry.get_handler("skill_create")(  # type: ignore[misc]
         person="bob",
@@ -533,7 +540,8 @@ async def test_non_admin_skill_create_goes_to_pending(
 
 @pytest.mark.asyncio
 async def test_admin_skill_create_bypasses_approval(
-    approval_registry: ToolRegistry, workspaces: Path,
+    approval_registry: ToolRegistry,
+    workspaces: Path,
 ) -> None:
     result = await approval_registry.get_handler("skill_create")(  # type: ignore[misc]
         person="alice",  # alice is admin
@@ -548,7 +556,8 @@ async def test_admin_skill_create_bypasses_approval(
 
 @pytest.mark.asyncio
 async def test_approval_disabled_anyone_can_create(
-    no_approval_registry: ToolRegistry, workspaces: Path,
+    no_approval_registry: ToolRegistry,
+    workspaces: Path,
 ) -> None:
     result = await no_approval_registry.get_handler("skill_create")(  # type: ignore[misc]
         person="bob",
@@ -562,7 +571,8 @@ async def test_approval_disabled_anyone_can_create(
 
 @pytest.mark.asyncio
 async def test_skill_pending_list(
-    approval_registry: ToolRegistry, workspaces: Path,
+    approval_registry: ToolRegistry,
+    workspaces: Path,
 ) -> None:
     # Create a pending skill as non-admin
     await approval_registry.get_handler("skill_create")(  # type: ignore[misc]
@@ -582,7 +592,8 @@ async def test_skill_pending_list(
 
 @pytest.mark.asyncio
 async def test_skill_approve(
-    approval_registry: ToolRegistry, workspaces: Path,
+    approval_registry: ToolRegistry,
+    workspaces: Path,
 ) -> None:
     # Create pending skill
     await approval_registry.get_handler("skill_create")(  # type: ignore[misc]
@@ -608,7 +619,8 @@ async def test_skill_approve(
 
 @pytest.mark.asyncio
 async def test_skill_approve_non_admin_rejected(
-    approval_registry: ToolRegistry, workspaces: Path,
+    approval_registry: ToolRegistry,
+    workspaces: Path,
 ) -> None:
     await approval_registry.get_handler("skill_create")(  # type: ignore[misc]
         person="bob",
@@ -627,7 +639,8 @@ async def test_skill_approve_non_admin_rejected(
 
 @pytest.mark.asyncio
 async def test_skill_reject(
-    approval_registry: ToolRegistry, workspaces: Path,
+    approval_registry: ToolRegistry,
+    workspaces: Path,
 ) -> None:
     await approval_registry.get_handler("skill_create")(  # type: ignore[misc]
         person="bob",
@@ -673,6 +686,138 @@ async def test_skill_create_includes_verification(
     assert result["verification"]["skill_name"] == "weather"
     assert "weather__data_write" in result["verification"]["expected_tools"]
     assert "weather__http_call" in result["verification"]["expected_tools"]
+
+
+@pytest.mark.asyncio
+async def test_skill_enable_ui_app_updates_skill_md_and_creates_asset(
+    registry: ToolRegistry, workspaces: Path
+) -> None:
+    make_skill(
+        workspaces,
+        "household",
+        "budget",
+        """\
+---
+name: budget
+description: Track the household budget
+---
+Use the budget skill.
+""",
+    )
+
+    result = await registry.get_handler("skill_enable_ui_app")(  # type: ignore[misc]
+        person="alice",
+        name="budget",
+        owner="household",
+        title="Budget Dashboard",
+    )
+
+    assert result["status"] == "ui_app_enabled"
+    assert result["ui_app"] == {"entry": "index.html", "title": "Budget Dashboard"}
+    assert result["asset_file"] == "assets/index.html"
+
+    skill_dir = workspaces / "household" / "skills" / "budget"
+    skill_md = (skill_dir / "SKILL.md").read_text()
+    assert "ui-app:" in skill_md
+    assert "entry: index.html" in skill_md
+    assert "title: Budget Dashboard" in skill_md
+
+    asset_html = (skill_dir / "assets" / "index.html").read_text()
+    assert "https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs" in asset_html
+    assert "/api/skills/household/budget/files/data/state.json" in asset_html
+
+
+@pytest.mark.asyncio
+async def test_skill_enable_ui_app_with_custom_html_content_writes_asset(
+    registry: ToolRegistry, workspaces: Path
+) -> None:
+    make_skill(
+        workspaces,
+        "household",
+        "dashboard",
+        """\
+---
+name: dashboard
+description: Dashboard skill
+---
+Use the dashboard skill.
+""",
+    )
+
+    html = "<!DOCTYPE html><html><body><h1>Custom UI</h1></body></html>"
+    result = await registry.get_handler("skill_enable_ui_app")(  # type: ignore[misc]
+        person="alice",
+        name="dashboard",
+        owner="household",
+        html_content=html,
+    )
+
+    assert result["status"] == "ui_app_enabled"
+    written = (
+        workspaces / "household" / "skills" / "dashboard" / "assets" / "index.html"
+    ).read_text()
+    assert written == html
+
+
+@pytest.mark.asyncio
+async def test_skill_data_write_rejects_assets_path_with_hint(
+    registry: ToolRegistry, plugin_reg: PluginRegistry
+) -> None:
+    await registry.get_handler("skill_create")(  # type: ignore[misc]
+        person="alice",
+        name="budget_app",
+        description="Budget app",
+        scope="household",
+        allowed_domains=[],
+        instructions="Use the budget app.",
+    )
+
+    plugin = plugin_reg.get("budget_app")
+    assert plugin is not None
+    result = await plugin.handle_tool(  # type: ignore[union-attr]
+        "data_write",
+        {"filename": "assets/index.html", "content": "<!doctype html>"},
+    )
+
+    assert "error" in result
+    assert "Use skill_edit_file" in (result["error"] + result.get("hint", ""))
+
+
+@pytest.mark.asyncio
+async def test_skill_edit_file_rejects_invalid_skill_md_ui_app_in_metadata(
+    registry: ToolRegistry, workspaces: Path
+) -> None:
+    make_skill(
+        workspaces,
+        "household",
+        "broken-ui",
+        """\
+---
+name: broken-ui
+description: Broken UI skill
+---
+Use the broken UI skill.
+""",
+    )
+
+    bad_skill_md = """\
+---
+name: broken-ui
+description: Broken UI skill
+metadata:
+  ui-app: true
+---
+Use the broken UI skill.
+"""
+    result = await registry.get_handler("skill_edit_file")(  # type: ignore[misc]
+        person="alice",
+        name="broken-ui",
+        file="SKILL.md",
+        content=bad_skill_md,
+    )
+
+    assert "error" in result
+    assert "top-level" in result["error"]
 
 
 @pytest.mark.asyncio
@@ -774,5 +919,7 @@ def test_skill_creator_builtin_instructions_cover_existing_skill_mini_apps() -> 
     assert "If the skill already exists, do NOT call `skill_create` again." in skill_md
     assert "Do NOT return raw HTML to the user" in skill_md
     assert "assets/index.html" in skill_md
+    assert "skill_enable_ui_app" in skill_md
+    assert "Never use `{name}__data_write` for `SKILL.md` or `assets/index.html`" in skill_md
     assert "https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs" in skill_md
     assert "dist/index.js" not in skill_md

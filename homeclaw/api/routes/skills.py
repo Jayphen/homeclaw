@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
+import mimetypes
 import re
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Any
-
-import mimetypes
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from homeclaw.api.deps import AdminDep, AuthDep, MemberDep, get_config, list_member_workspaces
+from homeclaw.api.deps import AdminDep, AuthDep, get_config, list_member_workspaces
 
 router = APIRouter(prefix="/api/skills", tags=["skills"])
 
@@ -22,11 +21,13 @@ router = APIRouter(prefix="/api/skills", tags=["skills"])
 def _load_env(skill_dir: Path) -> dict[str, str]:
     """Load .env from skill dir for dep checking."""
     from homeclaw.plugins.skills.loader import _load_skill_env
+
     return _load_skill_env(skill_dir)
 
 
 def _check_deps(
-    metadata: dict[str, Any], skill_env: dict[str, str] | None = None,
+    metadata: dict[str, Any],
+    skill_env: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
     """Check skill deps, return result only if something is missing."""
     from homeclaw.plugins.skills.deps import check_skill_deps
@@ -35,6 +36,7 @@ def _check_deps(
     if deps["satisfied"]:
         return None
     return deps
+
 
 _ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -157,7 +159,6 @@ async def update_skill_settings(body: SkillSettingsUpdate) -> dict[str, Any]:
     }
 
 
-
 # ---------------------------------------------------------------------------
 # Delete (archive) a skill
 # ---------------------------------------------------------------------------
@@ -172,7 +173,7 @@ async def delete_skill(owner: str, name: str) -> dict[str, Any]:
     if not skill_dir.is_dir():
         raise HTTPException(status_code=404, detail="Skill not found")
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     archive_root = workspaces / owner / "skills" / ".archive"
     archive_root.mkdir(parents=True, exist_ok=True)
     archive_dir = archive_root / f"{name}_{timestamp}"
@@ -475,8 +476,8 @@ async def read_skill_file(owner: str, name: str, file_path: str) -> dict[str, An
 
     try:
         content = path.read_text()
-    except UnicodeDecodeError:
-        raise HTTPException(status_code=422, detail="File is not a text file")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=422, detail="File is not a text file") from exc
 
     return {
         "path": file_path,
@@ -492,7 +493,10 @@ class FileUpdate(BaseModel):
 
 @router.put("/{owner}/{name}/files/{file_path:path}", dependencies=[AuthDep])
 async def write_skill_file(
-    owner: str, name: str, file_path: str, body: FileUpdate,
+    owner: str,
+    name: str,
+    file_path: str,
+    body: FileUpdate,
 ) -> dict[str, Any]:
     """Write or update a file inside a skill directory.
 
@@ -548,26 +552,22 @@ async def write_skill_file(
         raise HTTPException(status_code=400, detail="content is required")
 
     # Validate SKILL.md before saving
-    validation_error: str | None = None
     if file_path == "SKILL.md":
         from homeclaw.plugins.skills.loader import skill_md_to_definition
 
         try:
             skill_md_to_definition(body.content)
         except ValueError as exc:
-            validation_error = str(exc)
+            raise HTTPException(status_code=400, detail=f"Invalid SKILL.md: {exc}") from exc
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(body.content)
 
-    result: dict[str, Any] = {
+    return {
         "path": file_path,
         "size": len(body.content),
         "status": "written",
     }
-    if validation_error:
-        result["validation_error"] = validation_error
-    return result
 
 
 @router.delete("/{owner}/{name}/files/{file_path:path}", dependencies=[AuthDep])
@@ -580,7 +580,10 @@ async def delete_skill_file(owner: str, name: str, file_path: str) -> dict[str, 
         raise HTTPException(status_code=404, detail="Skill not found")
 
     if file_path == "SKILL.md":
-        raise HTTPException(status_code=400, detail="Cannot delete SKILL.md — use skill_remove instead")
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete SKILL.md — use skill_remove instead",
+        )
 
     path = _safe_relative(skill_dir, file_path)
     if not path.is_file():
@@ -639,15 +642,11 @@ def _parse_archive_dir(owner: str, archive_dir: Path) -> dict[str, Any] | None:
     ts_str = name_ts[-15:]  # YYYYMMDD_HHMMSS
 
     try:
-        archived_at = datetime.strptime(ts_str, "%Y%m%d_%H%M%S").replace(tzinfo=timezone.utc)
+        archived_at = datetime.strptime(ts_str, "%Y%m%d_%H%M%S").replace(tzinfo=UTC)
     except ValueError:
         return None
 
-    files = sorted(
-        str(p.relative_to(archive_dir))
-        for p in archive_dir.rglob("*")
-        if p.is_file()
-    )
+    files = sorted(str(p.relative_to(archive_dir)) for p in archive_dir.rglob("*") if p.is_file())
 
     return {
         "id": name_ts,
