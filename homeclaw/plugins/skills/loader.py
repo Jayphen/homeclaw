@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class SkillUiApp(BaseModel):
     """Embedded web app declaration for a skill."""
 
-    entry: str = "assets/index.html"
+    entry: str = "index.html"
     title: str | None = None
 
 
@@ -122,6 +122,30 @@ def _normalize_string_list_field(value: Any, *, field_name: str) -> list[str]:
     )
 
 
+def _normalize_ui_app_entry(value: Any) -> str:
+    """Normalize a ui-app entry path relative to the skill's assets directory.
+
+    Public SKILL.md examples use ``assets/index.html`` while the asset route
+    already scopes requests to ``assets/``. Strip one leading ``assets/``
+    segment so consumers can safely build ``/assets/{entry}`` URLs.
+    """
+    if not value:
+        return "index.html"
+    if not isinstance(value, str):
+        raise ValueError(
+            f"Invalid ui_app.entry frontmatter: expected string, got {type(value).__name__}"
+        )
+
+    entry = value.strip().lstrip("/")
+    if not entry:
+        return "index.html"
+    if entry == "assets":
+        return "index.html"
+    if entry.startswith("assets/"):
+        return entry.removeprefix("assets/")
+    return entry
+
+
 def parse_skill_md(content: str) -> tuple[SkillFrontmatter, str]:
     """Parse a SKILL.md file into frontmatter and markdown body.
 
@@ -165,7 +189,7 @@ def parse_skill_md(content: str) -> tuple[SkillFrontmatter, str]:
     ui_app: SkillUiApp | None = None
     if isinstance(ui_app_raw, dict):
         ui_app = SkillUiApp(
-            entry=ui_app_raw.get("entry", "assets/index.html"),
+            entry=_normalize_ui_app_entry(ui_app_raw.get("entry", "assets/index.html")),
             title=ui_app_raw.get("title"),
         )
     elif ui_app_raw is True:
@@ -267,11 +291,6 @@ def _load_skill_env(skill_dir: Path) -> dict[str, str]:
                 if key:
                     env[key] = value
 
-    # Also pull from os.environ for keys the skill declares it needs
-    import os
-    for key in list(env.keys()):
-        # .env file takes precedence, but fill gaps from os.environ
-        pass
     return env
 
 
