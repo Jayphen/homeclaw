@@ -366,7 +366,8 @@
   // token as a query param so the browser navigation request is authenticated.
   function appSrc(owner: string, name: string, entry: string): string {
     const token = getToken();
-    const base = `/api/skills/${owner}/${name}/assets/${entry}`;
+    const normalizedEntry = entry.replace(/^\/?assets\//, "").replace(/^\/+/, "");
+    const base = `/api/skills/${owner}/${name}/assets/${normalizedEntry || "index.html"}`;
     return token ? `${base}?token=${encodeURIComponent(token)}` : base;
   }
 </script>

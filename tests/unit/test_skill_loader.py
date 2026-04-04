@@ -6,13 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from homeclaw.agent.providers.base import ToolDefinition
 from homeclaw.agent.tools import ToolRegistry
 from homeclaw.plugins.interface import Plugin
-from homeclaw.plugins.registry import PluginEntry, PluginRegistry, PluginType
+from homeclaw.plugins.registry import PluginRegistry, PluginType
 from homeclaw.plugins.skills.loader import (
-    SkillCatalogEntry,
-    SkillLocation,
     SkillPlugin,
     build_skill_catalog,
     discover_skills,
@@ -133,6 +130,38 @@ def test_parse_skill_md_all_fields() -> None:
     assert fm.metadata == {"currency": "AUD"}
     assert fm.allowed_tools == ["data_read", "data_write"]
     assert "## Usage" in body
+
+
+def test_parse_skill_md_normalizes_ui_app_entry_under_assets_dir() -> None:
+    content = """\
+---
+name: embedded-app
+description: Generated embedded app skill
+ui-app:
+  entry: assets/index.html
+  title: Embedded App
+---
+Open the UI app when asked.
+"""
+    fm, body = parse_skill_md(content)
+    assert fm.ui_app is not None
+    assert fm.ui_app.entry == "index.html"
+    assert fm.ui_app.title == "Embedded App"
+    assert body == "Open the UI app when asked."
+
+
+def test_parse_skill_md_ui_app_true_uses_index_html_default() -> None:
+    content = """\
+---
+name: embedded-app
+description: Generated embedded app skill
+ui-app: true
+---
+Open the UI app when asked.
+"""
+    fm, _ = parse_skill_md(content)
+    assert fm.ui_app is not None
+    assert fm.ui_app.entry == "index.html"
 
 
 def test_parse_skill_md_missing_frontmatter() -> None:
