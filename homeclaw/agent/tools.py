@@ -231,6 +231,38 @@ def register_builtin_tools(
         return {"status": "updated", "id": id}
 
     @_reg(
+        name="contact_create",
+        description=(
+            "Create a new contact. "
+            "Use this instead of contact_update when the contact does not already exist."
+        ),
+        policy=ToolPolicy(access="write", scope="personal"),
+    )
+    async def contact_create(
+        *,
+        id: Annotated[str, Desc("New contact ID")],
+        name: Annotated[str, Desc("Contact name")],
+        relationship: Annotated[str, Desc("Relationship (e.g. 'wife', 'mother', 'friend', 'pet')")],
+        nicknames: Annotated[
+            list[str] | None, Desc("Nicknames or shortened names for this person")
+        ] = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        if get_contact(workspaces, id) is not None:
+            return {
+                "error": f"Contact '{id}' already exists",
+                "hint": "Use contact_update to modify an existing contact.",
+            }
+        contact = Contact(
+            id=id,
+            name=name,
+            relationship=relationship,
+            nicknames=nicknames or [],
+        )
+        await save_contact_safe(workspaces, contact)
+        return {"status": "created", "id": id}
+
+    @_reg(
         name="contact_note",
         description=(
             "Add a note about a contact — a fact, observation, preference, or "
@@ -355,6 +387,41 @@ def register_builtin_tools(
             return {"person": person, "topic": topic, "content": text}
         topics = memory_list_topics(workspaces, person)
         return {"person": person, "topics": topics}
+
+    @_reg(
+        name="memory_list_topics",
+        description=(
+            "List memory topics for a household member. "
+            "Use this instead of memory_read when you only want the topic list."
+        ),
+        policy=ToolPolicy(access="read", scope="personal"),
+    )
+    async def memory_list_topics_tool(
+        *,
+        person: Annotated[str, Desc("Household member name")],
+        **_: Any,
+    ) -> dict[str, Any]:
+        topics = memory_list_topics(workspaces, person)
+        return {"person": person, "topics": topics}
+
+    @_reg(
+        name="memory_read_topic",
+        description=(
+            "Read one stored memory topic for a household member. "
+            "Use this instead of memory_read when you want one specific topic."
+        ),
+        policy=ToolPolicy(access="read", scope="personal"),
+    )
+    async def memory_read_topic_tool(
+        *,
+        person: Annotated[str, Desc("Household member name")],
+        topic: Annotated[str, Desc("Topic to read")],
+        **_: Any,
+    ) -> dict[str, Any]:
+        text = memory_read_topic(workspaces, person, topic)
+        if text is None:
+            return {"person": person, "topic": topic, "content": None}
+        return {"person": person, "topic": topic, "content": text}
 
     # --- Note tools ---
 
@@ -2227,6 +2294,95 @@ def register_builtin_tools(
 </html>
 """
 
+    def _resolve_skill_file_path(
+        *,
+        person: str,
+        name: str,
+        file: str,
+        owner: str | None = None,
+    ) -> tuple[Any | None, Path | None, dict[str, Any] | None]:
+        loc, err = _resolve_editable_skill_location(person=person, name=name, owner=owner)
+        if err is not None:
+            return None, None, err
+        assert loc is not None
+        path = (loc.skill_dir / file).resolve()
+        if not path.is_relative_to(loc.skill_dir.resolve()):
+            return None, None, {"error": f"Invalid file path: {file}"}
+        return loc, path, None
+
+    def _validate_skill_root_write(
+        *,
+        file: str,
+        path: Path,
+        content: str,
+    ) -> dict[str, Any] | None:
+        from homeclaw.plugins.skills.loader import skill_md_to_definition
+
+        if err := _check_content_length(content):
+            return err
+        if file == "SKILL.md":
+            try:
+                skill_md_to_definition(content)
+            except ValueError as exc:
+                return {
+                    "error": f"Invalid SKILL.md: {exc}",
+                    "hint": (
+                        "For embedded UIs, declare ui-app as a top-level frontmatter key "
+                        "and use skill_enable_ui_app to create assets/index.html."
+                    ),
+                }
+        if path.is_file():
+            old_size = path.stat().st_size
+            if old_size > 500 and len(content) < old_size * 0.2:
+                return {
+                    "error": (
+                        f"Refusing to overwrite {file} ({old_size} bytes) with "
+                        f"much shorter content ({len(content)} bytes). This usually "
+                        f"means truncation. Use skill_replace_in_file for targeted edits, "
+                        f"or pass the full content if you really mean to replace it."
+                    ),
+                }
+        return None
+
+    def _read_skill_root_file(*, path: Path, file: str) -> dict[str, Any]:
+        if not path.is_file():
+            return {"error": f"File not found: {file}"}
+        text = path.read_text()
+        return {"file": file, "content": text, "size": len(text)}
+
+    def _replace_skill_root_file(
+        *,
+        path: Path,
+        file: str,
+        find: str,
+        replace: str | None,
+    ) -> dict[str, Any]:
+        if not path.is_file():
+            return {"error": f"File not found: {file}"}
+        text = path.read_text()
+        if find not in text:
+            return {"error": f"Text to find not found in {file}"}
+        new_text = text.replace(find, replace or "")
+        path.write_text(new_text)
+        return {
+            "file": file,
+            "status": "edited",
+            "replacements": text.count(find),
+            "size": len(new_text),
+        }
+
+    def _write_skill_root_file(
+        *,
+        file: str,
+        path: Path,
+        content: str,
+    ) -> dict[str, Any]:
+        if err := _validate_skill_root_write(file=file, path=path, content=content):
+            return err
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        return {"file": file, "status": "written", "size": len(content)}
+
     @_reg(
         name="skill_edit_file",
         description=(
@@ -2254,77 +2410,99 @@ def register_builtin_tools(
         replace: Annotated[str | None, Desc("Replacement text (find/replace mode)")] = None,
         **_: Any,
     ) -> dict[str, Any]:
-        from homeclaw.plugins.skills.loader import skill_md_to_definition
-
-        loc, err = _resolve_editable_skill_location(person=person, name=name)
+        _loc, path, err = _resolve_skill_file_path(person=person, name=name, file=file)
         if err is not None:
             return err
-        assert loc is not None
-        if loc.scope == "builtin":
-            return {
-                "error": f"Cannot edit built-in skill '{name}'. Install a copy to household or personal skills first."
-            }
-
-        # Resolve and validate path
-        path = (loc.skill_dir / file).resolve()
-        if not path.is_relative_to(loc.skill_dir.resolve()):
-            return {"error": f"Invalid file path: {file}"}
+        assert path is not None
 
         # Read mode
         if content is None and find is None:
-            if not path.is_file():
-                return {"error": f"File not found: {file}"}
-            text = path.read_text()
-            return {"file": file, "content": text, "size": len(text)}
+            return _read_skill_root_file(path=path, file=file)
 
         # Find/replace mode
         if find is not None:
-            if not path.is_file():
-                return {"error": f"File not found: {file}"}
-            text = path.read_text()
-            if find not in text:
-                return {"error": f"Text to find not found in {file}"}
-            new_text = text.replace(find, replace or "")
-            path.write_text(new_text)
-            return {
-                "file": file,
-                "status": "edited",
-                "replacements": text.count(find),
-                "size": len(new_text),
-            }
+            return _replace_skill_root_file(path=path, file=file, find=find, replace=replace)
 
         # Write mode
         if content is not None:
-            if err := _check_content_length(content):
-                return err
-            if file == "SKILL.md":
-                try:
-                    skill_md_to_definition(content)
-                except ValueError as exc:
-                    return {
-                        "error": f"Invalid SKILL.md: {exc}",
-                        "hint": (
-                            "For embedded UIs, declare ui-app as a top-level frontmatter key "
-                            "and use skill_enable_ui_app to create assets/index.html."
-                        ),
-                    }
-            # Safety: warn if overwriting a large file with much shorter content
-            if path.is_file():
-                old_size = path.stat().st_size
-                if old_size > 500 and len(content) < old_size * 0.2:
-                    return {
-                        "error": (
-                            f"Refusing to overwrite {file} ({old_size} bytes) with "
-                            f"much shorter content ({len(content)} bytes). This usually "
-                            f"means truncation. Use find/replace mode for targeted edits, "
-                            f"or pass the full content if you really mean to replace it."
-                        ),
-                    }
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(content)
-            return {"file": file, "status": "written", "size": len(content)}
+            return _write_skill_root_file(file=file, path=path, content=content)
 
         return {"error": "Provide content (write), or find+replace (edit), or nothing (read)"}
+
+    @_reg(
+        name="skill_read_file",
+        description=(
+            "Read a file from a skill directory. "
+            "Use this instead of skill_edit_file when you only want to inspect a file."
+        ),
+        policy=ToolPolicy(access="read", scope="personal"),
+    )
+    async def skill_read_file(
+        *,
+        person: Annotated[str, Desc("Household member name")],
+        name: Annotated[str, Desc("Skill name")],
+        file: Annotated[str, Desc("File path relative to the skill directory")],
+        owner: Annotated[
+            str | None, Desc("Optional owner to disambiguate same-named skills")
+        ] = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        _loc, path, err = _resolve_skill_file_path(person=person, name=name, file=file, owner=owner)
+        if err is not None:
+            return err
+        assert path is not None
+        return _read_skill_root_file(path=path, file=file)
+
+    @_reg(
+        name="skill_write_file",
+        description=(
+            "Create or overwrite a file in a skill directory. "
+            "Use this instead of skill_edit_file when you want a deterministic write."
+        ),
+        policy=ToolPolicy(access="write", scope="personal"),
+    )
+    async def skill_write_file(
+        *,
+        person: Annotated[str, Desc("Household member name")],
+        name: Annotated[str, Desc("Skill name")],
+        file: Annotated[str, Desc("File path relative to the skill directory")],
+        content: Annotated[str, Desc("Full file content to write")],
+        owner: Annotated[
+            str | None, Desc("Optional owner to disambiguate same-named skills")
+        ] = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        _loc, path, err = _resolve_skill_file_path(person=person, name=name, file=file, owner=owner)
+        if err is not None:
+            return err
+        assert path is not None
+        return _write_skill_root_file(file=file, path=path, content=content)
+
+    @_reg(
+        name="skill_replace_in_file",
+        description=(
+            "Perform a find/replace edit in a skill file. "
+            "Use this instead of skill_edit_file when you want a deterministic targeted edit."
+        ),
+        policy=ToolPolicy(access="write", scope="personal"),
+    )
+    async def skill_replace_in_file(
+        *,
+        person: Annotated[str, Desc("Household member name")],
+        name: Annotated[str, Desc("Skill name")],
+        file: Annotated[str, Desc("File path relative to the skill directory")],
+        find: Annotated[str, Desc("Text to find")],
+        replace: Annotated[str | None, Desc("Replacement text")] = None,
+        owner: Annotated[
+            str | None, Desc("Optional owner to disambiguate same-named skills")
+        ] = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        _loc, path, err = _resolve_skill_file_path(person=person, name=name, file=file, owner=owner)
+        if err is not None:
+            return err
+        assert path is not None
+        return _replace_skill_root_file(path=path, file=file, find=find, replace=replace)
 
     @_reg(
         name="skill_enable_ui_app",

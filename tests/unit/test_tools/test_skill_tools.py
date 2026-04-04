@@ -821,6 +821,100 @@ Use the broken UI skill.
 
 
 @pytest.mark.asyncio
+async def test_skill_read_write_replace_file_tools_are_single_purpose(
+    registry: ToolRegistry, workspaces: Path
+) -> None:
+    make_skill(
+        workspaces,
+        "household",
+        "notes_skill",
+        """\
+---
+name: notes_skill
+description: Notes skill
+---
+Use the notes skill.
+""",
+    )
+
+    write_result = await registry.get_handler("skill_write_file")(  # type: ignore[misc]
+        person="alice",
+        name="notes_skill",
+        owner="household",
+        file="assets/index.html",
+        content="<html><body>Hello</body></html>",
+    )
+    assert write_result["status"] == "written"
+
+    read_result = await registry.get_handler("skill_read_file")(  # type: ignore[misc]
+        person="alice",
+        name="notes_skill",
+        owner="household",
+        file="assets/index.html",
+    )
+    assert read_result["content"] == "<html><body>Hello</body></html>"
+
+    replace_result = await registry.get_handler("skill_replace_in_file")(  # type: ignore[misc]
+        person="alice",
+        name="notes_skill",
+        owner="household",
+        file="assets/index.html",
+        find="Hello",
+        replace="Hi",
+    )
+    assert replace_result["status"] == "edited"
+
+    updated = (
+        workspaces / "household" / "skills" / "notes_skill" / "assets" / "index.html"
+    ).read_text()
+    assert updated == "<html><body>Hi</body></html>"
+
+
+@pytest.mark.asyncio
+async def test_memory_explicit_read_tools_match_memory_read(registry: ToolRegistry) -> None:
+    await registry.get_handler("memory_save")(  # type: ignore[misc]
+        person="alice",
+        topic="food",
+        content="Likes pasta",
+    )
+
+    topics = await registry.get_handler("memory_list_topics")(person="alice")  # type: ignore[misc]
+    topic = await registry.get_handler("memory_read_topic")(  # type: ignore[misc]
+        person="alice",
+        topic="food",
+    )
+
+    assert topics["topics"] == ["food"]
+    assert "Likes pasta" in topic["content"]
+
+
+@pytest.mark.asyncio
+async def test_contact_create_requires_new_contact_and_contact_update_can_modify(
+    registry: ToolRegistry,
+) -> None:
+    created = await registry.get_handler("contact_create")(  # type: ignore[misc]
+        id="jane",
+        name="Jane",
+        relationship="friend",
+        nicknames=["J"],
+    )
+    assert created["status"] == "created"
+
+    duplicate = await registry.get_handler("contact_create")(  # type: ignore[misc]
+        id="jane",
+        name="Jane",
+        relationship="friend",
+    )
+    assert "already exists" in duplicate["error"]
+
+    updated = await registry.get_handler("contact_update")(  # type: ignore[misc]
+        id="jane",
+        relationship="best friend",
+    )
+    assert updated["status"] == "updated"
+
+
+@pytest.mark.asyncio
 async def test_read_skill_tracks_activation_reason(
     workspaces: Path,
     plugin_reg: PluginRegistry,
