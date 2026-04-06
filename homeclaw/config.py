@@ -71,6 +71,7 @@ _SAVEABLE_FIELDS = {
     "timezone",
     "skill_approval_required",
     "skill_allow_local_network",
+    "browser_enabled",
     "provider_mode",
 }
 
@@ -191,6 +192,9 @@ class HomeclawConfig(BaseSettings):
     # Skills
     skill_approval_required: bool = True  # Non-admins need admin approval to create skills
     skill_allow_local_network: bool = False  # Allow skill http_call to reach LAN services
+
+    # Browser automation (requires agent-browser CLI and Chrome/Chromium)
+    browser_enabled: bool = False
 
     # Note-taking detail level
     note_detail_level: NoteDetailLevel = "normal"

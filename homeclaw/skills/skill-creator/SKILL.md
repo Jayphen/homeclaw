@@ -383,3 +383,7 @@ skill_edit_file(
 - SQLite queries: `POST /api/skills/{owner}/{name}/db/query` with `{sql, params}` body (SELECT only)
 - Writes go through the agent (LLM calls `db_execute` / `data_write`); the UI is read-only
 - LAN-only installs: vendor Arrow.js into `assets/arrow.js` and use a relative import
+- **UI verification**: if `browser_enabled` is on in Settings, you can verify the app renders
+  correctly by calling `web_browse(url="http://localhost:8080/api/skills/{owner}/{name}/assets/index.html")`.
+  This opens the page in a real browser and returns its accessibility tree. If the UI has issues
+  (blank page, JS errors in the output), fix them with `skill_edit_file` and re-verify.
