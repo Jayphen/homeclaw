@@ -6,6 +6,7 @@ set -e
 PACKAGES_FILE="/data/workspaces/household/packages.txt"
 if [ -f "$PACKAGES_FILE" ]; then
     echo "[homeclaw] Installing extra packages from $PACKAGES_FILE ..."
+    dpkg --configure -a || true
     apt-get update -qq
     xargs -a "$PACKAGES_FILE" apt-get install -y --no-install-recommends -qq
     rm -rf /var/lib/apt/lists/*
