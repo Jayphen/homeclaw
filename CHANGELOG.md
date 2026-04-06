@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.1](https://github.com/Jayphen/homeclaw/compare/v0.26.0...v0.26.1) (2026-04-06)
+
+
+### Bug Fixes
+
+* send proactive progress messages during silent multi-round tool execution ([#133](https://github.com/Jayphen/homeclaw/issues/133)) ([5d95840](https://github.com/Jayphen/homeclaw/commit/5d958404f52eadb79d86ba573c6142172cef4d99))
+
 ## [0.26.0](https://github.com/Jayphen/homeclaw/compare/v0.25.3...v0.26.0) (2026-04-06)
 
 
