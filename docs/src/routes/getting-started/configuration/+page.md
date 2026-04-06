@@ -92,7 +92,7 @@ homeclaw can browse JavaScript-rendered pages and verify skill UIs using the [ag
 1. Install agent-browser and Chrome:
    - macOS: `brew install agent-browser` (Chrome is detected automatically)
    - npm: `npm i -g agent-browser`
-   - Docker: add `chromium` and `npm` to `workspaces/household/packages.txt`, then add `npm install -g agent-browser` to your entrypoint
+   - Docker: add `chromium` and `npm` to `workspaces/household/packages.txt`, and add `agent-browser` to `workspaces/household/npm-packages.txt`
 
 2. Enable browser automation in Settings or `config.json`:
 
