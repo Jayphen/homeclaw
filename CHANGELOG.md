@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.0](https://github.com/Jayphen/homeclaw/compare/v0.27.0...v0.28.0) (2026-04-06)
+
+
+### Features
+
+* add web_browse tool via agent-browser CLI ([#139](https://github.com/Jayphen/homeclaw/issues/139)) ([ae76995](https://github.com/Jayphen/homeclaw/commit/ae769959647ab7b051f9eef8d463d0331def27b0))
+
 ## [0.27.0](https://github.com/Jayphen/homeclaw/compare/v0.26.1...v0.27.0) (2026-04-06)
 
 
