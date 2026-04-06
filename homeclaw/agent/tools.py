@@ -925,6 +925,15 @@ def register_builtin_tools(
                 if parsed.scheme.lower() in _BLOCKED_SCHEMES:
                     return {"error": f"URL scheme '{parsed.scheme}' is not allowed"}
 
+                hostname = parsed.hostname or ""
+                if hostname:
+                    from homeclaw.plugins.skills.http_call import _check_private_ip
+
+                    try:
+                        _check_private_ip(hostname)
+                    except ValueError as exc:
+                        return {"error": str(exc)}
+
                 async def _run(*args: str) -> tuple[str, str, int]:
                     proc = await asyncio.create_subprocess_exec(
                         "agent-browser",
