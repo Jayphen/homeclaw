@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.1](https://github.com/Jayphen/homeclaw/compare/v0.28.0...v0.28.1) (2026-04-06)
+
+
+### Bug Fixes
+
+* run dpkg --configure -a before apt-get in entrypoint ([#141](https://github.com/Jayphen/homeclaw/issues/141)) ([dd70c1a](https://github.com/Jayphen/homeclaw/commit/dd70c1a79b6717c1fe13aec264f0ba9fb503ef00))
+
 ## [0.28.0](https://github.com/Jayphen/homeclaw/compare/v0.27.0...v0.28.0) (2026-04-06)
 
 
