@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.0](https://github.com/Jayphen/homeclaw/compare/v0.25.3...v0.26.0) (2026-04-06)
+
+
+### Features
+
+* add SQLite skill storage, db/query API, and fix token-limit failures ([#131](https://github.com/Jayphen/homeclaw/issues/131)) ([97654e6](https://github.com/Jayphen/homeclaw/commit/97654e62e7a406674471f10c80983b4aa09a6433))
+
 ## [0.25.3](https://github.com/Jayphen/homeclaw/compare/v0.25.2...v0.25.3) (2026-04-04)
 
 
