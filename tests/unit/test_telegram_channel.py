@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import ANY, AsyncMock, MagicMock
 
 import pytest
 
@@ -196,7 +196,7 @@ class TestMessageHandling:
         await channel._handle_message(update, None)
 
         channel._loop.run.assert_awaited_once_with(  # type: ignore[union-attr]
-            "what's for dinner?", "alice", channel=None,
+            "what's for dinner?", "alice", channel=None, interim_callback=ANY,
         )
         from telegram.constants import ParseMode
 
@@ -236,7 +236,7 @@ class TestMessageHandling:
         await channel._handle_message(update, None)
 
         channel._loop.run.assert_awaited_once_with(  # type: ignore[union-attr]
-            "[alice] dinner at 7", "alice", channel="group--100999",
+            "[alice] dinner at 7", "alice", channel="group--100999", interim_callback=ANY,
         )
 
     @pytest.mark.asyncio
@@ -247,7 +247,7 @@ class TestMessageHandling:
         await channel._handle_message(update, None)
 
         channel._loop.run.assert_awaited_once_with(  # type: ignore[union-attr]
-            "private thing", "alice", channel=None,
+            "private thing", "alice", channel=None, interim_callback=ANY,
         )
 
     @pytest.mark.asyncio
