@@ -484,8 +484,7 @@ class SkillPlugin:
                             "type": "array",
                             "items": {},
                             "description": (
-                                "Optional positional parameters for "
-                                "parameterized queries"
+                                "Optional positional parameters for parameterized queries"
                             ),
                         },
                     },
@@ -652,11 +651,13 @@ class SkillPlugin:
             )
         if name == "db_execute":
             return self._handle_db_execute(
-                args.get("sql", ""), args.get("params"),
+                args.get("sql", ""),
+                args.get("params"),
             )
         if name == "db_query":
             return self._handle_db_query(
-                args.get("sql", ""), args.get("params"),
+                args.get("sql", ""),
+                args.get("params"),
             )
         if name == "get_env":
             return self._handle_get_env(args.get("key", ""))
@@ -703,7 +704,8 @@ class SkillPlugin:
                 ),
                 "hint": (
                     "data_write only manages files inside the skill's data/ directory. "
-                    "For embedded UI files, write SKILL.md and assets/index.html with skill_edit_file."
+                    "For embedded UI files, write SKILL.md and assets/index.html "
+                    "with skill_edit_file."
                 ),
             }
         path = self._safe_path(normalized)
@@ -734,7 +736,9 @@ class SkillPlugin:
         return self.data_dir / f"{self.name}.db"
 
     def _handle_db_execute(
-        self, sql: str, params: list[Any] | None = None,
+        self,
+        sql: str,
+        params: list[Any] | None = None,
     ) -> dict[str, Any]:
         import sqlite3
 
@@ -756,7 +760,9 @@ class SkillPlugin:
             return {"error": str(e)}
 
     def _handle_db_query(
-        self, sql: str, params: list[Any] | None = None,
+        self,
+        sql: str,
+        params: list[Any] | None = None,
     ) -> dict[str, Any]:
         import sqlite3
 
@@ -765,10 +771,7 @@ class SkillPlugin:
         sql_upper = sql.strip().upper()
         if not sql_upper.startswith("SELECT") and not sql_upper.startswith("WITH"):
             return {
-                "error": (
-                    "db_query only allows SELECT statements; "
-                    "use db_execute for writes"
-                ),
+                "error": ("db_query only allows SELECT statements; use db_execute for writes"),
             }
         try:
             conn = sqlite3.connect(self._db_path)

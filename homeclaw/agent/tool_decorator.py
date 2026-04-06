@@ -82,13 +82,16 @@ class ToolPolicy:
                            household-shared data in a DM context, triggering a
                            confirmation prompt before the call proceeds.
     """
+
     access: Literal["read", "write", "action", "unknown"] = "unknown"
     scope: Literal["personal", "household", "general"] = "general"
     admin_only: bool = False
     routine_blocked: bool = False
     # Callable field excluded from eq/hash since Callable is not hashable.
     household_confirm: Callable[[dict[str, Any]], bool] | None = field(
-        default=None, compare=False, hash=False,
+        default=None,
+        compare=False,
+        hash=False,
     )
 
 
@@ -98,12 +101,14 @@ class ToolPolicy:
 @dataclass(frozen=True, slots=True)
 class Desc:
     """Parameter description annotation."""
+
     text: str
 
 
 @dataclass(frozen=True, slots=True)
 class Enum:
     """Explicit enum values annotation."""
+
     values: list[str]
 
 
@@ -191,6 +196,7 @@ def _extract_annotations(annotation: Any) -> tuple[Any, str | None, list[str] | 
         # Check for typing.Annotated
         try:
             from typing import Annotated
+
             if origin is Annotated:
                 args = get_args(annotation)
                 base = args[0]

@@ -32,9 +32,7 @@ def _is_retryable_openai(exc: BaseException) -> bool:
         return True
     if isinstance(exc, openai.APIStatusError) and exc.status_code >= 500:
         return True
-    if isinstance(exc, openai.APIConnectionError):
-        return True
-    return False
+    return bool(isinstance(exc, openai.APIConnectionError))
 
 
 class OpenAIProvider:
@@ -123,8 +121,7 @@ def _to_api_message(message: Message) -> dict[str, Any]:
             ]
         if message.reasoning:
             msg["reasoning_details"] = [
-                {"type": r.type, "content": r.content}
-                for r in message.reasoning
+                {"type": r.type, "content": r.content} for r in message.reasoning
             ]
         return msg
     if isinstance(message.content, str):
@@ -138,12 +135,14 @@ def _to_api_message(message: Message) -> dict[str, Any]:
             source = block.get("source", {})
             media_type = source.get("media_type", "image/jpeg")
             data = source.get("data", "")
-            parts.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{media_type};base64,{data}",
-                },
-            })
+            parts.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{media_type};base64,{data}",
+                    },
+                }
+            )
     return {"role": "user", "content": parts if parts else ""}
 
 
@@ -165,9 +164,15 @@ def _parse_response(response: ChatCompletion) -> LLMResponse:
             response.model,
             response.id,
             response.usage,
-            response.model_dump_json(indent=2) if hasattr(response, "model_dump_json") else str(response),
+            response.model_dump_json(indent=2)
+            if hasattr(response, "model_dump_json")
+            else str(response),
         )
-        return LLMResponse(content="Sorry, the LLM returned an empty response.", tool_calls=[], stop_reason="end_turn")
+        return LLMResponse(
+            content="Sorry, the LLM returned an empty response.",
+            tool_calls=[],
+            stop_reason="end_turn",
+        )
     choice = response.choices[0]
     message = choice.message
 
@@ -196,15 +201,19 @@ def _parse_response(response: ChatCompletion) -> LLMResponse:
     if raw_reasoning:
         for block in raw_reasoning:
             if isinstance(block, dict):
-                reasoning.append(ReasoningBlock(
-                    type=block.get("type", "reasoning"),
-                    content=block.get("content", ""),
-                ))
+                reasoning.append(
+                    ReasoningBlock(
+                        type=block.get("type", "reasoning"),
+                        content=block.get("content", ""),
+                    )
+                )
             elif hasattr(block, "content"):
-                reasoning.append(ReasoningBlock(
-                    type=getattr(block, "type", "reasoning"),
-                    content=block.content or "",
-                ))
+                reasoning.append(
+                    ReasoningBlock(
+                        type=getattr(block, "type", "reasoning"),
+                        content=block.content or "",
+                    )
+                )
 
     finish_reason_map: dict[str, Literal["end_turn", "tool_use", "max_tokens"]] = {
         "stop": "end_turn",

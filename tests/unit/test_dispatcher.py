@@ -1,13 +1,11 @@
 """Unit tests for the channel dispatcher."""
 
-import json
 from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
 
 from homeclaw.channel.dispatcher import ChannelDispatcher
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -80,7 +78,9 @@ class TestSend:
         dispatcher = _make_dispatcher(tmp_path)
         tg_send = AsyncMock(return_value={"status": "sent", "channel": "telegram"})
         dispatcher.register(
-            "telegram", send=tg_send, has_person=lambda p: p == "alice",
+            "telegram",
+            send=tg_send,
+            has_person=lambda p: p == "alice",
         )
 
         result = await dispatcher.send("alice", "hey")
@@ -90,7 +90,8 @@ class TestSend:
 
     @pytest.mark.asyncio
     async def test_returns_error_when_no_channel_registered(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         dispatcher = _make_dispatcher(tmp_path)
 
@@ -104,7 +105,9 @@ class TestSend:
         dispatcher = _make_dispatcher(tmp_path)
         tg_send = AsyncMock()
         dispatcher.register(
-            "telegram", send=tg_send, has_person=lambda p: False,
+            "telegram",
+            send=tg_send,
+            has_person=lambda p: False,
         )
 
         result = await dispatcher.send("unknown", "hello")
@@ -120,11 +123,15 @@ class TestSendImage:
         tg_img = AsyncMock(return_value={"status": "sent", "channel": "telegram"})
         wa_img = AsyncMock(return_value={"status": "sent", "channel": "whatsapp"})
         dispatcher.register(
-            "telegram", send=AsyncMock(), has_person=lambda p: True,
+            "telegram",
+            send=AsyncMock(),
+            has_person=lambda p: True,
             send_image=tg_img,
         )
         dispatcher.register(
-            "whatsapp", send=AsyncMock(), has_person=lambda p: True,
+            "whatsapp",
+            send=AsyncMock(),
+            has_person=lambda p: True,
             send_image=wa_img,
         )
         dispatcher.set_preference("alice", "whatsapp")
@@ -140,7 +147,9 @@ class TestSendImage:
         dispatcher = _make_dispatcher(tmp_path)
         tg_img = AsyncMock(return_value={"status": "sent", "channel": "telegram"})
         dispatcher.register(
-            "telegram", send=AsyncMock(), has_person=lambda p: p == "bob",
+            "telegram",
+            send=AsyncMock(),
+            has_person=lambda p: p == "bob",
             send_image=tg_img,
         )
 
@@ -160,7 +169,9 @@ class TestSendImage:
         dispatcher = _make_dispatcher(tmp_path)
         # Register channel without send_image callback.
         dispatcher.register(
-            "telegram", send=AsyncMock(), has_person=lambda p: True,
+            "telegram",
+            send=AsyncMock(),
+            has_person=lambda p: True,
         )
         result = await dispatcher.send_image("alice", "https://img.test/x.jpg")
         assert result["status"] == "error"
@@ -172,8 +183,11 @@ class TestSendImage:
             return_value={"status": "sent", "channel": "whatsapp"},
         )
         dispatcher.register(
-            "whatsapp", send=AsyncMock(), has_person=lambda p: True,
-            send_group=AsyncMock(), group_ids=lambda: ["grp1"],
+            "whatsapp",
+            send=AsyncMock(),
+            has_person=lambda p: True,
+            send_group=AsyncMock(),
+            group_ids=lambda: ["grp1"],
             send_group_image=wa_group_img,
         )
 
@@ -189,8 +203,11 @@ class TestSendImage:
             return_value={"status": "sent", "channel": "whatsapp"},
         )
         dispatcher.register(
-            "whatsapp", send=AsyncMock(), has_person=lambda p: True,
-            send_group=AsyncMock(), group_ids=lambda: ["grp1"],
+            "whatsapp",
+            send=AsyncMock(),
+            has_person=lambda p: True,
+            send_group=AsyncMock(),
+            group_ids=lambda: ["grp1"],
             send_group_image=wa_group_img,
         )
 
@@ -206,17 +223,24 @@ class TestSendImage:
         dispatcher = _make_dispatcher(tmp_path)
         tg_img = AsyncMock(return_value={"status": "sent", "channel": "telegram"})
         dispatcher.register(
-            "telegram", send=AsyncMock(), has_person=lambda p: True,
+            "telegram",
+            send=AsyncMock(),
+            has_person=lambda p: True,
             send_image=tg_img,
         )
 
         data = b"\x89PNG fake image bytes"
         result = await dispatcher.send_image(
-            "alice", "https://immich.local/thumb.jpg", "photo",
+            "alice",
+            "https://immich.local/thumb.jpg",
+            "photo",
             image_data=data,
         )
 
         tg_img.assert_awaited_once_with(
-            "alice", "https://immich.local/thumb.jpg", "photo", data,
+            "alice",
+            "https://immich.local/thumb.jpg",
+            "photo",
+            data,
         )
         assert result["status"] == "sent"

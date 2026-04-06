@@ -20,9 +20,7 @@ def registry(dev_workspaces: Path) -> ToolRegistry:
 
 
 @pytest.mark.asyncio
-async def test_memory_save_creates_topic(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
+async def test_memory_save_creates_topic(registry: ToolRegistry, dev_workspaces: Path) -> None:
     handler = registry.get_handler("memory_save")
     assert handler is not None
     result = await handler(person="alice", topic="food", content="Likes manchego")
@@ -38,9 +36,7 @@ async def test_memory_save_creates_topic(
 
 
 @pytest.mark.asyncio
-async def test_memory_save_appends(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
+async def test_memory_save_appends(registry: ToolRegistry, dev_workspaces: Path) -> None:
     handler = registry.get_handler("memory_save")
     assert handler is not None
     await handler(person="alice", topic="health", content="Allergic to shellfish")
@@ -56,9 +52,7 @@ async def test_memory_save_appends(
 
 
 @pytest.mark.asyncio
-async def test_memory_read_lists_topics(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
+async def test_memory_read_lists_topics(registry: ToolRegistry, dev_workspaces: Path) -> None:
     save = registry.get_handler("memory_save")
     read = registry.get_handler("memory_read")
     assert save is not None and read is not None
@@ -72,9 +66,7 @@ async def test_memory_read_lists_topics(
 
 
 @pytest.mark.asyncio
-async def test_memory_read_specific_topic(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
+async def test_memory_read_specific_topic(registry: ToolRegistry, dev_workspaces: Path) -> None:
     save = registry.get_handler("memory_save")
     read = registry.get_handler("memory_read")
     assert save is not None and read is not None
@@ -106,7 +98,8 @@ async def test_memory_read_nonexistent_person(registry: ToolRegistry) -> None:
 
 @pytest.mark.asyncio
 async def test_memory_save_household_writes_to_household(
-    registry: ToolRegistry, dev_workspaces: Path,
+    registry: ToolRegistry,
+    dev_workspaces: Path,
 ) -> None:
     handler = registry.get_handler("memory_save")
     assert handler is not None
@@ -120,7 +113,8 @@ async def test_memory_save_household_writes_to_household(
 
 @pytest.mark.asyncio
 async def test_memory_save_household_does_not_touch_personal(
-    registry: ToolRegistry, dev_workspaces: Path,
+    registry: ToolRegistry,
+    dev_workspaces: Path,
 ) -> None:
     handler = registry.get_handler("memory_save")
     assert handler is not None

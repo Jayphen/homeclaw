@@ -4,17 +4,17 @@ typecheck:
 	pyright
 
 lint:
-	ruff check homeclaw tests
-	ruff format --check homeclaw tests
+	uv run ruff check homeclaw tests
+	uv run ruff format --check homeclaw tests
 
 test:
-	pytest tests/ -m "not integration"
+	uv run pytest tests/ -m "not integration"
 
 test-integration:
-	pytest tests/ -m integration
+	uv run pytest tests/ -m integration
 
 test-record:
-	pytest tests/ -m integration --record
+	uv run pytest tests/ -m integration --record
 
 dev:
 	homeclaw chat --person alice --workspaces ./workspaces-dev

@@ -24,7 +24,8 @@ def _log_entry(record: logging.LogRecord, tz: tzinfo) -> dict[str, Any]:
         msg = msg + "\n" + fmt.formatException(record.exc_info)
     entry: dict[str, Any] = {
         "ts": datetime.fromtimestamp(
-            record.created, tz=tz,
+            record.created,
+            tz=tz,
         ).isoformat(),
         "level": record.levelname,
         "logger": record.name,
@@ -49,14 +50,14 @@ class LogBuffer(logging.Handler):
         self._records.append(_log_entry(record, self._tz))
 
     def get_entries(
-        self, limit: int = 200, level: str | None = None,
+        self,
+        limit: int = 200,
+        level: str | None = None,
     ) -> list[dict[str, Any]]:
         """Return recent log entries, newest first."""
         entries = list(self._records)
         if level:
-            entries = [
-                e for e in entries if e["level"] == level.upper()
-            ]
+            entries = [e for e in entries if e["level"] == level.upper()]
         return list(reversed(entries[-limit:]))
 
 
@@ -174,9 +175,13 @@ def install_log_buffer(
 
     # Persistent JSONL file
     if log_dir is None:
-        log_dir = Path(
-            os.environ.get("HOMECLAW_WORKSPACES", "workspaces"),
-        ) / "household" / "logs"
+        log_dir = (
+            Path(
+                os.environ.get("HOMECLAW_WORKSPACES", "workspaces"),
+            )
+            / "household"
+            / "logs"
+        )
     _log_file_path = log_dir / "homeclaw.log"
     file_handler = LogFileHandler(_log_file_path, tz=tz)
     file_handler.setLevel(logging.DEBUG)

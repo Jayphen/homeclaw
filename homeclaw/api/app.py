@@ -13,7 +13,6 @@ from homeclaw.api.deps import AuthDep as AuthDep  # noqa: F401
 from homeclaw.api.deps import get_config as get_config  # noqa: F401
 from homeclaw.api.deps import set_config as set_config  # noqa: F401
 from homeclaw.api.routes.auth import router as auth_router
-from homeclaw.api.routes.health import router as health_router
 from homeclaw.api.routes.bookmarks import router as bookmarks_router
 from homeclaw.api.routes.calendar import router as calendar_router
 from homeclaw.api.routes.chat import router as chat_router
@@ -22,6 +21,7 @@ from homeclaw.api.routes.cost import router as cost_router
 from homeclaw.api.routes.dashboard import router as dashboard_router
 from homeclaw.api.routes.data import router as data_router
 from homeclaw.api.routes.feed import router as feed_router
+from homeclaw.api.routes.health import router as health_router
 from homeclaw.api.routes.knowledge import router as knowledge_router
 from homeclaw.api.routes.memory import router as memory_router
 from homeclaw.api.routes.notes import router as notes_router
@@ -74,7 +74,9 @@ if _cors_origins:
 # In Docker the package is installed to site-packages, so __file__-relative
 # resolution won't find ui/dist. HOMECLAW_UI_DIST overrides the path.
 _ui_dist_env = os.environ.get("HOMECLAW_UI_DIST")
-_ui_dist = Path(_ui_dist_env) if _ui_dist_env else Path(__file__).parent.parent.parent / "ui" / "dist"
+_ui_dist = (
+    Path(_ui_dist_env) if _ui_dist_env else Path(__file__).parent.parent.parent / "ui" / "dist"
+)
 if _ui_dist.is_dir():
     app.mount("/assets", StaticFiles(directory=str(_ui_dist / "assets")), name="assets")
 

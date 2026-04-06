@@ -133,7 +133,9 @@ class HomeclawApp:
 
         # Load household-wide skills at startup (private skills hot-loaded on skill_create)
         load_all_skills(
-            self.workspaces, "household", self.plugin_registry,
+            self.workspaces,
+            "household",
+            self.plugin_registry,
             allow_local_network=self.config.skill_allow_local_network,
         )
 
@@ -325,6 +327,7 @@ def _run_serve(workspaces: Path, port: int) -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     from homeclaw.api.logbuffer import install_log_buffer
+
     log_dir = config.workspaces.resolve() / "household" / "logs"
     install_log_buffer(timezone=config.timezone, log_dir=log_dir)
 
@@ -337,9 +340,7 @@ def _run_serve(workspaces: Path, port: int) -> None:
         _run_serve_with_deferred_telegram(app, config, workspaces, port)
 
 
-def _run_serve_with_channels(
-    app: Any, config: Any, workspaces: Path, port: int
-) -> None:
+def _run_serve_with_channels(app: Any, config: Any, workspaces: Path, port: int) -> None:
     """Run uvicorn + Telegram (and optionally WhatsApp) concurrently in one event loop."""
     import uvicorn
 
@@ -351,6 +352,7 @@ def _run_serve_with_channels(
         set_plugin_registry,
         set_runtime_observability,
     )
+
     set_plugin_registry(hc_app.plugin_registry)
     set_agent_loop(hc_app.loop)
     set_runtime_observability(hc_app.runtime_observability)
@@ -389,6 +391,7 @@ def _run_serve_with_channels(
         if wa_channel:
             await wa_channel.start()
             from homeclaw.api.deps import set_whatsapp_connected_fn, set_whatsapp_qr_fn
+
             _wa = wa_channel  # capture for lambda
             set_whatsapp_connected_fn(lambda: _wa.connected)
             set_whatsapp_qr_fn(lambda: _wa.pending_qr)
@@ -400,7 +403,9 @@ def _run_serve_with_channels(
         channels_desc = "Telegram" + (" + WhatsApp" if wa_channel else "")
         logger.info(
             "Starting web server on port %d + %s (workspaces: %s)",
-            port, channels_desc, workspaces,
+            port,
+            channels_desc,
+            workspaces,
         )
         try:
             await server.serve()
@@ -413,9 +418,7 @@ def _run_serve_with_channels(
     asyncio.run(_serve())
 
 
-def _run_serve_with_deferred_telegram(
-    app: Any, config: Any, workspaces: Path, port: int
-) -> None:
+def _run_serve_with_deferred_telegram(app: Any, config: Any, workspaces: Path, port: int) -> None:
     """Run uvicorn, starting Telegram later if configured via setup.
 
     WhatsApp (if enabled) starts immediately since it needs no token.
@@ -447,6 +450,7 @@ def _run_serve_with_deferred_telegram(
             from homeclaw.api.deps import set_agent_loop as _set_al
             from homeclaw.api.deps import set_plugin_registry as _set_pr
             from homeclaw.api.deps import set_runtime_observability as _set_ro
+
             _set_pr(hc_app.plugin_registry)
             _set_al(hc_app.loop)
             _set_ro(hc_app.runtime_observability)
@@ -472,6 +476,7 @@ def _run_serve_with_deferred_telegram(
                         set_plugin_registry,
                         set_runtime_observability,
                     )
+
                     set_plugin_registry(hc_app.plugin_registry)
                     set_agent_loop(hc_app.loop)
                     set_runtime_observability(hc_app.runtime_observability)
@@ -506,6 +511,7 @@ def _run_serve_with_deferred_telegram(
                 from homeclaw.api.deps import set_agent_loop as _set_al
                 from homeclaw.api.deps import set_plugin_registry as _set_pr
                 from homeclaw.api.deps import set_runtime_observability as _set_ro
+
                 _set_pr(hc_app.plugin_registry)
                 _set_al(hc_app.loop)
                 _set_ro(hc_app.runtime_observability)
@@ -521,6 +527,7 @@ def _run_serve_with_deferred_telegram(
         if wa_channel and hc_app:
             await wa_channel.start()
             from homeclaw.api.deps import set_whatsapp_connected_fn, set_whatsapp_qr_fn
+
             _wa = wa_channel  # capture for lambda
             set_whatsapp_connected_fn(lambda: _wa.connected)  # type: ignore[union-attr]
             set_whatsapp_qr_fn(lambda: _wa.pending_qr)  # type: ignore[union-attr]

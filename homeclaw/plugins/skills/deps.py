@@ -12,7 +12,7 @@ def _is_docker() -> bool:
     """Detect if we're running inside a Docker container."""
     return (
         Path("/.dockerenv").exists()
-        or os.environ.get("container") == "docker"
+        or os.environ.get("CONTAINER") == "docker"
         or (
             Path("/proc/1/cgroup").exists()
             and "docker" in Path("/proc/1/cgroup").read_text(errors="ignore")

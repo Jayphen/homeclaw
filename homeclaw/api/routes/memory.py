@@ -38,12 +38,14 @@ async def memory_list(
                     mtime = datetime.fromtimestamp(f.stat().st_mtime)
                     if last_updated is None or mtime > last_updated:
                         last_updated = mtime
-        result.append({
-            "person": person,
-            "topic_count": len(topics),
-            "topics": topics,
-            "last_updated": last_updated.isoformat() if last_updated else None,
-        })
+        result.append(
+            {
+                "person": person,
+                "topic_count": len(topics),
+                "topics": topics,
+                "last_updated": last_updated.isoformat() if last_updated else None,
+            }
+        )
     return {
         "members": result,
         "semantic_ready": get_semantic_status(workspaces) == "ready",

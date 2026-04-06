@@ -3,8 +3,6 @@
 from datetime import datetime
 from pathlib import Path
 
-import pytest
-
 from homeclaw.agent.context import build_context
 
 
@@ -134,8 +132,7 @@ class TestDecisions:
         decisions_path = dev_workspaces / "household" / "decisions.md"
         decisions_path.parent.mkdir(parents=True, exist_ok=True)
         decisions_path.write_text(
-            "# Decisions\n\n"
-            "- [2026-03-19 10:00] Piano lessons on Tuesdays — alice\n"
+            "# Decisions\n\n- [2026-03-19 10:00] Piano lessons on Tuesdays — alice\n"
         )
         ctx = await build_context("hello", "alice", dev_workspaces)
         assert "Settled decisions" in ctx
@@ -145,8 +142,7 @@ class TestDecisions:
         decisions_path = dev_workspaces / "alice" / "decisions.md"
         decisions_path.parent.mkdir(parents=True, exist_ok=True)
         decisions_path.write_text(
-            "# Decisions\n\n"
-            "- [2026-03-19 10:00] Switch to morning yoga — alice\n"
+            "# Decisions\n\n- [2026-03-19 10:00] Switch to morning yoga — alice\n"
         )
         ctx = await build_context("hello", "alice", dev_workspaces)
         assert "morning yoga" in ctx
@@ -154,10 +150,7 @@ class TestDecisions:
     async def test_no_personal_decisions_in_shared_context(self, dev_workspaces: Path) -> None:
         decisions_path = dev_workspaces / "alice" / "decisions.md"
         decisions_path.parent.mkdir(parents=True, exist_ok=True)
-        decisions_path.write_text(
-            "# Decisions\n\n"
-            "- [2026-03-19 10:00] Personal decision — alice\n"
-        )
+        decisions_path.write_text("# Decisions\n\n- [2026-03-19 10:00] Personal decision — alice\n")
         ctx = await build_context("hello", "alice", dev_workspaces, shared_only=True)
         assert "Personal decision" not in ctx
 

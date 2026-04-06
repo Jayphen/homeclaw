@@ -116,15 +116,16 @@ class TestChatHistory:
         assert resp.json() == []
 
     def test_returns_user_and_assistant_messages(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ):
         person_dir = workspaces / "user"
         person_dir.mkdir(parents=True)
         lines = [
             json.dumps({"role": "user", "content": "hello"}),
             json.dumps({"role": "assistant", "content": "hi there!"}),
-            json.dumps({"role": "tool", "content": '{"ok": true}',
-                         "tool_call_id": "t1"}),
+            json.dumps({"role": "tool", "content": '{"ok": true}', "tool_call_id": "t1"}),
             json.dumps({"role": "user", "content": "bye"}),
             json.dumps({"role": "assistant", "content": "see ya"}),
         ]
@@ -139,7 +140,9 @@ class TestChatHistory:
         assert data[3] == {"role": "assistant", "content": "see ya"}
 
     def test_skips_metadata_lines(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ):
         person_dir = workspaces / "user"
         person_dir.mkdir(parents=True)

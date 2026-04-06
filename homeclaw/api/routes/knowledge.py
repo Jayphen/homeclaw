@@ -26,7 +26,8 @@ _ENTRY_RE = re.compile(r"^- \[(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\]")
 
 
 def _analyze_person_memory(
-    workspaces: Path, person: str,
+    workspaces: Path,
+    person: str,
 ) -> dict[str, Any]:
     """Analyze one person's memory directory."""
     memory_dir = workspaces / person / "memory"
@@ -79,12 +80,14 @@ def _analyze_person_memory(
         if topic_latest and (latest_entry is None or topic_latest > latest_entry):
             latest_entry = topic_latest
 
-        topics.append({
-            "name": topic,
-            "entries": entry_count,
-            "last_updated": topic_latest.isoformat() if topic_latest else None,
-            "size_bytes": f.stat().st_size,
-        })
+        topics.append(
+            {
+                "name": topic,
+                "entries": entry_count,
+                "last_updated": topic_latest.isoformat() if topic_latest else None,
+                "size_bytes": f.stat().st_size,
+            }
+        )
 
     # Sort topics by entry count descending — most active first
     topics.sort(key=lambda t: t["entries"], reverse=True)
@@ -109,15 +112,15 @@ def _household_stats(workspaces: Path) -> dict[str, Any]:
     # Count notes across all members
     total_notes = 0
     members = [
-        d.name for d in workspaces.iterdir()
+        d.name
+        for d in workspaces.iterdir()
         if d.is_dir() and d.name != "household" and not d.name.startswith(".")
     ]
     for person in members:
         notes_dir = workspaces / person / "notes"
         if notes_dir.is_dir():
             total_notes += sum(
-                1 for f in notes_dir.iterdir()
-                if f.suffix == ".md" and f.name != "reminders.md"
+                1 for f in notes_dir.iterdir() if f.suffix == ".md" and f.name != "reminders.md"
             )
 
     # Count bookmarks

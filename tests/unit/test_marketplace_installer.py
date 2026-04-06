@@ -64,12 +64,14 @@ class Plugin:
         return []
 '''
 
-MINIMAL_MANIFEST = json.dumps({
-    "name": "testplugin",
-    "version": "1.0.0",
-    "description": "A test plugin",
-    "type": "python",
-})
+MINIMAL_MANIFEST = json.dumps(
+    {
+        "name": "testplugin",
+        "version": "1.0.0",
+        "description": "A test plugin",
+        "type": "python",
+    }
+)
 
 MINIMAL_SKILL_MD = """\
 ---
@@ -117,10 +119,13 @@ def test_verify_checksum_unsupported_format():
 
 @pytest.mark.asyncio
 async def test_install_python_plugin(tmp_path: Path) -> None:
-    tarball = _make_tarball("testplugin", {
-        "plugin.py": MINIMAL_PLUGIN_PY,
-        "manifest.json": MINIMAL_MANIFEST,
-    })
+    tarball = _make_tarball(
+        "testplugin",
+        {
+            "plugin.py": MINIMAL_PLUGIN_PY,
+            "manifest.json": MINIMAL_MANIFEST,
+        },
+    )
 
     plugin = MarketplacePlugin(
         name="testplugin",
@@ -169,11 +174,14 @@ async def test_install_python_plugin_checksum_mismatch(tmp_path: Path) -> None:
 
     registry = _make_registry(tmp_path)
 
-    with patch(
-        "homeclaw.plugins.marketplace.installer._download",
-        new_callable=AsyncMock,
-        return_value=tarball,
-    ), pytest.raises(InstallError, match="Checksum mismatch"):
+    with (
+        patch(
+            "homeclaw.plugins.marketplace.installer._download",
+            new_callable=AsyncMock,
+            return_value=tarball,
+        ),
+        pytest.raises(InstallError, match="Checksum mismatch"),
+    ):
         await install_plugin(plugin, tmp_path, registry)
 
 
@@ -193,11 +201,14 @@ async def test_install_python_already_exists(tmp_path: Path) -> None:
 
     registry = _make_registry(tmp_path)
 
-    with patch(
-        "homeclaw.plugins.marketplace.installer._download",
-        new_callable=AsyncMock,
-        return_value=tarball,
-    ), pytest.raises(InstallError, match="already installed"):
+    with (
+        patch(
+            "homeclaw.plugins.marketplace.installer._download",
+            new_callable=AsyncMock,
+            return_value=tarball,
+        ),
+        pytest.raises(InstallError, match="already installed"),
+    ):
         await install_plugin(plugin, tmp_path, registry)
 
 
@@ -214,11 +225,14 @@ async def test_install_python_missing_plugin_py(tmp_path: Path) -> None:
 
     registry = _make_registry(tmp_path)
 
-    with patch(
-        "homeclaw.plugins.marketplace.installer._download",
-        new_callable=AsyncMock,
-        return_value=tarball,
-    ), pytest.raises(InstallError, match="missing plugin.py"):
+    with (
+        patch(
+            "homeclaw.plugins.marketplace.installer._download",
+            new_callable=AsyncMock,
+            return_value=tarball,
+        ),
+        pytest.raises(InstallError, match="missing plugin.py"),
+    ):
         await install_plugin(plugin, tmp_path, registry)
 
 
@@ -266,11 +280,14 @@ async def test_install_skill_invalid_markdown(tmp_path: Path) -> None:
 
     registry = _make_registry(tmp_path)
 
-    with patch(
-        "homeclaw.plugins.marketplace.installer._download",
-        new_callable=AsyncMock,
-        return_value=data,
-    ), pytest.raises(InstallError, match="Invalid skill markdown"):
+    with (
+        patch(
+            "homeclaw.plugins.marketplace.installer._download",
+            new_callable=AsyncMock,
+            return_value=data,
+        ),
+        pytest.raises(InstallError, match="Invalid skill markdown"),
+    ):
         await install_plugin(plugin, tmp_path, registry)
 
 

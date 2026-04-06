@@ -51,22 +51,32 @@ class RoutingConfig(BaseSettings):
 _REASONING_TOOLS = frozenset({"web_read", "web_search"})
 
 # Tools that do simple writes — Haiku is fine for the follow-up summary.
-_SIMPLE_WRITE_TOOLS = frozenset({
-    "memory_save", "memory_read", "note_save",
-    "reminder_add", "reminder_complete", "reminder_delete",
-    "bookmark_save", "decision_log", "interaction_log",
-})
+_SIMPLE_WRITE_TOOLS = frozenset(
+    {
+        "memory_save",
+        "memory_read",
+        "note_save",
+        "reminder_add",
+        "reminder_complete",
+        "reminder_delete",
+        "bookmark_save",
+        "decision_log",
+        "interaction_log",
+    }
+)
 
 # Tools that generate large content (file writes, skill edits) — the LLM
 # needs the full output-token budget to produce complete content without
 # being cut off mid-write.
-_LARGE_WRITE_TOOLS = frozenset({
-    "skill_edit_file",
-    "skill_create",
-    "skill_update",
-    "run_skill_script",
-    "note_save",
-})
+_LARGE_WRITE_TOOLS = frozenset(
+    {
+        "skill_edit_file",
+        "skill_create",
+        "skill_update",
+        "run_skill_script",
+        "note_save",
+    }
+)
 
 
 def classify_tool_round(tool_names: list[str]) -> CallType:

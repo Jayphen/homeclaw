@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from datetime import UTC, datetime
@@ -74,7 +75,11 @@ class Scheduler:
         # Save result text (truncate to keep file reasonable)
         results_path = self._workspaces / _RESULTS_FILE
         try:
-            results = json.loads(results_path.read_text(encoding="utf-8")) if results_path.exists() else {}
+            results = (
+                json.loads(results_path.read_text(encoding="utf-8"))
+                if results_path.exists()
+                else {}
+            )
         except (json.JSONDecodeError, OSError):
             results = {}
         results[job_id] = result[:8000] if result else ""
@@ -95,7 +100,10 @@ class Scheduler:
         )
 
     def _make_routine_func(
-        self, job_id: str, description: str, target: str | None = None,
+        self,
+        job_id: str,
+        description: str,
+        target: str | None = None,
     ) -> Any:
         """Create the async callable for a routine job.
 
@@ -120,7 +128,8 @@ class Scheduler:
             )
             if result and result.strip() and scheduler._dispatcher:
                 await scheduler._dispatcher.send(
-                    person, f"📋 *{description}*\n\n{result}",
+                    person,
+                    f"📋 *{description}*\n\n{result}",
                 )
             return result
 
@@ -136,12 +145,16 @@ class Scheduler:
                             results.append(r)
                         except Exception:
                             logger.exception(
-                                "Routine failed for member %s: %s", member, description,
+                                "Routine failed for member %s: %s",
+                                member,
+                                description,
                             )
                     combined = "\n---\n".join(r for r in results if r.strip())
                     scheduler._save_last_run(job_id, combined)
                     logger.info(
-                        "Routine completed for %d members: %s", len(members), description,
+                        "Routine completed for %d members: %s",
+                        len(members),
+                        description,
                     )
                     return combined
 
@@ -149,7 +162,9 @@ class Scheduler:
                     # Specific person
                     result = await _run_for_person(target)
                     scheduler._save_last_run(job_id, result)
-                    logger.info("Routine completed: %s (response length: %d)", description, len(result))
+                    logger.info(
+                        "Routine completed: %s (response length: %d)", description, len(result)
+                    )
                     return result
 
                 # Default: household group chat
@@ -164,7 +179,8 @@ class Scheduler:
                 if result and result.strip() and scheduler._dispatcher:
                     try:
                         await scheduler._dispatcher.send_group(
-                            "", f"📋 *{description}*\n\n{result}",
+                            "",
+                            f"📋 *{description}*\n\n{result}",
                         )
                     except Exception:
                         logger.exception("Failed to deliver routine result: %s", description)
@@ -271,9 +287,7 @@ class Scheduler:
             # Ask the trigger: when would you have fired after last_run?
             next_fire = job.trigger.get_next_fire_time(None, last_dt)
             if next_fire is not None and next_fire < now:
-                display_time = (
-                    next_fire.astimezone(self._tz) if self._tz else next_fire
-                )
+                display_time = next_fire.astimezone(self._tz) if self._tz else next_fire
                 logger.info(
                     "Missed routine detected: %s (should have fired %s)",
                     job.name,
@@ -289,10 +303,8 @@ class Scheduler:
     def shutdown(self) -> None:
         """Shutdown the scheduler gracefully."""
         if self._scheduler.running:
-            try:
+            with contextlib.suppress(RuntimeError):  # Event loop already closed
                 self._scheduler.shutdown(wait=False)
-            except RuntimeError:
-                pass  # Event loop already closed
             logger.info("Scheduler shut down")
 
     def reload_routines(self) -> int:

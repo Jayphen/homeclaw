@@ -6,8 +6,7 @@ from unittest.mock import ANY, AsyncMock, MagicMock
 
 import pytest
 
-from homeclaw.channel.telegram import TelegramChannel, _split_message, _clean_markdown_for_telegram
-
+from homeclaw.channel.telegram import TelegramChannel, _clean_markdown_for_telegram, _split_message
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -15,7 +14,9 @@ from homeclaw.channel.telegram import TelegramChannel, _split_message, _clean_ma
 
 
 def _make_update(
-    user_id: int = 123, text: str = "hello", chat_type: str = "private",
+    user_id: int = 123,
+    text: str = "hello",
+    chat_type: str = "private",
     entities: list[MagicMock] | None = None,
 ) -> MagicMock:
     update = MagicMock()
@@ -95,7 +96,10 @@ class TestCleanMarkdownForTelegram:
             "   [https://fidget.github.io/jit.html](https://fidget.github.io/jit.html)"
         )
         result = _clean_markdown_for_telegram(text)
-        assert result == "3. [Python 3.15's JIT is now back on track](https://fidget.github.io/jit.html)"
+        assert (
+            result
+            == "3. [Python 3.15's JIT is now back on track](https://fidget.github.io/jit.html)"
+        )
 
     def test_handles_mixed_list(self) -> None:
         text = (
@@ -147,7 +151,9 @@ class TestAllowedUsers:
     @pytest.mark.asyncio
     async def test_allowed_user_can_message(self, tmp_path: Path) -> None:
         channel = _make_channel(
-            tmp_path, user_map={"123": "alice"}, allowed_user_ids={123},
+            tmp_path,
+            user_map={"123": "alice"},
+            allowed_user_ids={123},
         )
         update = _make_update(user_id=123, text="hi")
 
@@ -158,7 +164,9 @@ class TestAllowedUsers:
     @pytest.mark.asyncio
     async def test_disallowed_user_silently_dropped(self, tmp_path: Path) -> None:
         channel = _make_channel(
-            tmp_path, user_map={"999": "eve"}, allowed_user_ids={123},
+            tmp_path,
+            user_map={"999": "eve"},
+            allowed_user_ids={123},
         )
         update = _make_update(user_id=999, text="hi")
 
@@ -196,12 +204,16 @@ class TestMessageHandling:
         await channel._handle_message(update, None)
 
         channel._loop.run.assert_awaited_once_with(  # type: ignore[union-attr]
-            "what's for dinner?", "alice", channel=None, interim_callback=ANY,
+            "what's for dinner?",
+            "alice",
+            channel=None,
+            interim_callback=ANY,
         )
         from telegram.constants import ParseMode
 
         update.message.reply_text.assert_awaited_once_with(
-            "I'm homeclaw\\.", parse_mode=ParseMode.MARKDOWN_V2,
+            "I'm homeclaw\\.",
+            parse_mode=ParseMode.MARKDOWN_V2,
         )
 
     @pytest.mark.asyncio
@@ -228,7 +240,8 @@ class TestMessageHandling:
 
     @pytest.mark.asyncio
     async def test_group_message_prefixes_speaker_and_passes_channel(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         channel = _make_channel(tmp_path, user_map={"123": "alice"})
         update = _make_update(user_id=123, text="dinner at 7", chat_type="supergroup")
@@ -236,7 +249,10 @@ class TestMessageHandling:
         await channel._handle_message(update, None)
 
         channel._loop.run.assert_awaited_once_with(  # type: ignore[union-attr]
-            "[alice] dinner at 7", "alice", channel="group--100999", interim_callback=ANY,
+            "[alice] dinner at 7",
+            "alice",
+            channel="group--100999",
+            interim_callback=ANY,
         )
 
     @pytest.mark.asyncio
@@ -247,12 +263,16 @@ class TestMessageHandling:
         await channel._handle_message(update, None)
 
         channel._loop.run.assert_awaited_once_with(  # type: ignore[union-attr]
-            "private thing", "alice", channel=None, interim_callback=ANY,
+            "private thing",
+            "alice",
+            channel=None,
+            interim_callback=ANY,
         )
 
     @pytest.mark.asyncio
     async def test_group_message_with_mention_of_other_is_skipped(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         from telegram import MessageEntity
 
@@ -263,8 +283,10 @@ class TestMessageHandling:
         entity.offset = 0
         entity.length = 5
         update = _make_update(
-            user_id=123, text="@john what do you think?",
-            chat_type="supergroup", entities=[entity],
+            user_id=123,
+            text="@john what do you think?",
+            chat_type="supergroup",
+            entities=[entity],
         )
         entity.offset = 0
         entity.length = 5  # "@john"
@@ -275,7 +297,8 @@ class TestMessageHandling:
 
     @pytest.mark.asyncio
     async def test_group_message_mentioning_bot_is_processed(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         from telegram import MessageEntity
 
@@ -286,8 +309,10 @@ class TestMessageHandling:
         entity.offset = 0
         entity.length = 13  # "@homeclaw_bot"
         update = _make_update(
-            user_id=123, text="@homeclaw_bot what's for dinner?",
-            chat_type="supergroup", entities=[entity],
+            user_id=123,
+            text="@homeclaw_bot what's for dinner?",
+            chat_type="supergroup",
+            entities=[entity],
         )
 
         await channel._handle_message(update, None)
@@ -296,12 +321,15 @@ class TestMessageHandling:
 
     @pytest.mark.asyncio
     async def test_group_message_no_mentions_is_processed(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         channel = _make_channel(tmp_path, user_map={"123": "alice"})
         channel._bot_username = "homeclaw_bot"
         update = _make_update(
-            user_id=123, text="what's for dinner?", chat_type="supergroup",
+            user_id=123,
+            text="what's for dinner?",
+            chat_type="supergroup",
         )
 
         await channel._handle_message(update, None)

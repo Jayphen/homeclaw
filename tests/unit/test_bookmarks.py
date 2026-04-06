@@ -1,6 +1,6 @@
 """Tests for bookmarks store and models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -27,7 +27,7 @@ def _make_bookmark(**kwargs: object) -> Bookmark:
         "category": "place",
         "url": "https://example.com",
         "tags": ["italian"],
-        "saved_at": datetime.now(timezone.utc),
+        "saved_at": datetime.now(UTC),
     }
     defaults.update(kwargs)
     return Bookmark.model_validate(defaults)
@@ -65,8 +65,13 @@ def test_filter_by_tag(workspaces: Path) -> None:
 
 
 def test_search(workspaces: Path) -> None:
-    save_bookmark(workspaces, _make_bookmark(id="a", title="Klunkerkranich", tags=["rooftop", "bar"], url=None))
-    save_bookmark(workspaces, _make_bookmark(id="b", title="Pasta Carbonara", category="recipe", url=None))
+    save_bookmark(
+        workspaces,
+        _make_bookmark(id="a", title="Klunkerkranich", tags=["rooftop", "bar"], url=None),
+    )
+    save_bookmark(
+        workspaces, _make_bookmark(id="b", title="Pasta Carbonara", category="recipe", url=None)
+    )
     results = search_bookmarks(workspaces, "rooftop")
     assert len(results) >= 1
     assert results[0].title == "Klunkerkranich"

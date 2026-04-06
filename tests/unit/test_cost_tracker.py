@@ -23,11 +23,7 @@ def test_estimate_cost_with_cache():
     prices = load_prices()
     cost = estimate_cost("claude-sonnet-4-6", 1000, 100, 800, prices)
     # 200 uncached input + 800 cached + 100 output
-    expected = (
-        (200 / 1_000_000) * 3.0
-        + (800 / 1_000_000) * 0.30
-        + (100 / 1_000_000) * 15.0
-    )
+    expected = (200 / 1_000_000) * 3.0 + (800 / 1_000_000) * 0.30 + (100 / 1_000_000) * 15.0
     assert abs(cost - expected) < 1e-8
 
 

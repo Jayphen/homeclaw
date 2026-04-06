@@ -6,7 +6,7 @@ import ipaddress
 import json
 import logging
 import socket
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -48,13 +48,7 @@ def _is_private_ip(addr: str) -> bool:
         ip = ipaddress.ip_address(addr)
     except ValueError:
         return False
-    return (
-        ip.is_private
-        or ip.is_loopback
-        or ip.is_reserved
-        or ip.is_link_local
-        or ip.is_multicast
-    )
+    return ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local or ip.is_multicast
 
 
 def _normalize_domain(entry: str) -> str:
@@ -79,9 +73,7 @@ def _check_domain(url: str, allowed_domains: list[str]) -> str:
         raise ValueError(f"Cannot parse hostname from URL: {url}")
     normalized = [_normalize_domain(d) for d in allowed_domains]
     if hostname not in normalized:
-        raise ValueError(
-            f"Domain '{hostname}' is not in the allowed list: {allowed_domains}"
-        )
+        raise ValueError(f"Domain '{hostname}' is not in the allowed list: {allowed_domains}")
     return hostname
 
 
@@ -98,9 +90,7 @@ def _check_private_ip(hostname: str) -> None:
     for _family, _type, _proto, _canonname, sockaddr in infos:
         addr = str(sockaddr[0])
         if _is_private_ip(addr):
-            raise ValueError(
-                f"Hostname '{hostname}' resolves to private address {addr} — blocked"
-            )
+            raise ValueError(f"Hostname '{hostname}' resolves to private address {addr} — blocked")
 
 
 def _log_request(
@@ -113,12 +103,12 @@ def _log_request(
 ) -> None:
     """Append a one-line JSON record to ``log_dir/{date}.jsonl``."""
     log_dir.mkdir(parents=True, exist_ok=True)
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     path = log_dir / f"{today}.jsonl"
     record: dict[str, Any] = {
         "url": url,
         "method": method,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     if status is not None:
         record["status"] = status
@@ -187,7 +177,5 @@ async def http_call(
     except Exception as exc:
         logger.exception("http_call failed for %s %s", method, url)
         if config.log_dir:
-            _log_request(
-                config.log_dir, url=url, method=method, status=status, error=str(exc)
-            )
+            _log_request(config.log_dir, url=url, method=method, status=status, error=str(exc))
         return {"error": str(exc)}

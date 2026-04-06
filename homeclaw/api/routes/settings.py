@@ -58,8 +58,11 @@ async def get_logs(
     """Return log entries. Uses file when date range given, buffer otherwise."""
     if after or before:
         entries = get_log_entries_from_file(
-            after=after, before=before, level=level,
-            search=search, limit=min(limit, 5000),
+            after=after,
+            before=before,
+            level=level,
+            search=search,
+            limit=min(limit, 5000),
         )
         return {"entries": entries, "source": "file"}
     buf = get_log_buffer()
@@ -78,13 +81,13 @@ async def download_logs(
 ) -> PlainTextResponse:
     """Download filtered log entries as a text file."""
     entries = get_log_entries_from_file(
-        after=after, before=before, level=level,
-        search=search, limit=min(limit, 10000),
+        after=after,
+        before=before,
+        level=level,
+        search=search,
+        limit=min(limit, 10000),
     )
-    lines = [
-        f"{e['ts']}  {e['level']:<7}  {e['logger']}  {e['message']}"
-        for e in entries
-    ]
+    lines = [f"{e['ts']}  {e['level']:<7}  {e['logger']}  {e['message']}" for e in entries]
     content = "\n".join(lines) + "\n" if lines else "No log entries.\n"
     return PlainTextResponse(
         content,

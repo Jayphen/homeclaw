@@ -1,6 +1,7 @@
 """homeclaw configuration — loads from environment variables, .env, and config.json."""
 
 import asyncio
+import contextlib
 import json
 import logging
 from pathlib import Path
@@ -288,10 +289,8 @@ class HomeclawConfig(BaseSettings):
         """Persist saveable fields to config.json in the workspaces directory."""
         existing: dict[str, Any] = {}
         if self.config_json_path.is_file():
-            try:
+            with contextlib.suppress(json.JSONDecodeError, OSError):
                 existing = json.loads(self.config_json_path.read_text())
-            except (json.JSONDecodeError, OSError):
-                pass
 
         for field_name in _SAVEABLE_FIELDS:
             val = getattr(self, field_name)
