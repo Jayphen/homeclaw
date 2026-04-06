@@ -28,9 +28,7 @@ def _is_retryable_anthropic(exc: BaseException) -> bool:
         return True
     if isinstance(exc, anthropic.APIStatusError) and exc.status_code >= 500:
         return True
-    if isinstance(exc, anthropic.APIConnectionError):
-        return True
-    return False
+    return bool(isinstance(exc, anthropic.APIConnectionError))
 
 
 class AnthropicProvider:
@@ -119,9 +117,11 @@ def _log_cache_usage(response: anthropic.types.Message) -> None:
     read = usage.cache_read_input_tokens or 0
     if created or read:
         logger.debug(
-            "Cache: %d tokens read (hit), %d tokens created (miss), "
-            "%d input, %d output",
-            read, created, usage.input_tokens, usage.output_tokens,
+            "Cache: %d tokens read (hit), %d tokens created (miss), %d input, %d output",
+            read,
+            created,
+            usage.input_tokens,
+            usage.output_tokens,
         )
 
 
@@ -152,12 +152,14 @@ def _to_api_message(message: Message) -> dict[str, Any]:
         elif isinstance(message.content, list):
             blocks.extend(message.content)
         for tc in message.tool_calls:
-            blocks.append({
-                "type": "tool_use",
-                "id": tc.id,
-                "name": tc.name,
-                "input": tc.arguments,
-            })
+            blocks.append(
+                {
+                    "type": "tool_use",
+                    "id": tc.id,
+                    "name": tc.name,
+                    "input": tc.arguments,
+                }
+            )
         return {"role": "assistant", "content": blocks}
     return {
         "role": message.role,
@@ -182,11 +184,13 @@ def _parse_response(response: anthropic.types.Message) -> LLMResponse:
         if block.type == "text":
             content_parts.append(block.text)
         elif block.type == "thinking":
-            reasoning.append(ReasoningBlock(
-                type="thinking",
-                content=getattr(block, "thinking", ""),
-                signature=getattr(block, "signature", None),
-            ))
+            reasoning.append(
+                ReasoningBlock(
+                    type="thinking",
+                    content=getattr(block, "thinking", ""),
+                    signature=getattr(block, "signature", None),
+                )
+            )
         elif block.type == "tool_use":
             tool_calls.append(
                 ToolCall(

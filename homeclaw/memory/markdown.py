@@ -5,7 +5,7 @@ memsearch for semantic recall. Each entry is appended with a timestamp,
 so history is preserved and the agent never has to read-then-merge.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -22,14 +22,12 @@ def _slugify(topic: str) -> str:
     return safe_slug(topic)
 
 
-def memory_save_topic(
-    workspaces: Path, person: str, topic: str, content: str
-) -> Path:
+def memory_save_topic(workspaces: Path, person: str, topic: str, content: str) -> Path:
     """Append a memory entry to a topic file. Creates the file if needed."""
     d = _memory_dir(workspaces, person)
     slug = _slugify(topic)
     path = d / f"{slug}.md"
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
 
     if not path.exists():
         path.write_text(f"# {topic}\n\n- [{timestamp}] {content}\n")

@@ -45,14 +45,17 @@ a customer service bot.
 
 Rules for tone:
 - Short replies. One or two sentences when possible. No essays.
-- Never start with "Sure!", "Of course!", "Absolutely!", "Great question!", or "I'd be happy to help!"
+- Never start with "Sure!", "Of course!", "Absolutely!", "Great question!", \
+or "I'd be happy to help!"
 - Never use "I understand", "Let me", "Here's what I found", or "Based on my knowledge"
 - Use contractions (don't, can't, won't, it's)
 - Match the energy of the message — casual gets casual, urgent gets focused
 - Say "dunno" or "not sure" instead of "I don't have information about that"
 - Use sentence fragments when natural ("Yep, done." / "Nothing saved for that.")
-- Be blunt. "Nah, that won't work because..." is better than "Unfortunately, that approach may not be ideal because..."
-- Never end with "Let me know if you need anything else", "Is there anything else?", or similar. Just stop when you're done.
+- Be blunt. "Nah, that won't work because..." is better than \
+"Unfortunately, that approach may not be ideal because..."
+- Never end with "Let me know if you need anything else", "Is there anything else?", \
+or similar. Just stop when you're done.
 
 If someone asks about you — your version, model, what you are — answer from the "About you" \
 section in your context. Never reveal API keys, passwords, tokens, or internal configuration.
@@ -131,8 +134,10 @@ large files will be truncated and fail.
 When someone asks for an interactive skill, dashboard, tracker, widget, panel, or small web UI, \
 prefer building it as an embedded skill mini-app instead of pasting raw HTML in chat. Use the \
 skill-creator guidance, and prefer the dedicated `skill_enable_ui_app` tool when available so \
-SKILL.md and `assets/index.html` are written deterministically. Add `ui-app:` to the skill frontmatter, \
-write the app to `assets/index.html`, and prefer Arrow.js for the UI. For browser-loaded Arrow apps, use an ESM import such as \
+SKILL.md and `assets/index.html` are written deterministically. \
+Add `ui-app:` to the skill frontmatter, \
+write the app to `assets/index.html`, and prefer Arrow.js for the UI. \
+For browser-loaded Arrow apps, use an ESM import such as \
 `https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs`. The app should read the auth token \
 from `localStorage.getItem('homeclaw_token')` and call the homeclaw skill API endpoints. \
 Data files: `GET /api/skills/{{owner}}/{{name}}/files/data/{{filename}}`. \
@@ -220,7 +225,12 @@ def _policy_to_entry(tool_name: str, policy: ToolPolicy | None) -> ToolPolicyEnt
         else:
             categories.append("skill_action")
         # Skill tools have no explicit ToolPolicy — derive from convention
-        access = "read" if suffix in skill_read_suffixes else "write" if suffix in skill_write_suffixes else "action"
+        if suffix in skill_read_suffixes:
+            access = "read"
+        elif suffix in skill_write_suffixes:
+            access = "write"
+        else:
+            access = "action"
         return ToolPolicyEntry(
             tool_name=tool_name,
             access=access,  # type: ignore[arg-type]
@@ -361,7 +371,9 @@ def _sanitize_history(history: list[Message]) -> list[Message]:
 
 
 def _truncate_history(
-    history: list[Message], system_tokens: int, context_window: int,
+    history: list[Message],
+    system_tokens: int,
+    context_window: int,
 ) -> list[Message]:
     """Drop oldest messages so history fits within the model's context window."""
     window = context_window
@@ -384,7 +396,9 @@ def _truncate_history(
     if len(kept) < len(history):
         logger.info(
             "Truncated history from %d to %d messages (%d estimated tokens)",
-            len(history), len(kept), used,
+            len(history),
+            len(kept),
+            used,
         )
     return _sanitize_history(kept)
 
@@ -403,25 +417,29 @@ def _build_system_prompt(
     ]
 
     if note_detail_level == "minimal":
-        sections.append(PromptSection(
-            name="note_detail_minimal",
-            content=(
-                "Note-taking level: MINIMAL. Only save notes for truly significant "
-                "events — major decisions, important plans, health emergencies. "
-                "Skip routine daily activities."
-            ),
-        ))
+        sections.append(
+            PromptSection(
+                name="note_detail_minimal",
+                content=(
+                    "Note-taking level: MINIMAL. Only save notes for truly significant "
+                    "events — major decisions, important plans, health emergencies. "
+                    "Skip routine daily activities."
+                ),
+            )
+        )
     elif note_detail_level == "detailed":
-        sections.append(PromptSection(
-            name="note_detail_detailed",
-            content=(
-                "Note-taking level: DETAILED. Save notes aggressively for almost "
-                "everything mentioned — meals, activities, moods, weather "
-                "observations, conversations, purchases, plans, ideas, health, "
-                "exercise, chores. The household wants a rich, comprehensive daily "
-                "journal. When in doubt, always save."
-            ),
-        ))
+        sections.append(
+            PromptSection(
+                name="note_detail_detailed",
+                content=(
+                    "Note-taking level: DETAILED. Save notes aggressively for almost "
+                    "everything mentioned — meals, activities, moods, weather "
+                    "observations, conversations, purchases, plans, ideas, health, "
+                    "exercise, chores. The household wants a rich, comprehensive daily "
+                    "journal. When in doubt, always save."
+                ),
+            )
+        )
 
     system = "\n\n".join(section.content for section in sections if section.content).strip()
     return system, sections
@@ -520,13 +538,15 @@ class AgentLoop:
         if instructions:
             logger.info("Auto-activated skill '%s' for tool %s", skill_name, tool_name)
             if self._runtime_observability is not None:
-                self._runtime_observability.record_skill_activation(SkillActivationEvent(
-                    skill_name=skill_name,
-                    person=person,
-                    reason="auto_tool_use",
-                    tool_name=tool_name,
-                    activated_at=now_utc(),
-                ))
+                self._runtime_observability.record_skill_activation(
+                    SkillActivationEvent(
+                        skill_name=skill_name,
+                        person=person,
+                        reason="auto_tool_use",
+                        tool_name=tool_name,
+                        activated_at=now_utc(),
+                    )
+                )
         return instructions
 
     def set_interim_callback(self, callback: InterimCallback | None) -> None:
@@ -574,23 +594,27 @@ class AgentLoop:
         unconsolidated = all_messages[last_consolidated:]
         person = history_key.split("-")[0] if "-" in history_key else history_key
 
-        def _record(status: str, reason: str, *, chunk_size: int = 0, saved_entries: int = 0) -> None:
+        def _record(
+            status: str, reason: str, *, chunk_size: int = 0, saved_entries: int = 0
+        ) -> None:
             if self._runtime_observability is None:
                 return
-            self._runtime_observability.record_consolidation(ConsolidationEvent(
-                history_key=history_key,
-                person=person,
-                status=status,  # type: ignore[arg-type]
-                reason=reason,
-                unconsolidated_messages=len(unconsolidated),
-                history_tokens=history_tokens,
-                chunk_size=chunk_size,
-                saved_entries=saved_entries,
-                model=getattr(consolidation_provider, "model", self._current_model)
-                if "consolidation_provider" in locals()
-                else self._current_model,
-                recorded_at=now_utc(),
-            ))
+            self._runtime_observability.record_consolidation(
+                ConsolidationEvent(
+                    history_key=history_key,
+                    person=person,
+                    status=status,  # type: ignore[arg-type]
+                    reason=reason,
+                    unconsolidated_messages=len(unconsolidated),
+                    history_tokens=history_tokens,
+                    chunk_size=chunk_size,
+                    saved_entries=saved_entries,
+                    model=getattr(consolidation_provider, "model", self._current_model)
+                    if "consolidation_provider" in locals()
+                    else self._current_model,
+                    recorded_at=now_utc(),
+                )
+            )
 
         # Check if consolidation is needed
         history_tokens = sum(_estimate_message_tokens(m) for m in unconsolidated)
@@ -615,6 +639,7 @@ class AgentLoop:
         if self._routing:
             from homeclaw.agent.routing import CallType as CT
             from homeclaw.agent.routing import route_model
+
             cheap_model = route_model(CT.ROUTINE, self._routing)
             if hasattr(consolidation_provider, "model"):
                 consolidation_provider.model = cheap_model  # type: ignore[attr-defined]
@@ -622,19 +647,30 @@ class AgentLoop:
         result = await consolidate_chunk(chunk, person, consolidation_provider)
 
         if "error" in result:
-            logger.warning("Consolidation failed for '%s': %s — will retry next cycle", history_key, result["error"])
+            logger.warning(
+                "Consolidation failed for '%s': %s — will retry next cycle",
+                history_key,
+                result["error"],
+            )
             _record("failed", f"provider_error:{result['error']}", chunk_size=len(chunk))
             return  # Don't advance pointer — retry next cycle
 
         # Save extracted memories
         entries = result.get("memory_entries", [])
         if not entries:
-            logger.info("Consolidation returned no memory entries for '%s' — will retry", history_key)
+            logger.info(
+                "Consolidation returned no memory entries for '%s' — will retry", history_key
+            )
             _record("failed", "no_memory_entries", chunk_size=len(chunk))
             return  # Don't advance pointer — LLM likely returned bad JSON
 
         saved = await save_consolidated_memories(entries, person, self._workspaces)
-        logger.info("Consolidated %d messages → %d memory entries for '%s'", len(chunk), saved, history_key)
+        logger.info(
+            "Consolidated %d messages → %d memory entries for '%s'",
+            len(chunk),
+            saved,
+            history_key,
+        )
 
         # Only advance the pointer after successfully extracting memories
         _advance_consolidation_pointer(self._workspaces, history_key, last_consolidated + chunk_end)
@@ -669,7 +705,11 @@ class AgentLoop:
         history_key = channel or person
         async with self._lock_pool.lock_for(history_key):
             result = await self._run_inner(
-                user_message, person, channel, call_type, history_key,
+                user_message,
+                person,
+                channel,
+                call_type,
+                history_key,
                 interim_callback=interim_callback,
                 metadata=metadata,
             )
@@ -700,7 +740,8 @@ class AgentLoop:
             text_for_context = user_message
         else:
             text_for_context = " ".join(
-                block["text"] for block in user_message
+                block["text"]
+                for block in user_message
                 if isinstance(block, dict) and block.get("type") == "text"
             )
 
@@ -754,20 +795,24 @@ class AgentLoop:
             logger.debug("Routed %s → %s%s", call_type.value, model, suffix)
         self._current_model = model
         if self._runtime_observability is not None:
-            self._runtime_observability.record_prompt_snapshot(PromptSnapshot(
-                history_key=history_key,
-                person=person,
-                channel=channel,
-                call_type=call_type.value,
-                model=model,
-                tool_count=len(tools),
-                system_token_estimate=system_tokens,
-                sections=prompt_sections,
-                captured_at=now_utc(),
-            ))
+            self._runtime_observability.record_prompt_snapshot(
+                PromptSnapshot(
+                    history_key=history_key,
+                    person=person,
+                    channel=channel,
+                    call_type=call_type.value,
+                    model=model,
+                    tool_count=len(tools),
+                    system_token_estimate=system_tokens,
+                    sections=prompt_sections,
+                    captured_at=now_utc(),
+                )
+            )
 
         for _ in range(MAX_TOOL_ROUNDS):
-            token_limit = max_tokens_for(current_call_type, self._routing) if self._routing else None
+            token_limit = (
+                max_tokens_for(current_call_type, self._routing) if self._routing else None
+            )
             response = await active_provider.complete(
                 messages=history,
                 tools=tools,
@@ -790,12 +835,14 @@ class AgentLoop:
             # Always append the assistant message — include tool_calls and
             # reasoning so providers can round-trip thinking blocks between
             # tool rounds (required by OpenRouter reasoning models, MiniMax, etc.)
-            history.append(Message(
-                role="assistant",
-                content=response.content or "",
-                tool_calls=response.tool_calls,
-                reasoning=response.reasoning,
-            ))
+            history.append(
+                Message(
+                    role="assistant",
+                    content=response.content or "",
+                    tool_calls=response.tool_calls,
+                    reasoning=response.reasoning,
+                )
+            )
 
             if response.stop_reason != "tool_use" or not response.tool_calls:
                 break
@@ -817,10 +864,12 @@ class AgentLoop:
             tool_rounds += 1
             tool_names_used.extend(tc.name for tc in response.tool_calls)
             tool_results = await self._dispatch_tools(
-                response.tool_calls, person=person, channel=channel,
+                response.tool_calls,
+                person=person,
+                channel=channel,
                 call_type=call_type,
             )
-            for tc, result in zip(response.tool_calls, tool_results):
+            for tc, result in zip(response.tool_calls, tool_results, strict=False):
                 history.append(
                     Message(
                         role="tool",
@@ -837,12 +886,9 @@ class AgentLoop:
             else:
                 rounds_since_interim += 1
                 if rounds_since_interim >= _PROGRESS_INTERVAL and on_interim:
-                    tool_summary = ", ".join(
-                        dict.fromkeys(tc.name for tc in response.tool_calls)
-                    )
+                    tool_summary = ", ".join(dict.fromkeys(tc.name for tc in response.tool_calls))
                     progress_text = (
-                        f"Still working\u2026 (step {tool_rounds}, "
-                        f"using {tool_summary})"
+                        f"Still working\u2026 (step {tool_rounds}, using {tool_summary})"
                     )
                     prog_result = on_interim(progress_text)
                     if hasattr(prog_result, "__await__"):
@@ -855,8 +901,7 @@ class AgentLoop:
             if has_images:
                 for i, msg in enumerate(history):
                     if isinstance(msg.content, list) and any(
-                        isinstance(b, dict) and b.get("type") == "image"
-                        for b in msg.content
+                        isinstance(b, dict) and b.get("type") == "image" for b in msg.content
                     ):
                         history[i] = msg.model_copy(
                             update={"content": _strip_images(msg.content)},
@@ -874,7 +919,12 @@ class AgentLoop:
                 active_provider = self._pick_provider(current_call_type, has_images=has_images)
                 if hasattr(active_provider, "model"):
                     active_provider.model = model  # type: ignore[attr-defined]
-                    logger.debug("Re-routed after tools %s → %s (%s)", tool_names, model, current_call_type.value)
+                    logger.debug(
+                        "Re-routed after tools %s → %s (%s)",
+                        tool_names,
+                        model,
+                        current_call_type.value,
+                    )
                 self._current_model = model
                 extra = {"model": model}
 
@@ -883,7 +933,8 @@ class AgentLoop:
             _save_history(self._workspaces, history_key, history)
             if metadata is not None:
                 metadata.update(
-                    model=self._current_model, tools=tool_names_used,
+                    model=self._current_model,
+                    tools=tool_names_used,
                     tool_rounds=tool_rounds,
                     prompt_sections=[section.name for section in prompt_sections],
                     duration_ms=int((time.monotonic() - t0) * 1000),
@@ -902,7 +953,8 @@ class AgentLoop:
             _save_history(self._workspaces, history_key, history)
             if metadata is not None:
                 metadata.update(
-                    model=self._current_model, tools=tool_names_used,
+                    model=self._current_model,
+                    tools=tool_names_used,
                     tool_rounds=tool_rounds,
                     prompt_sections=[section.name for section in prompt_sections],
                     duration_ms=int((time.monotonic() - t0) * 1000),
@@ -922,12 +974,16 @@ class AgentLoop:
         # members reference group conversations from private DMs.
         if channel and channel.startswith("group-") and response and response.content:
             _append_chat_log(
-                self._workspaces, channel, text_for_context, response.content,
+                self._workspaces,
+                channel,
+                text_for_context,
+                response.content,
             )
 
         if metadata is not None:
             metadata.update(
-                model=self._current_model, tools=tool_names_used,
+                model=self._current_model,
+                tools=tool_names_used,
                 tool_rounds=tool_rounds,
                 prompt_sections=[section.name for section in prompt_sections],
                 duration_ms=int((time.monotonic() - t0) * 1000),
@@ -950,7 +1006,12 @@ class AgentLoop:
             # Routines: block tools that deliver output via the channel dispatcher
             # to prevent double-sends (scheduler handles delivery).
             if call_type == CallType.ROUTINE and policy is not None and policy.routine_blocked:
-                results.append({"status": "skipped", "reason": "Routine output is delivered automatically by the scheduler."})
+                results.append(
+                    {
+                        "status": "skipped",
+                        "reason": "Routine output is delivered automatically by the scheduler.",
+                    }
+                )
                 continue
 
             args = dict(tc.arguments)
@@ -960,10 +1021,9 @@ class AgentLoop:
                 args["person"] = args["person"].lower()
 
             # Admin-only enforcement: block non-admins before the handler runs.
-            if policy is not None and policy.admin_only:
-                if not self._admin_check(person):
-                    results.append({"error": f"Tool '{tc.name}' requires admin access."})
-                    continue
+            if policy is not None and policy.admin_only and not self._admin_check(person):
+                results.append({"error": f"Tool '{tc.name}' requires admin access."})
+                continue
 
             # In DMs, force personal-scope tools to the authenticated caller.
             # Allow "household" through — it's an explicit shared-write that the
@@ -971,31 +1031,45 @@ class AgentLoop:
             if is_dm and policy is not None and policy.scope == "personal" and "person" in args:
                 requested = args["person"]
                 if requested != person and requested != HOUSEHOLD_WORKSPACE:
-                    label = "DM write enforcement" if policy.access == "write" else "DM read enforcement"
+                    label = (
+                        "DM write enforcement"
+                        if policy.access == "write"
+                        else "DM read enforcement"
+                    )
                     logger.info(
                         "Tool %s: overriding person %r → %r (%s)",
-                        tc.name, requested, person, label,
+                        tc.name,
+                        requested,
+                        person,
+                        label,
                     )
                     args["person"] = person
 
             # In DMs, block tools that would write to shared household data without
             # explicit user confirmation. The block fires once per tool per run()
             # call — after the user confirms and the LLM retries, it goes through.
-            if is_dm and policy is not None and policy.household_confirm is not None:
-                if policy.household_confirm(args) and tc.name not in self._household_confirmed:
-                    self._household_confirmed.add(tc.name)
-                    logger.info(
-                        "Tool %s: blocked household write in DM — asking LLM to confirm",
-                        tc.name,
-                    )
-                    results.append({
+            if (
+                is_dm
+                and policy is not None
+                and policy.household_confirm is not None
+                and policy.household_confirm(args)
+                and tc.name not in self._household_confirmed
+            ):
+                self._household_confirmed.add(tc.name)
+                logger.info(
+                    "Tool %s: blocked household write in DM — asking LLM to confirm",
+                    tc.name,
+                )
+                results.append(
+                    {
                         "error": (
                             "This would save to the shared household — visible to all members. "
                             "Ask the user: should this be shared with the household, or kept "
                             "private? If private, use the person parameter with the user's name."
                         ),
-                    })
-                    continue
+                    }
+                )
+                continue
 
             if self._on_tool_call is not None:
                 self._on_tool_call(tc.name, args)
@@ -1015,13 +1089,17 @@ class AgentLoop:
                 result_str = json.dumps(result, default=str)
                 logger.info(
                     "Tool result: %s → %s",
-                    tc.name, result_str[:2000],
+                    tc.name,
+                    result_str[:2000],
                     extra={"model": self._current_model},
                 )
                 results.append(result)
                 asyncio.create_task(
                     _log_tool_event(
-                        self._workspaces, tc.name, args, person,
+                        self._workspaces,
+                        tc.name,
+                        args,
+                        person,
                         self._fast_provider or self._provider,
                     ),
                 )
@@ -1240,10 +1318,14 @@ def _persistable_messages(messages: list[Message]) -> list[Message]:
         if m.role == "user":
             persistent.append(m.model_copy(update={"content": _strip_images(m.content)}))
         elif m.role == "assistant":
-            persistent.append(m.model_copy(update={
-                "content": _strip_images(m.content),
-                "reasoning": [],  # only needed within tool chains, not across turns
-            }))
+            persistent.append(
+                m.model_copy(
+                    update={
+                        "content": _strip_images(m.content),
+                        "reasoning": [],  # only needed within tool chains, not across turns
+                    }
+                )
+            )
         elif m.role == "tool":
             # Cap tool results to prevent huge API responses from bloating history
             content = m.content if isinstance(m.content, str) else json.dumps(m.content)

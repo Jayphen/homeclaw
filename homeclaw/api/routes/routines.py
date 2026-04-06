@@ -59,15 +59,17 @@ async def list_routines() -> dict[str, Any]:
     items: list[dict[str, Any]] = []
     for r in routines:
         job_id = f"routine:{r.name}"
-        items.append({
-            "name": r.name,
-            "description": r.description,
-            "trigger_type": r.trigger_type,
-            "trigger_kwargs": r.trigger_kwargs,
-            "last_run": last_runs.get(job_id),
-            "next_run": next_runs.get(job_id),
-            "last_result": results.get(job_id) or None,
-        })
+        items.append(
+            {
+                "name": r.name,
+                "description": r.description,
+                "trigger_type": r.trigger_type,
+                "trigger_kwargs": r.trigger_kwargs,
+                "last_run": last_runs.get(job_id),
+                "next_run": next_runs.get(job_id),
+                "last_result": results.get(job_id) or None,
+            }
+        )
 
     return {"routines": items, "count": len(items)}
 
@@ -103,15 +105,19 @@ class RoutineUpdateBody(BaseModel):
 
 @router.patch("/{name}", dependencies=[AdminDep])
 async def update_routine_endpoint(
-    name: str, body: RoutineUpdateBody,
+    name: str,
+    body: RoutineUpdateBody,
 ) -> dict[str, Any]:
     """Update an existing routine. Admin only."""
     config = get_config()
     workspaces = config.workspaces.resolve()
     try:
         updated = update_routine(
-            workspaces, name,
-            schedule=body.schedule, action=body.action, title=body.title,
+            workspaces,
+            name,
+            schedule=body.schedule,
+            action=body.action,
+            title=body.title,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

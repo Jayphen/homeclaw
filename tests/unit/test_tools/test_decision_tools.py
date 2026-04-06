@@ -21,7 +21,8 @@ def registry(dev_workspaces: Path) -> ToolRegistry:
 
 @pytest.mark.asyncio
 async def test_decision_log_creates_household_file(
-    registry: ToolRegistry, dev_workspaces: Path,
+    registry: ToolRegistry,
+    dev_workspaces: Path,
 ) -> None:
     handler = registry.get_handler("decision_log")
     assert handler is not None
@@ -37,7 +38,8 @@ async def test_decision_log_creates_household_file(
 
 @pytest.mark.asyncio
 async def test_decision_log_appends(
-    registry: ToolRegistry, dev_workspaces: Path,
+    registry: ToolRegistry,
+    dev_workspaces: Path,
 ) -> None:
     handler = registry.get_handler("decision_log")
     assert handler is not None
@@ -51,12 +53,15 @@ async def test_decision_log_appends(
 
 @pytest.mark.asyncio
 async def test_decision_log_personal_scope(
-    registry: ToolRegistry, dev_workspaces: Path,
+    registry: ToolRegistry,
+    dev_workspaces: Path,
 ) -> None:
     handler = registry.get_handler("decision_log")
     assert handler is not None
     result = await handler(
-        person="alice", decision="Morning yoga at 6am", scope="personal",
+        person="alice",
+        decision="Morning yoga at 6am",
+        scope="personal",
     )
     assert result["scope"] == "personal"
     path = dev_workspaces / "alice" / "decisions.md"

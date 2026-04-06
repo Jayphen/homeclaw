@@ -12,7 +12,6 @@ import pytest
 
 from homeclaw.plugins.skills.http_call import HttpCallConfig, http_call
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

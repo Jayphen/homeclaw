@@ -36,19 +36,34 @@ class WhatsAppState(StrEnum):
 # Valid state transitions — prevents impossible state changes and race conditions.
 _VALID_TRANSITIONS: dict[WhatsAppState, frozenset[WhatsAppState]] = {
     WhatsAppState.IDLE: frozenset({WhatsAppState.CONNECTING, WhatsAppState.STOPPED}),
-    WhatsAppState.CONNECTING: frozenset({
-        WhatsAppState.AWAITING_QR, WhatsAppState.CONNECTED,
-        WhatsAppState.DISCONNECTED, WhatsAppState.STOPPED,
-    }),
-    WhatsAppState.AWAITING_QR: frozenset({
-        WhatsAppState.CONNECTED, WhatsAppState.DISCONNECTED, WhatsAppState.STOPPED,
-    }),
-    WhatsAppState.CONNECTED: frozenset({
-        WhatsAppState.DISCONNECTED, WhatsAppState.STOPPED,
-    }),
-    WhatsAppState.DISCONNECTED: frozenset({
-        WhatsAppState.CONNECTING, WhatsAppState.CONNECTED, WhatsAppState.STOPPED,
-    }),
+    WhatsAppState.CONNECTING: frozenset(
+        {
+            WhatsAppState.AWAITING_QR,
+            WhatsAppState.CONNECTED,
+            WhatsAppState.DISCONNECTED,
+            WhatsAppState.STOPPED,
+        }
+    ),
+    WhatsAppState.AWAITING_QR: frozenset(
+        {
+            WhatsAppState.CONNECTED,
+            WhatsAppState.DISCONNECTED,
+            WhatsAppState.STOPPED,
+        }
+    ),
+    WhatsAppState.CONNECTED: frozenset(
+        {
+            WhatsAppState.DISCONNECTED,
+            WhatsAppState.STOPPED,
+        }
+    ),
+    WhatsAppState.DISCONNECTED: frozenset(
+        {
+            WhatsAppState.CONNECTING,
+            WhatsAppState.CONNECTED,
+            WhatsAppState.STOPPED,
+        }
+    ),
     WhatsAppState.STOPPED: frozenset(),
 }
 
@@ -56,6 +71,8 @@ logger = logging.getLogger(__name__)
 
 # Maps phone numbers to household member names.
 _USER_MAP_FILE = "whatsapp_users.json"
+
+
 def _load_known_groups(workspaces: Path) -> set[str]:
     """Discover group IDs from existing channel history directories."""
     channels_dir = workspaces / "household" / "channels"
@@ -70,11 +87,7 @@ def _load_known_groups(workspaces: Path) -> set[str]:
 
 def _extract_text(ev: Any) -> str | None:
     """Extract plain text from a WhatsApp MessageEv protobuf."""
-    return (
-        ev.Message.conversation
-        or ev.Message.extendedTextMessage.text
-        or None
-    )
+    return ev.Message.conversation or ev.Message.extendedTextMessage.text or None
 
 
 def _has_image(ev: Any) -> bool:
@@ -203,9 +216,12 @@ class WhatsAppChannel:
         # paircode callback so neonize uses numeric code auth instead of QR.
         # The user enters the code on their phone — no camera needed.
         if phone_number:
+
             @self._client.paircode
             async def _on_paircode(
-                _: Any, code: str, connected: bool = False,
+                _: Any,
+                code: str,
+                connected: bool = False,
             ) -> None:
                 if connected:
                     logger.info("WhatsApp pair code accepted")
@@ -229,7 +245,8 @@ class WhatsAppChannel:
             if new_state not in allowed:
                 logger.debug(
                     "Ignoring invalid WhatsApp state transition %s → %s",
-                    self._state, new_state,
+                    self._state,
+                    new_state,
                 )
                 return False
             self._state = new_state
@@ -379,9 +396,7 @@ class WhatsAppChannel:
             image_bytes = await self._client.download_any(ev.Message)
         except Exception:
             logger.exception("Failed to download WhatsApp image from %s", person)
-            await self._client.reply_message(
-                "Sorry, I couldn't download that image.", ev
-            )
+            await self._client.reply_message("Sorry, I couldn't download that image.", ev)
             return
 
         b64_data = base64.b64encode(image_bytes).decode("ascii")
@@ -440,7 +455,10 @@ class WhatsAppChannel:
         await self._client.reply_message(msg, ev)
 
     async def _handle_register_member(
-        self, phone: str, text: str, ev: Any,
+        self,
+        phone: str,
+        text: str,
+        ev: Any,
     ) -> None:
         """Handle /register_member <name> <phone> — admin-only."""
         parts = text.split()
@@ -452,9 +470,7 @@ class WhatsAppChannel:
             )
             return
 
-        target_phone = parts[2].strip().translate(
-            str.maketrans("", "", "+- ()")
-        )
+        target_phone = parts[2].strip().translate(str.maketrans("", "", "+- ()"))
         ok, msg = await register_member(
             admin_identifier=phone,
             target_identifier=target_phone,
@@ -477,6 +493,7 @@ class WhatsAppChannel:
         channel: str | None,
     ) -> None:
         """Run content through the agent loop and reply with the response."""
+
         # Send interim messages (e.g. "Connecting to HA...") as they happen
         async def _send_interim(text: str) -> None:
             formatted = _md_to_whatsapp(text)
@@ -484,16 +501,17 @@ class WhatsAppChannel:
 
         try:
             response = await self._loop.run(
-                content, person, channel=channel, interim_callback=_send_interim,
+                content,
+                person,
+                channel=channel,
+                interim_callback=_send_interim,
             )
         except Exception as exc:
             logger.exception("Agent loop failed for message from %s", person)
             error_msg = str(exc)
             if len(error_msg) > 300:
                 error_msg = error_msg[:300] + "..."
-            await self._client.reply_message(
-                f"Sorry, something went wrong:\n\n{error_msg}", ev
-            )
+            await self._client.reply_message(f"Sorry, something went wrong:\n\n{error_msg}", ev)
             return
 
         if response:
@@ -619,9 +637,7 @@ class WhatsAppChannel:
         await self._transition(WhatsAppState.CONNECTING)
         self._connect_task = asyncio.create_task(self._run_connect())
         self._register_with_dispatcher()
-        logger.info(
-            "WhatsApp channel connecting — scan the QR code in logs if this is a first run"
-        )
+        logger.info("WhatsApp channel connecting — scan the QR code in logs if this is a first run")
 
     async def _run_connect(self) -> None:
         try:

@@ -24,6 +24,7 @@ _SESSION_TOKEN_TTL = timedelta(days=7)
 # Password hashing
 # ---------------------------------------------------------------------------
 
+
 def hash_password(plain: str) -> str:
     """Hash a plaintext password with bcrypt."""
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
@@ -45,6 +46,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 # JWT session tokens
 # ---------------------------------------------------------------------------
 
+
 def _ensure_jwt_secret(config: HomeclawConfig) -> str:
     """Return the JWT signing secret, generating and persisting one if needed."""
     if config.jwt_secret:
@@ -55,7 +57,9 @@ def _ensure_jwt_secret(config: HomeclawConfig) -> str:
 
 
 def create_session_token(
-    member: str, *, is_admin: bool,
+    member: str,
+    *,
+    is_admin: bool,
 ) -> dict[str, Any]:
     """Create a signed JWT session token.
 
@@ -96,6 +100,7 @@ def _parse_jwt(token: str) -> tuple[str | None, bool] | None:
         return None, True
     is_admin = sub in config.admin_members
     return sub, is_admin
+
 
 _config: HomeclawConfig | None = None
 _setup_token: str | None = None
@@ -231,9 +236,14 @@ def get_whatsapp_qr() -> bytes | None:
 
 
 # Names to skip at any level during export/import (derived data, caches).
-SKIP_EXPORT_NAMES = frozenset({
-    ".index", "__pycache__", "config.json", "cost_log.jsonl",
-})
+SKIP_EXPORT_NAMES = frozenset(
+    {
+        ".index",
+        "__pycache__",
+        "config.json",
+        "cost_log.jsonl",
+    }
+)
 
 # Additional top-level dirs that are not member workspaces.
 _NON_MEMBER_DIRS = frozenset({HOUSEHOLD_WORKSPACE, PLUGINS_DIR})
@@ -385,7 +395,8 @@ def visible_members(member: str | None, all_members: list[str]) -> list[str]:
 
 
 def visible_members_with_household(
-    workspaces: Path, member: str | None,
+    workspaces: Path,
+    member: str | None,
 ) -> list[str]:
     """Return visible members plus the household workspace."""
     all_members = list_member_workspaces(workspaces)

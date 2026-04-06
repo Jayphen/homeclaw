@@ -4,7 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from homeclaw.scheduler.routines import ParsedRoutine, parse_routines_md, _parse_schedule, _parse_time, _ordinal_day_range, add_routine, update_routine
+from homeclaw.scheduler.routines import (
+    _ordinal_day_range,
+    _parse_schedule,
+    _parse_time,
+    add_routine,
+    parse_routines_md,
+    update_routine,
+)
 
 
 class TestParseTime:
@@ -33,23 +40,24 @@ class TestParseTime:
 
 class TestParseSchedule:
     def test_every_day_at(self):
-        assert _parse_schedule("Every day at 7:30am") == (
-            "cron", {"hour": 7, "minute": 30}
-        )
+        assert _parse_schedule("Every day at 7:30am") == ("cron", {"hour": 7, "minute": 30})
 
     def test_every_weekday_at(self):
         assert _parse_schedule("Every weekday at 9:00am") == (
-            "cron", {"day_of_week": "mon-fri", "hour": 9, "minute": 0}
+            "cron",
+            {"day_of_week": "mon-fri", "hour": 9, "minute": 0},
         )
 
     def test_every_sunday_at(self):
         assert _parse_schedule("Every Sunday at 10:00am") == (
-            "cron", {"day_of_week": "sun", "hour": 10, "minute": 0}
+            "cron",
+            {"day_of_week": "sun", "hour": 10, "minute": 0},
         )
 
     def test_every_monday_at(self):
         assert _parse_schedule("Every Monday at 9:00am") == (
-            "cron", {"day_of_week": "mon", "hour": 9, "minute": 0}
+            "cron",
+            {"day_of_week": "mon", "hour": 9, "minute": 0},
         )
 
     def test_every_n_days(self):
@@ -63,7 +71,8 @@ class TestParseSchedule:
 
     def test_case_insensitive(self):
         assert _parse_schedule("every WEEKDAY at 8:00AM") == (
-            "cron", {"day_of_week": "mon-fri", "hour": 8, "minute": 0}
+            "cron",
+            {"day_of_week": "mon-fri", "hour": 8, "minute": 0},
         )
 
     def test_invalid_schedule(self):
@@ -74,12 +83,14 @@ class TestParseSchedule:
 
     def test_cron_expression_weekday_morning(self):
         assert _parse_schedule("30 7 * * 1-5") == (
-            "cron", {"minute": "30", "hour": "7", "day": "*", "month": "*", "day_of_week": "1-5"}
+            "cron",
+            {"minute": "30", "hour": "7", "day": "*", "month": "*", "day_of_week": "1-5"},
         )
 
     def test_cron_expression_monthly(self):
         assert _parse_schedule("0 9 1 * *") == (
-            "cron", {"minute": "0", "hour": "9", "day": "1", "month": "*", "day_of_week": "*"}
+            "cron",
+            {"minute": "0", "hour": "9", "day": "1", "month": "*", "day_of_week": "*"},
         )
 
     def test_every_other_day(self):
@@ -101,12 +112,14 @@ class TestParseSchedule:
 
     def test_monthly_on_the_15th(self):
         assert _parse_schedule("Monthly on the 15th at 9:00am") == (
-            "cron", {"day": 15, "hour": 9, "minute": 0}
+            "cron",
+            {"day": 15, "hour": 9, "minute": 0},
         )
 
     def test_monthly_on_the_1st(self):
         assert _parse_schedule("Monthly on the 1st at 10:00am") == (
-            "cron", {"day": 1, "hour": 10, "minute": 0}
+            "cron",
+            {"day": 1, "hour": 10, "minute": 0},
         )
 
     def test_first_monday_of_month(self):
@@ -229,7 +242,11 @@ class TestUpdateRoutine:
             "- **Schedule**: Every weekday at 7:30am\n"
             "- **Action**: Send each household member their daily summary\n"
         )
-        assert update_routine(tmp_path, "morning_briefing", action="Send daily summary with top news headlines and weather")
+        assert update_routine(
+            tmp_path,
+            "morning_briefing",
+            action="Send daily summary with top news headlines and weather",
+        )
         routines = parse_routines_md(tmp_path)
         assert len(routines) == 1
         assert "top news headlines" in routines[0].description
@@ -263,10 +280,7 @@ class TestUpdateRoutine:
     def test_update_invalid_schedule_raises(self, tmp_path: Path):
         (tmp_path / "household").mkdir()
         (tmp_path / "household" / "ROUTINES.md").write_text(
-            "# Routines\n\n"
-            "## Test\n"
-            "- **Schedule**: Every day at 8:00am\n"
-            "- **Action**: Do stuff\n"
+            "# Routines\n\n## Test\n- **Schedule**: Every day at 8:00am\n- **Action**: Do stuff\n"
         )
         with pytest.raises(ValueError, match="Cannot parse schedule"):
             update_routine(tmp_path, "test", schedule="whenever")

@@ -7,7 +7,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from homeclaw.agent.context import estimate_tokens
 from homeclaw.agent.providers.base import LLMProvider, Message
 
 logger = logging.getLogger(__name__)

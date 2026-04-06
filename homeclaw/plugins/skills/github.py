@@ -15,9 +15,25 @@ _KNOWN_DIRS = {"scripts", "references", "assets", "data"}
 
 # GitHub URL path segments that are actions, not repo subpaths
 _GITHUB_ACTIONS = {
-    "tree", "blob", "raw", "commit", "commits", "releases", "issues",
-    "pull", "pulls", "actions", "settings", "wiki", "discussions",
-    "projects", "security", "network", "compare", "tags", "archive",
+    "tree",
+    "blob",
+    "raw",
+    "commit",
+    "commits",
+    "releases",
+    "issues",
+    "pull",
+    "pulls",
+    "actions",
+    "settings",
+    "wiki",
+    "discussions",
+    "projects",
+    "security",
+    "network",
+    "compare",
+    "tags",
+    "archive",
 }
 
 
@@ -172,7 +188,7 @@ async def list_repo_skills(url: str) -> list[dict[str, str]]:
         if prefix and not path.startswith(prefix):
             continue
         # Strip prefix to get the relative path
-        rel = path[len(prefix):]
+        rel = path[len(prefix) :]
         # The skill dir is the parent of SKILL.md
         skill_subdir = rel.rsplit("/", 1)[0] if "/" in rel else ""
         skills.append({"path": skill_subdir})

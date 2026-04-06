@@ -23,12 +23,20 @@ def _today_notes(workspaces_path: str, members: list[str], today: str) -> list[d
         path = ws / person / "notes" / f"{today}.md"
         if path.exists():
             mtime = datetime.fromtimestamp(path.stat().st_mtime).isoformat()
-            notes.append({"person": person, "content": path.read_text().strip(), "updated_at": mtime})
+            notes.append(
+                {
+                    "person": person,
+                    "content": path.read_text().strip(),
+                    "updated_at": mtime,
+                }
+            )
     return notes
 
 
 def _upcoming_reminders(
-    workspaces: Path, members: list[str], days: int = 7,
+    workspaces: Path,
+    members: list[str],
+    days: int = 7,
 ) -> list[dict[str, Any]]:
     """Get reminders due within the next N days from the JSON reminder store."""
     today = date.today()
@@ -39,11 +47,13 @@ def _upcoming_reminders(
         for r in load_reminders(workspaces, person):
             due = r.next_due
             if due and today <= due <= end:
-                reminders.append({
-                    "date": due.isoformat(),
-                    "person": person,
-                    "note": r.note,
-                })
+                reminders.append(
+                    {
+                        "date": due.isoformat(),
+                        "person": person,
+                        "note": r.note,
+                    }
+                )
 
     reminders.sort(key=lambda r: r["date"])
     return reminders
@@ -66,11 +76,13 @@ def _upcoming_birthdays(workspaces_path: str, days: int = 30) -> list[dict[str, 
         if bday < today:
             bday = bday.replace(year=today.year + 1)
         if today <= bday <= end:
-            birthdays.append({
-                "date": bday.isoformat(),
-                "name": c.name,
-                "relationship": c.relationship,
-            })
+            birthdays.append(
+                {
+                    "date": bday.isoformat(),
+                    "name": c.name,
+                    "relationship": c.relationship,
+                }
+            )
 
     birthdays.sort(key=lambda b: b["date"])
     return birthdays
@@ -87,12 +99,14 @@ def _recent_interactions(workspaces_path: str, days: int = 7) -> list[dict[str, 
     for c in contacts:
         for ix in c.interactions:
             if ix.date.date() >= cutoff:
-                interactions.append({
-                    "date": ix.date.isoformat(),
-                    "contact": c.name,
-                    "type": ix.type,
-                    "notes": ix.notes[:200],
-                })
+                interactions.append(
+                    {
+                        "date": ix.date.isoformat(),
+                        "contact": c.name,
+                        "type": ix.type,
+                        "notes": ix.notes[:200],
+                    }
+                )
 
     interactions.sort(key=lambda i: i["date"], reverse=True)
     return interactions
@@ -109,13 +123,15 @@ def _overdue_checkins(workspaces_path: str) -> list[dict[str, Any]]:
     for c in contacts:
         for r in c.reminders:
             if r.interval_days and r.next_date and r.next_date < today:
-                overdue.append({
-                    "contact": c.name,
-                    "relationship": c.relationship,
-                    "note": r.note,
-                    "due_date": r.next_date.isoformat(),
-                    "days_overdue": (today - r.next_date).days,
-                })
+                overdue.append(
+                    {
+                        "contact": c.name,
+                        "relationship": c.relationship,
+                        "note": r.note,
+                        "due_date": r.next_date.isoformat(),
+                        "days_overdue": (today - r.next_date).days,
+                    }
+                )
 
     overdue.sort(key=lambda o: o["days_overdue"], reverse=True)
     return overdue

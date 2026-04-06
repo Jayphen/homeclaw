@@ -27,16 +27,12 @@ class TestParseGithubUrl:
         assert result == ("user", "repo", "dev", "")
 
     def test_tree_branch_with_subpath(self) -> None:
-        result = parse_github_url(
-            "https://github.com/user/repo/tree/main/skills/cooking"
-        )
+        result = parse_github_url("https://github.com/user/repo/tree/main/skills/cooking")
         assert result == ("user", "repo", "main", "skills/cooking")
 
     def test_bare_subpath_treated_as_path(self) -> None:
         """github.com/user/repo/skills/cooking → subpath, not ignored."""
-        result = parse_github_url(
-            "https://github.com/Jayphen/homeclaw/skills/some-skill"
-        )
+        result = parse_github_url("https://github.com/Jayphen/homeclaw/skills/some-skill")
         assert result is not None
         user, repo, branch, subpath = result
         assert user == "Jayphen"
@@ -84,22 +80,12 @@ class TestRawSkillMdUrl:
         assert url == "https://raw.githubusercontent.com/user/repo/main/SKILL.md"
 
     def test_with_subpath(self) -> None:
-        url = raw_skill_md_url(
-            "https://github.com/user/repo/skills/cooking"
-        )
-        assert url == (
-            "https://raw.githubusercontent.com/user/repo/main"
-            "/skills/cooking/SKILL.md"
-        )
+        url = raw_skill_md_url("https://github.com/user/repo/skills/cooking")
+        assert url == ("https://raw.githubusercontent.com/user/repo/main/skills/cooking/SKILL.md")
 
     def test_tree_branch_subpath(self) -> None:
-        url = raw_skill_md_url(
-            "https://github.com/user/repo/tree/dev/skills/cooking"
-        )
-        assert url == (
-            "https://raw.githubusercontent.com/user/repo/dev"
-            "/skills/cooking/SKILL.md"
-        )
+        url = raw_skill_md_url("https://github.com/user/repo/tree/dev/skills/cooking")
+        assert url == ("https://raw.githubusercontent.com/user/repo/dev/skills/cooking/SKILL.md")
 
 
 # ---------------------------------------------------------------------------
@@ -113,9 +99,7 @@ class TestSkillSubpathUrl:
         assert result == "https://github.com/user/repo/tree/main/cooking"
 
     def test_existing_subpath_plus_extra(self) -> None:
-        result = skill_subpath_url(
-            "https://github.com/user/repo/skills", "cooking"
-        )
+        result = skill_subpath_url("https://github.com/user/repo/skills", "cooking")
         assert result == "https://github.com/user/repo/tree/main/skills/cooking"
 
     def test_non_github_raises(self) -> None:

@@ -34,9 +34,7 @@ async def health() -> dict[str, Any]:
         config = get_config()
         index_path = Path(str(config.workspaces)) / SEMANTIC_INDEX_PATH
         if index_path.exists():
-            semantic["index_size_mb"] = round(
-                index_path.stat().st_size / (1024 * 1024), 2
-            )
+            semantic["index_size_mb"] = round(index_path.stat().st_size / (1024 * 1024), 2)
     except RuntimeError:
         pass
 

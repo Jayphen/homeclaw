@@ -5,13 +5,13 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
 
 from homeclaw.agent.loop import _FEED_WORTHY_TOOLS, _log_tool_event
 from homeclaw.agent.providers.base import LLMResponse
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -47,9 +47,11 @@ class TestLogToolEvent:
     async def test_writes_event_with_llm_summary(self, tmp_path: Path) -> None:
         provider = _mock_provider("Saved a food memory for Alice")
         await _log_tool_event(
-            tmp_path, "memory_save",
+            tmp_path,
+            "memory_save",
             {"topic": "food", "person": "alice", "content": "likes pasta"},
-            "alice", provider,
+            "alice",
+            provider,
         )
         events = _read_events(tmp_path)
         assert len(events) == 1
@@ -61,9 +63,11 @@ class TestLogToolEvent:
     @pytest.mark.asyncio
     async def test_fallback_when_provider_is_none(self, tmp_path: Path) -> None:
         await _log_tool_event(
-            tmp_path, "memory_save",
+            tmp_path,
+            "memory_save",
             {"topic": "food", "person": "alice"},
-            "alice", None,
+            "alice",
+            None,
         )
         events = _read_events(tmp_path)
         assert len(events) == 1
@@ -74,9 +78,11 @@ class TestLogToolEvent:
         provider = AsyncMock()
         provider.complete.side_effect = RuntimeError("API down")
         await _log_tool_event(
-            tmp_path, "bookmark_save",
+            tmp_path,
+            "bookmark_save",
             {"title": "Cool site", "url": "https://example.com"},
-            "bob", provider,
+            "bob",
+            provider,
         )
         events = _read_events(tmp_path)
         assert len(events) == 1
@@ -87,8 +93,11 @@ class TestLogToolEvent:
         """LLM returns too-short text → fallback used."""
         provider = _mock_provider("OK")
         await _log_tool_event(
-            tmp_path, "note_save", {"person": "carol", "date": "today"},
-            "carol", provider,
+            tmp_path,
+            "note_save",
+            {"person": "carol", "date": "today"},
+            "carol",
+            provider,
         )
         events = _read_events(tmp_path)
         assert len(events) == 1
@@ -99,7 +108,11 @@ class TestLogToolEvent:
     async def test_skips_non_feed_worthy_tools(self, tmp_path: Path) -> None:
         provider = _mock_provider("Listed contacts")
         await _log_tool_event(
-            tmp_path, "contact_list", {}, "alice", provider,
+            tmp_path,
+            "contact_list",
+            {},
+            "alice",
+            provider,
         )
         events = _read_events(tmp_path)
         assert len(events) == 0
@@ -110,9 +123,11 @@ class TestLogToolEvent:
         provider = _mock_provider("Saved a memory for Alice")
         long_content = "x" * 500
         await _log_tool_event(
-            tmp_path, "memory_save",
+            tmp_path,
+            "memory_save",
             {"topic": "food", "content": long_content, "person": "alice"},
-            "alice", provider,
+            "alice",
+            provider,
         )
         events = _read_events(tmp_path)
         assert len(events) == 1
@@ -122,10 +137,18 @@ class TestLogToolEvent:
     async def test_multiple_events_append(self, tmp_path: Path) -> None:
         provider = _mock_provider("Did something")
         await _log_tool_event(
-            tmp_path, "memory_save", {"topic": "a"}, "alice", provider,
+            tmp_path,
+            "memory_save",
+            {"topic": "a"},
+            "alice",
+            provider,
         )
         await _log_tool_event(
-            tmp_path, "note_save", {"person": "bob", "date": "today"}, "bob", provider,
+            tmp_path,
+            "note_save",
+            {"person": "bob", "date": "today"},
+            "bob",
+            provider,
         )
         events = _read_events(tmp_path)
         assert len(events) == 2
@@ -133,10 +156,19 @@ class TestLogToolEvent:
     def test_feed_worthy_set_has_only_write_tools(self) -> None:
         """Sanity check: no read-only tools in the set."""
         read_tools = {
-            "contact_list", "contact_get", "memory_read", "note_get",
-            "reminder_list", "bookmark_list", "bookmark_search",
-            "bookmark_categories", "routine_list", "settings_get",
-            "log_read", "channel_preference_get", "skill_list",
+            "contact_list",
+            "contact_get",
+            "memory_read",
+            "note_get",
+            "reminder_list",
+            "bookmark_list",
+            "bookmark_search",
+            "bookmark_categories",
+            "routine_list",
+            "settings_get",
+            "log_read",
+            "channel_preference_get",
+            "skill_list",
         }
         assert _FEED_WORTHY_TOOLS.isdisjoint(read_tools)
 
@@ -160,10 +192,23 @@ class TestToolUseEvents:
         from homeclaw.api.routes.feed import _tool_use_events
 
         now = datetime.now(UTC)
-        self._write_events(tmp_path, [
-            {"ts": now.isoformat(), "tool": "memory_save", "summary": "Saved food memory", "person": "alice"},
-            {"ts": (now - timedelta(hours=1)).isoformat(), "tool": "note_save", "summary": "Updated note", "person": "bob"},
-        ])
+        self._write_events(
+            tmp_path,
+            [
+                {
+                    "ts": now.isoformat(),
+                    "tool": "memory_save",
+                    "summary": "Saved food memory",
+                    "person": "alice",
+                },
+                {
+                    "ts": (now - timedelta(hours=1)).isoformat(),
+                    "tool": "note_save",
+                    "summary": "Updated note",
+                    "person": "bob",
+                },
+            ],
+        )
         events = _tool_use_events(tmp_path, now - timedelta(hours=2))
         assert len(events) == 2
         assert all(e["type"] == "tool_use" for e in events)
@@ -173,10 +218,23 @@ class TestToolUseEvents:
         from homeclaw.api.routes.feed import _tool_use_events
 
         now = datetime.now(UTC)
-        self._write_events(tmp_path, [
-            {"ts": now.isoformat(), "tool": "memory_save", "summary": "Recent", "person": "alice"},
-            {"ts": (now - timedelta(days=10)).isoformat(), "tool": "note_save", "summary": "Old", "person": "bob"},
-        ])
+        self._write_events(
+            tmp_path,
+            [
+                {
+                    "ts": now.isoformat(),
+                    "tool": "memory_save",
+                    "summary": "Recent",
+                    "person": "alice",
+                },
+                {
+                    "ts": (now - timedelta(days=10)).isoformat(),
+                    "tool": "note_save",
+                    "summary": "Old",
+                    "person": "bob",
+                },
+            ],
+        )
         events = _tool_use_events(tmp_path, now - timedelta(days=3))
         assert len(events) == 1
         assert events[0]["summary"] == "Recent"
@@ -195,7 +253,8 @@ class TestToolUseEvents:
         now = datetime.now(UTC)
         with open(log_dir / "tool_use.jsonl", "w") as f:
             f.write("not json\n")
-            f.write(json.dumps({"ts": now.isoformat(), "tool": "memory_save", "summary": "OK", "person": "a"}) + "\n")
+            entry = {"ts": now.isoformat(), "tool": "memory_save", "summary": "OK", "person": "a"}
+            f.write(json.dumps(entry) + "\n")
             f.write("\n")
 
         events = _tool_use_events(tmp_path, now - timedelta(hours=1))
@@ -222,13 +281,18 @@ class TestReadToolLog:
 
         now = datetime.now(UTC)
         log_path = tmp_path / "tool_use.jsonl"
-        self._write_log(log_path, [
-            {
-                "ts": now.isoformat(), "tool": "memory_save",
-                "summary": "Saved food", "person": "alice",
-                "args": {"person": "alice", "topic": "food", "content": "likes pasta"},
-            },
-        ])
+        self._write_log(
+            log_path,
+            [
+                {
+                    "ts": now.isoformat(),
+                    "tool": "memory_save",
+                    "summary": "Saved food",
+                    "person": "alice",
+                    "args": {"person": "alice", "topic": "food", "content": "likes pasta"},
+                },
+            ],
+        )
         entries = _read_tool_log(log_path, days=1)
         assert len(entries) == 1
         assert entries[0]["args"]["person"] == "alice"
@@ -239,10 +303,14 @@ class TestReadToolLog:
 
         now = datetime.now(UTC)
         log_path = tmp_path / "tool_use.jsonl"
-        self._write_log(log_path, [
-            {"ts": now.isoformat(), "tool": "memory_save", "summary": "A", "person": "alice", "args": {}},
-            {"ts": now.isoformat(), "tool": "note_save", "summary": "B", "person": "alice", "args": {}},
-        ])
+        ts = now.isoformat()
+        self._write_log(
+            log_path,
+            [
+                {"ts": ts, "tool": "memory_save", "summary": "A", "person": "alice", "args": {}},
+                {"ts": ts, "tool": "note_save", "summary": "B", "person": "alice", "args": {}},
+            ],
+        )
         entries = _read_tool_log(log_path, days=1, tool="memory_save")
         assert len(entries) == 1
         assert entries[0]["tool"] == "memory_save"
@@ -252,10 +320,14 @@ class TestReadToolLog:
 
         now = datetime.now(UTC)
         log_path = tmp_path / "tool_use.jsonl"
-        self._write_log(log_path, [
-            {"ts": now.isoformat(), "tool": "memory_save", "summary": "A", "person": "alice", "args": {}},
-            {"ts": now.isoformat(), "tool": "memory_save", "summary": "B", "person": "bob", "args": {}},
-        ])
+        ts = now.isoformat()
+        self._write_log(
+            log_path,
+            [
+                {"ts": ts, "tool": "memory_save", "summary": "A", "person": "alice", "args": {}},
+                {"ts": ts, "tool": "memory_save", "summary": "B", "person": "bob", "args": {}},
+            ],
+        )
         entries = _read_tool_log(log_path, days=1, person="bob")
         assert len(entries) == 1
         assert entries[0]["person"] == "bob"
@@ -271,10 +343,21 @@ class TestReadToolLog:
 
         now = datetime.now(UTC)
         log_path = tmp_path / "tool_use.jsonl"
-        self._write_log(log_path, [
-            {"ts": now.isoformat(), "tool": "memory_save", "summary": "Recent", "person": "a", "args": {}},
-            {"ts": (now - timedelta(days=30)).isoformat(), "tool": "note_save", "summary": "Old", "person": "a", "args": {}},
-        ])
+        now_ts = now.isoformat()
+        old_ts = (now - timedelta(days=30)).isoformat()
+        self._write_log(
+            log_path,
+            [
+                {
+                    "ts": now_ts,
+                    "tool": "memory_save",
+                    "summary": "Recent",
+                    "person": "a",
+                    "args": {},
+                },
+                {"ts": old_ts, "tool": "note_save", "summary": "Old", "person": "a", "args": {}},
+            ],
+        )
         entries = _read_tool_log(log_path, days=7)
         assert len(entries) == 1
         assert entries[0]["summary"] == "Recent"

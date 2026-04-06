@@ -54,7 +54,9 @@ async def run_repl(
 
         try:
             response = await loop.run(
-                message, person, interim_callback=_print_interim,
+                message,
+                person,
+                interim_callback=_print_interim,
             )
         except KeyboardInterrupt:
             print("\n[interrupted]")

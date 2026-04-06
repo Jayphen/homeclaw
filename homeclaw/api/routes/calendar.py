@@ -26,7 +26,10 @@ def _parse_month(month_str: str) -> tuple[date, date]:
 
 
 def _collect_notes(
-    workspaces_path: str, members: list[str], start: date, end: date,
+    workspaces_path: str,
+    members: list[str],
+    start: date,
+    end: date,
 ) -> list[dict[str, Any]]:
     """Collect notes from all members within date range."""
     from pathlib import Path
@@ -41,18 +44,23 @@ def _collect_notes(
             if path.exists():
                 with open(path) as f:
                     summary = f.read(200).strip()
-                events.append({
-                    "date": date_str,
-                    "type": "note",
-                    "person": person,
-                    "summary": summary,
-                })
+                events.append(
+                    {
+                        "date": date_str,
+                        "type": "note",
+                        "person": person,
+                        "summary": summary,
+                    }
+                )
         current += timedelta(days=1)
     return events
 
 
 def _collect_reminders(
-    workspaces_path: str, members: list[str], start: date, end: date,
+    workspaces_path: str,
+    members: list[str],
+    start: date,
+    end: date,
 ) -> list[dict[str, Any]]:
     """Collect reminders from all members within date range."""
     from pathlib import Path
@@ -68,13 +76,15 @@ def _collect_reminders(
                 summary = r.note
                 if r.interval_days:
                     summary += f" (every {r.interval_days}d)"
-                events.append({
-                    "date": nd.isoformat(),
-                    "type": "reminder",
-                    "person": person,
-                    "summary": summary,
-                    "done": r.done,
-                })
+                events.append(
+                    {
+                        "date": nd.isoformat(),
+                        "type": "reminder",
+                        "person": person,
+                        "summary": summary,
+                        "done": r.done,
+                    }
+                )
     return events
 
 
@@ -90,12 +100,14 @@ def _collect_birthdays(workspaces_path: str, start: date, end: date) -> list[dic
         # Check if birthday falls within range (use current year)
         bday = c.birthday.replace(year=start.year)
         if start <= bday <= end:
-            events.append({
-                "date": bday.isoformat(),
-                "type": "birthday",
-                "person": c.name,
-                "summary": f"{c.name}'s birthday",
-            })
+            events.append(
+                {
+                    "date": bday.isoformat(),
+                    "type": "birthday",
+                    "person": c.name,
+                    "summary": f"{c.name}'s birthday",
+                }
+            )
     return events
 
 
@@ -109,12 +121,14 @@ def _collect_interactions(workspaces_path: str, start: date, end: date) -> list[
         for ix in c.interactions:
             ix_date = ix.date.date()
             if start <= ix_date <= end:
-                events.append({
-                    "date": ix_date.isoformat(),
-                    "type": "interaction",
-                    "person": c.name,
-                    "summary": f"{ix.type}: {ix.notes}"[:200],
-                })
+                events.append(
+                    {
+                        "date": ix_date.isoformat(),
+                        "type": "interaction",
+                        "person": c.name,
+                        "summary": f"{ix.type}: {ix.notes}"[:200],
+                    }
+                )
     return events
 
 

@@ -78,7 +78,8 @@ class PluginRegistry:
                 logger.warning(
                     "Plugin '%s' web provider '%s' implements neither "
                     "WebSearchProvider nor WebReadProvider — skipped",
-                    plugin.name, wp.name,
+                    plugin.name,
+                    wp.name,
                 )
         return count
 
@@ -153,7 +154,9 @@ class PluginRegistry:
             parts.append(f"{web_provider_count} web providers")
         logger.info(
             "Registered plugin '%s' (%s): %s",
-            name, plugin_type.value, ", ".join(parts),
+            name,
+            plugin_type.value,
+            ", ".join(parts),
         )
         return entry
 
@@ -216,9 +219,7 @@ class PluginRegistry:
 
     @property
     def active_count(self) -> int:
-        return sum(
-            1 for e in self._entries.values() if e.status == PluginStatus.ACTIVE
-        )
+        return sum(1 for e in self._entries.values() if e.status == PluginStatus.ACTIVE)
 
     def disable(self, name: str) -> bool:
         """Disable a plugin without removing it."""

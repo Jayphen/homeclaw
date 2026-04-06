@@ -11,7 +11,6 @@ import pytest
 from homeclaw.agent.consolidation import consolidate_chunk, save_consolidated_memories
 from homeclaw.agent.providers.base import LLMResponse, Message
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -48,19 +47,23 @@ class TestConsolidateChunk:
     @pytest.mark.asyncio
     async def test_valid_json_response(self) -> None:
         """Mock LLM returns valid JSON → parsed correctly."""
-        response_json = json.dumps({
-            "memory_entries": [
-                {"topic": "food", "content": "Alice likes pasta"},
-                {"topic": "health", "content": "Bob has a peanut allergy"},
-            ],
-            "summary": "Discussed food preferences and allergies.",
-        })
+        response_json = json.dumps(
+            {
+                "memory_entries": [
+                    {"topic": "food", "content": "Alice likes pasta"},
+                    {"topic": "health", "content": "Bob has a peanut allergy"},
+                ],
+                "summary": "Discussed food preferences and allergies.",
+            }
+        )
         provider = _mock_provider(response_json)
 
-        messages = _make_messages([
-            ("I love pasta", "Noted! Pasta fan."),
-            ("Bob can't eat peanuts", "Good to know about the allergy."),
-        ])
+        messages = _make_messages(
+            [
+                ("I love pasta", "Noted! Pasta fan."),
+                ("Bob can't eat peanuts", "Good to know about the allergy."),
+            ]
+        )
 
         result = await consolidate_chunk(messages, "alice", provider)
 
@@ -111,10 +114,12 @@ class TestConsolidateChunk:
     @pytest.mark.asyncio
     async def test_empty_messages_list(self) -> None:
         """Empty message list still calls the provider."""
-        response_json = json.dumps({
-            "memory_entries": [],
-            "summary": "No conversation to summarize.",
-        })
+        response_json = json.dumps(
+            {
+                "memory_entries": [],
+                "summary": "No conversation to summarize.",
+            }
+        )
         provider = _mock_provider(response_json)
 
         result = await consolidate_chunk([], "alice", provider)

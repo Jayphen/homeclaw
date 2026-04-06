@@ -41,8 +41,7 @@ def _verify_checksum(data: bytes, expected: str) -> None:
     actual_hex = hashlib.sha256(data).hexdigest()
     if actual_hex != expected_hex:
         raise InstallError(
-            f"Checksum mismatch: expected {expected_hex[:16]}…, "
-            f"got {actual_hex[:16]}…"
+            f"Checksum mismatch: expected {expected_hex[:16]}…, got {actual_hex[:16]}…"
         )
 
 
@@ -117,10 +116,7 @@ async def _install_python(
     dest = plugins_dir / plugin.name
 
     if dest.exists():
-        raise InstallError(
-            f"Plugin '{plugin.name}' already installed at {dest}. "
-            "Uninstall first."
-        )
+        raise InstallError(f"Plugin '{plugin.name}' already installed at {dest}. Uninstall first.")
 
     # Extract to a temp dir, then move into place
     with tempfile.TemporaryDirectory() as tmp:
@@ -134,9 +130,7 @@ async def _install_python(
                 for member in tf.getmembers():
                     resolved = (tmp_path / member.name).resolve()
                     if not resolved.is_relative_to(tmp_path):
-                        raise InstallError(
-                            f"Tarball contains unsafe path: {member.name}"
-                        )
+                        raise InstallError(f"Tarball contains unsafe path: {member.name}")
                 tf.extractall(tmp_path, filter="data")
         except tarfile.TarError as e:
             raise InstallError(f"Failed to extract tarball: {e}") from e
@@ -149,9 +143,7 @@ async def _install_python(
             if len(children) == 1:
                 extracted = children[0]
             else:
-                raise InstallError(
-                    "Tarball must contain a single directory with plugin.py"
-                )
+                raise InstallError("Tarball must contain a single directory with plugin.py")
 
         if not (extracted / "plugin.py").is_file():
             raise InstallError("Tarball missing plugin.py")
@@ -204,8 +196,7 @@ async def _install_skill(
     skills_dir = workspaces / "household" / "skills" / plugin.name
     if skills_dir.exists():
         raise InstallError(
-            f"Skill '{plugin.name}' already installed at {skills_dir}. "
-            "Uninstall first."
+            f"Skill '{plugin.name}' already installed at {skills_dir}. Uninstall first."
         )
 
     skills_dir.mkdir(parents=True, exist_ok=True)
@@ -237,9 +228,7 @@ async def _install_mcp(
 
     compose_path = mcp_dir / f"{plugin.name}.yml"
     if compose_path.exists():
-        raise InstallError(
-            f"MCP plugin '{plugin.name}' already installed. Uninstall first."
-        )
+        raise InstallError(f"MCP plugin '{plugin.name}' already installed. Uninstall first.")
 
     # download_url is the Docker image reference for MCP plugins
     image = plugin.download_url
@@ -258,7 +247,8 @@ async def _install_mcp(
 
     logger.info(
         "Installed MCP sidecar config for '%s' (image: %s)",
-        plugin.name, image,
+        plugin.name,
+        image,
     )
 
     # Return a synthetic entry — MCP plugins aren't registered in the

@@ -95,7 +95,7 @@ async def test_skill_remove_archives_household_skill(
 async def test_skill_remove_archives_private_skill(
     registry: ToolRegistry, workspaces: Path
 ) -> None:
-    skill_dir = make_skill(workspaces, "alice", "my_secret")
+    make_skill(workspaces, "alice", "my_secret")
 
     result = await registry.get_handler("skill_remove")(  # type: ignore[misc]
         person="alice", name="my_secret", owner="alice"

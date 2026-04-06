@@ -11,7 +11,6 @@ from homeclaw.plugins.registry import PluginRegistry, PluginType
 from homeclaw.plugins.skills.loader import load_skill
 from homeclaw.plugins.skills.verification import verify_skill
 
-
 WEATHER_SKILL_MD = """\
 ---
 name: weather

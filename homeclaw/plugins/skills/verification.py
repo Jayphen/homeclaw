@@ -110,20 +110,24 @@ def verify_skill(
     skill_name = definition.name
     expected_dir_name = skill_dir.name
     if skill_name == expected_dir_name:
-        checks.append(SkillVerificationCheck(
-            name="skill_name_matches_directory",
-            status="passed",
-            detail=f"Skill name '{skill_name}' matches directory",
-        ))
+        checks.append(
+            SkillVerificationCheck(
+                name="skill_name_matches_directory",
+                status="passed",
+                detail=f"Skill name '{skill_name}' matches directory",
+            )
+        )
     else:
-        checks.append(SkillVerificationCheck(
-            name="skill_name_matches_directory",
-            status="failed",
-            detail=(
-                f"Frontmatter name '{skill_name}' does not match directory "
-                f"'{expected_dir_name}'"
-            ),
-        ))
+        checks.append(
+            SkillVerificationCheck(
+                name="skill_name_matches_directory",
+                status="failed",
+                detail=(
+                    f"Frontmatter name '{skill_name}' does not match directory "
+                    f"'{expected_dir_name}'"
+                ),
+            )
+        )
 
     try:
         plugin = load_skill(
@@ -131,11 +135,13 @@ def verify_skill(
             scope,
             allow_local_network=allow_local_network,
         )
-        checks.append(SkillVerificationCheck(
-            name="load_skill",
-            status="passed",
-            detail="Skill loaded successfully",
-        ))
+        checks.append(
+            SkillVerificationCheck(
+                name="load_skill",
+                status="passed",
+                detail="Skill loaded successfully",
+            )
+        )
     except Exception as exc:
         return SkillVerificationReport(
             skill_name=skill_name,
@@ -160,60 +166,74 @@ def verify_skill(
         )
 
     expected_tools = [f"{plugin.name}__{tool.name}" for tool in plugin.tools()]
-    checks.append(SkillVerificationCheck(
-        name="expected_tool_set",
-        status="passed",
-        detail=f"Skill declares {len(expected_tools)} tool(s)",
-    ))
+    checks.append(
+        SkillVerificationCheck(
+            name="expected_tool_set",
+            status="passed",
+            detail=f"Skill declares {len(expected_tools)} tool(s)",
+        )
+    )
 
     deps = check_skill_deps(definition.metadata, skill_env=_load_skill_env(skill_dir))
     dependency_warnings = _dependency_messages(deps)
     if dependency_warnings:
-        checks.append(SkillVerificationCheck(
-            name="dependencies",
-            status="warning",
-            detail="; ".join(dependency_warnings),
-        ))
+        checks.append(
+            SkillVerificationCheck(
+                name="dependencies",
+                status="warning",
+                detail="; ".join(dependency_warnings),
+            )
+        )
     else:
-        checks.append(SkillVerificationCheck(
-            name="dependencies",
-            status="passed",
-            detail="All declared dependencies are available",
-        ))
+        checks.append(
+            SkillVerificationCheck(
+                name="dependencies",
+                status="passed",
+                detail="All declared dependencies are available",
+            )
+        )
 
     if expect_registered and plugin_registry is not None:
         entry = plugin_registry.get_entry(plugin.name)
         available_tools = list(entry.tool_names) if entry is not None else []
         missing_tools = [tool for tool in expected_tools if tool not in available_tools]
         if missing_tools:
-            checks.append(SkillVerificationCheck(
-                name="registered_tool_set",
-                status="failed",
-                detail=f"Missing registered tools: {', '.join(missing_tools)}",
-            ))
+            checks.append(
+                SkillVerificationCheck(
+                    name="registered_tool_set",
+                    status="failed",
+                    detail=f"Missing registered tools: {', '.join(missing_tools)}",
+                )
+            )
         else:
-            checks.append(SkillVerificationCheck(
-                name="registered_tool_set",
-                status="passed",
-                detail=f"Registered {len(available_tools)} expected tool(s)",
-            ))
+            checks.append(
+                SkillVerificationCheck(
+                    name="registered_tool_set",
+                    status="passed",
+                    detail=f"Registered {len(available_tools)} expected tool(s)",
+                )
+            )
 
     scenario_check = _run_storage_roundtrip(plugin)
     checks.append(scenario_check)
 
     unexpected_root_files = _unexpected_root_files(skill_dir)
     if unexpected_root_files:
-        checks.append(SkillVerificationCheck(
-            name="skill_root_layout",
-            status="warning",
-            detail=f"Unexpected root files: {', '.join(unexpected_root_files)}",
-        ))
+        checks.append(
+            SkillVerificationCheck(
+                name="skill_root_layout",
+                status="warning",
+                detail=f"Unexpected root files: {', '.join(unexpected_root_files)}",
+            )
+        )
     else:
-        checks.append(SkillVerificationCheck(
-            name="skill_root_layout",
-            status="passed",
-            detail="Skill root layout matches expected conventions",
-        ))
+        checks.append(
+            SkillVerificationCheck(
+                name="skill_root_layout",
+                status="passed",
+                detail="Skill root layout matches expected conventions",
+            )
+        )
 
     status = _report_status(checks)
     return SkillVerificationReport(

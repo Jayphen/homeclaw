@@ -1,6 +1,6 @@
 """Tests for Pydantic data models."""
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from homeclaw.contacts.models import Contact, ContactReminder, Interaction
 
@@ -21,15 +21,13 @@ def test_contact_full():
         birthday=date(1990, 5, 15),
         interactions=[
             Interaction(
-                date=datetime(2026, 3, 1, tzinfo=timezone.utc),
+                date=datetime(2026, 3, 1, tzinfo=UTC),
                 type="call",
                 notes="Caught up about work",
             )
         ],
-        reminders=[
-            ContactReminder(interval_days=14, next_date=date(2026, 3, 20), note="Check in")
-        ],
+        reminders=[ContactReminder(interval_days=14, next_date=date(2026, 3, 20), note="Check in")],
     )
     assert c.birthday == date(1990, 5, 15)
     assert len(c.interactions) == 1
-    assert c.last_contact == datetime(2026, 3, 1, tzinfo=timezone.utc)
+    assert c.last_contact == datetime(2026, 3, 1, tzinfo=UTC)

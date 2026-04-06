@@ -44,10 +44,7 @@ async def list_repo_plugins(url: str) -> list[dict[str, str]]:
         return []
 
     user, repo, branch, subpath = info
-    api_url = (
-        f"https://api.github.com/repos/{user}/{repo}"
-        f"/git/trees/{branch}?recursive=1"
-    )
+    api_url = f"https://api.github.com/repos/{user}/{repo}/git/trees/{branch}?recursive=1"
 
     try:
         transport = httpx.AsyncHTTPTransport(retries=2)
@@ -57,9 +54,7 @@ async def list_repo_plugins(url: str) -> list[dict[str, str]]:
                 headers={"Accept": "application/vnd.github.v3+json"},
             )
             if resp.status_code != 200:
-                logger.debug(
-                    "GitHub tree API returned %d for %s", resp.status_code, api_url
-                )
+                logger.debug("GitHub tree API returned %d for %s", resp.status_code, api_url)
                 return []
             tree = resp.json().get("tree", [])
     except Exception:
@@ -95,10 +90,7 @@ async def download_plugin_repo(url: str, plugin_dir: Path) -> list[str]:
         return []
 
     user, repo, branch, subpath = info
-    api_url = (
-        f"https://api.github.com/repos/{user}/{repo}"
-        f"/git/trees/{branch}?recursive=1"
-    )
+    api_url = f"https://api.github.com/repos/{user}/{repo}/git/trees/{branch}?recursive=1"
 
     try:
         transport = httpx.AsyncHTTPTransport(retries=2)
@@ -108,9 +100,7 @@ async def download_plugin_repo(url: str, plugin_dir: Path) -> list[str]:
                 headers={"Accept": "application/vnd.github.v3+json"},
             )
             if resp.status_code != 200:
-                logger.debug(
-                    "GitHub tree API returned %d for %s", resp.status_code, api_url
-                )
+                logger.debug("GitHub tree API returned %d for %s", resp.status_code, api_url)
                 return []
 
             tree = resp.json().get("tree", [])
@@ -130,10 +120,7 @@ async def download_plugin_repo(url: str, plugin_dir: Path) -> list[str]:
                 if not rel or _should_skip(rel):
                     continue
 
-                raw_url = (
-                    f"https://raw.githubusercontent.com/"
-                    f"{user}/{repo}/{branch}/{path}"
-                )
+                raw_url = f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/{path}"
                 try:
                     file_resp = await client.get(raw_url)
                     if file_resp.status_code != 200:

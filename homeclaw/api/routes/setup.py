@@ -29,7 +29,7 @@ from homeclaw.api.deps import (
 from homeclaw.api.deps import (
     get_whatsapp_qr as _get_whatsapp_qr,
 )
-from homeclaw.config import NoteDetailLevel, ProviderMode, ProviderType, _SAVEABLE_FIELDS
+from homeclaw.config import _SAVEABLE_FIELDS, NoteDetailLevel, ProviderMode, ProviderType
 from homeclaw.web import web_providers
 
 logger = logging.getLogger(__name__)
@@ -56,9 +56,7 @@ async def setup_status(request: Request) -> dict[str, Any]:
     config = get_config()
     workspaces = config.workspaces.resolve()
     members = list_member_workspaces(workspaces)
-    members_with_passwords = [
-        m for m in members if m in config.member_passwords
-    ]
+    members_with_passwords = [m for m in members if m in config.member_passwords]
 
     # Minimal info is always available without auth — the UI needs this
     # to decide whether to show the login screen or onboarding flow.
@@ -91,20 +89,22 @@ async def setup_status(request: Request) -> dict[str, Any]:
         base[field_name] = val
 
     # Derived/computed fields that aren't direct config attributes
-    base.update({
-        "members": members,
-        "members_with_passwords": members_with_passwords,
-        "admin_members": config.admin_members,
-        "telegram_configured": config.telegram_token is not None,
-        "whatsapp_configured": config.whatsapp_enabled,
-        "whatsapp_connected": _get_whatsapp_connected(),
-        "ha_configured": config.ha_url is not None,
-        "conversation_model": config.routing.conversation_model,
-        "fast_model": config.routing.fast_model,
-        "vision_model": config.routing.vision_model,
-        "available_search_providers": web_providers.search_providers(),
-        "available_read_providers": web_providers.read_providers(),
-    })
+    base.update(
+        {
+            "members": members,
+            "members_with_passwords": members_with_passwords,
+            "admin_members": config.admin_members,
+            "telegram_configured": config.telegram_token is not None,
+            "whatsapp_configured": config.whatsapp_enabled,
+            "whatsapp_connected": _get_whatsapp_connected(),
+            "ha_configured": config.ha_url is not None,
+            "conversation_model": config.routing.conversation_model,
+            "fast_model": config.routing.fast_model,
+            "vision_model": config.routing.vision_model,
+            "available_search_providers": web_providers.search_providers(),
+            "available_read_providers": web_providers.read_providers(),
+        }
+    )
     return base
 
 
@@ -254,11 +254,21 @@ async def setup(request: Request, body: SetupBody) -> dict[str, Any]:
 
     # Hot-reload LLM providers if any provider-related field changed.
     _provider_fields = {
-        "provider", "anthropic_api_key", "anthropic_base_url",
-        "openai_api_key", "openai_base_url",
-        "fast_provider", "fast_api_key", "fast_base_url",
-        "vision_provider", "vision_api_key", "vision_base_url",
-        "model", "conversation_model", "fast_model", "vision_model",
+        "provider",
+        "anthropic_api_key",
+        "anthropic_base_url",
+        "openai_api_key",
+        "openai_base_url",
+        "fast_provider",
+        "fast_api_key",
+        "fast_base_url",
+        "vision_provider",
+        "vision_api_key",
+        "vision_base_url",
+        "model",
+        "conversation_model",
+        "fast_model",
+        "vision_model",
     }
     if any(getattr(body, f, None) is not None for f in _provider_fields):
         loop = get_agent_loop()
@@ -296,7 +306,8 @@ class MemberPasswordBody(BaseModel):
 
 @router.post("/members/password")
 async def set_member_password(
-    request: Request, body: MemberPasswordBody,
+    request: Request,
+    body: MemberPasswordBody,
 ) -> dict[str, Any]:
     """Set or update a member's web UI password.
 
@@ -317,8 +328,7 @@ async def set_member_password(
     if body.member not in members:
         raise HTTPException(
             status_code=404,
-            detail=f"Unknown member '{body.member}'. "
-            f"Available: {', '.join(members)}",
+            detail=f"Unknown member '{body.member}'. Available: {', '.join(members)}",
         )
 
     if not body.password.strip():
@@ -356,7 +366,8 @@ class MemberAdminBody(BaseModel):
 
 @router.post("/members/admin", dependencies=[AdminDep])
 async def set_member_admin(
-    request: Request, body: MemberAdminBody,
+    request: Request,
+    body: MemberAdminBody,
 ) -> dict[str, Any]:
     """Grant or revoke admin privileges for a member. Admin only."""
     config = get_config()
@@ -367,8 +378,7 @@ async def set_member_admin(
     if body.member not in members:
         raise HTTPException(
             status_code=404,
-            detail=f"Unknown member '{body.member}'. "
-            f"Available: {', '.join(members)}",
+            detail=f"Unknown member '{body.member}'. Available: {', '.join(members)}",
         )
 
     if body.is_admin and body.member not in config.admin_members:

@@ -19,6 +19,7 @@ class ToolCall(BaseModel):
 
 class ReasoningBlock(BaseModel):
     """A single reasoning/thinking block from the LLM."""
+
     type: str = "thinking"  # "thinking" for Anthropic, "reasoning" for OpenAI/OpenRouter
     content: str = ""
     signature: str | None = None  # Anthropic requires this for round-tripping thinking blocks

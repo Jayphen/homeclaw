@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
+import openai
 import pytest
 
 from homeclaw.config import HomeclawConfig
@@ -21,11 +22,14 @@ def test_config_requires_provider():
     from homeclaw.agent.providers.factory import create_provider
 
     with patch.dict(os.environ, {}, clear=True):
-        env = {k: v for k, v in os.environ.items()
-               if k not in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENAI_BASE_URL")}
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if k not in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENAI_BASE_URL")
+        }
         with patch.dict(os.environ, env, clear=True):
             config = HomeclawConfig(workspaces_path="./test-workspaces")
-            with pytest.raises(Exception):
+            with pytest.raises((ValueError, openai.OpenAIError)):
                 create_provider(config)
 
 

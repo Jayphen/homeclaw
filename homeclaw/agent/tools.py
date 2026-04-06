@@ -1120,7 +1120,8 @@ def register_builtin_tools(
                 "'Every Sunday at 10:00am', 'Every 3 days', 'Every other Tuesday at 9am', "
                 "'Monthly on the 1st at 10am', '1st Monday of the month at 9am', "
                 "'Last Friday of the month at 3pm'. "
-                "For complex schedules, use a 5-field cron expression: 'minute hour day month day_of_week' "
+                "For complex schedules, use a 5-field cron expression: "
+                "'minute hour day month day_of_week' "
                 "(e.g. '30 7 * * 1-5' for weekdays at 7:30am, '0 9 1 * *' for 1st of month at 9am)."
             ),
         ],
@@ -1388,7 +1389,9 @@ def register_builtin_tools(
             },
             "source_bookmarks": {
                 "type": "object",
-                "description": "Export saved bookmarks into the skill's data directory as bookmarks.md",
+                "description": (
+                    "Export saved bookmarks into the skill's data directory as bookmarks.md"
+                ),
                 "properties": {
                     "category": {"type": "string", "description": "Filter by category"},
                     "ids": {
@@ -1456,10 +1459,7 @@ def register_builtin_tools(
 
         # Check if approval is required
         pending = _needs_approval(person)
-        if pending:
-            skill_dir = _pending_dir() / slug
-        else:
-            skill_dir = workspaces / owner / "skills" / slug
+        skill_dir = _pending_dir() / slug if pending else workspaces / owner / "skills" / slug
 
         # Check for conflicts in both live and pending
         live_dir = workspaces / owner / "skills" / slug
@@ -1642,7 +1642,10 @@ def register_builtin_tools(
             "owner": owner,
             "archive_path": str(archive_dir),
             "unregistered": unregistered,
-            "note": "Skill data is preserved in the archive. Permanent deletion is only available via the web UI.",
+            "note": (
+                "Skill data is preserved in the archive. "
+                "Permanent deletion is only available via the web UI."
+            ),
         }
 
     @_reg(
@@ -1977,10 +1980,7 @@ def register_builtin_tools(
 
         pending = _needs_approval(person)
         owner = "household" if scope == "household" else person
-        if pending:
-            skill_dir = _pending_dir() / slug
-        else:
-            skill_dir = workspaces / owner / "skills" / slug
+        skill_dir = _pending_dir() / slug if pending else workspaces / owner / "skills" / slug
 
         live_dir = workspaces / owner / "skills" / slug
         if live_dir.exists():
@@ -2184,7 +2184,8 @@ def register_builtin_tools(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{title}</title>
   <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 1rem; }}
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0; padding: 1rem; }}
     .status {{ color: #666; font-size: 0.9rem; }}
   </style>
 </head>
@@ -2275,7 +2276,10 @@ def register_builtin_tools(
         # Write/edit mode — built-in skills are read-only
         if loc.scope == "builtin":
             return {
-                "error": f"Cannot edit built-in skill '{name}'. Install a copy to household or personal skills first."
+                "error": (
+                    f"Cannot edit built-in skill '{name}'. "
+                    "Install a copy to household or personal skills first."
+                )
             }
 
         # Find/replace mode
@@ -2332,7 +2336,8 @@ def register_builtin_tools(
         description=(
             "Deterministically enable an embedded web UI for an existing skill. "
             "This updates SKILL.md with a top-level ui-app declaration and creates or "
-            "overwrites assets/index.html with the provided content (or a default Arrow.js scaffold). "
+            "overwrites assets/index.html with the provided content "
+            "(or a default Arrow.js scaffold). "
             "Use this instead of data_write for SKILL.md or assets files."
         ),
         policy=ToolPolicy(access="write", scope="personal"),
@@ -2344,7 +2349,8 @@ def register_builtin_tools(
         owner: Annotated[
             str | None,
             Desc(
-                "Who owns the skill: 'household' or a person's name. Required if the name is ambiguous."
+                "Who owns the skill: 'household' or a person's name. "
+                "Required if the name is ambiguous."
             ),
         ] = None,
         title: Annotated[str | None, Desc("Display title for the embedded UI panel")] = None,
@@ -2626,7 +2632,8 @@ def register_builtin_tools(
         scope: Annotated[
             DecisionScope,
             Desc(
-                "Whether this applies to the whole household or just this person (default: household)"
+                "Whether this applies to the whole household or just this person "
+                "(default: household)"
             ),
         ] = "household",
         **_: Any,

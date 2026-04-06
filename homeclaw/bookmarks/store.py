@@ -140,8 +140,12 @@ async def update_bookmark_safe(
     """Update a bookmark with async locking."""
     async with _write_lock:
         return update_bookmark(
-            workspaces, bookmark_id,
-            url=url, title=title, category=category, tags=tags,
+            workspaces,
+            bookmark_id,
+            url=url,
+            title=title,
+            category=category,
+            tags=tags,
         )
 
 
