@@ -28,4 +28,28 @@ if [ -f "$PACKAGES_FILE" ]; then
     fi
 fi
 
+# Install extra npm packages from workspaces/household/npm-packages.txt
+NPM_PACKAGES_FILE="/data/workspaces/household/npm-packages.txt"
+if [ -f "$NPM_PACKAGES_FILE" ] && command -v npm >/dev/null 2>&1; then
+    MISSING_NPM=""
+    while IFS= read -r pkg || [ -n "$pkg" ]; do
+        case "$pkg" in ""|\#*) continue ;; esac
+        # Extract package name without version for the which-check
+        bin="${pkg%%@*}"
+        bin="${bin##*/}"
+        if ! command -v "$bin" >/dev/null 2>&1; then
+            MISSING_NPM="$MISSING_NPM $pkg"
+        fi
+    done < "$NPM_PACKAGES_FILE"
+
+    if [ -n "$MISSING_NPM" ]; then
+        echo "[homeclaw] Installing npm packages:$MISSING_NPM ..."
+        # shellcheck disable=SC2086
+        npm install -g --prefer-offline $MISSING_NPM
+        echo "[homeclaw] npm packages installed."
+    else
+        echo "[homeclaw] npm packages already installed, skipping."
+    fi
+fi
+
 exec homeclaw serve --workspaces /data/workspaces --port 8080 "$@"
