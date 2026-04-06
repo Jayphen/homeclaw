@@ -1,7 +1,7 @@
 .PHONY: typecheck lint test test-integration test-record dev dev-bob dev-context dev-setup dev-serve dev-ui ui ui-build dev-costs docker-build docker-push
 
 typecheck:
-	pyright
+	uv run pyright
 
 lint:
 	uv run ruff check homeclaw tests
