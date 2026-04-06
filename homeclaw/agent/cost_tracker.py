@@ -78,11 +78,7 @@ class CostTracker:
             return
         cutoff = (datetime.now(UTC) - timedelta(days=_RETENTION_DAYS)).isoformat()
         lines = self._log_path.read_text().strip().splitlines()
-        kept = [
-            line
-            for line in lines
-            if line and json.loads(line).get("ts", "") >= cutoff
-        ]
+        kept = [line for line in lines if line and json.loads(line).get("ts", "") >= cutoff]
         self._log_path.write_text("\n".join(kept) + "\n" if kept else "")
 
     def log(
@@ -95,9 +91,7 @@ class CostTracker:
         cached_tokens: int = 0,
     ) -> CostEntry:
         """Log a single LLM call and return the entry."""
-        cost = estimate_cost(
-            model, input_tokens, output_tokens, cached_tokens, self._prices
-        )
+        cost = estimate_cost(model, input_tokens, output_tokens, cached_tokens, self._prices)
         entry = CostEntry(
             ts=datetime.now(UTC).isoformat(),
             call_type=call_type,
@@ -112,7 +106,11 @@ class CostTracker:
             f.write(entry.model_dump_json() + "\n")
         logger.debug(
             "Cost: %s %s %d in/%d out → $%.6f",
-            call_type, model, input_tokens, output_tokens, cost,
+            call_type,
+            model,
+            input_tokens,
+            output_tokens,
+            cost,
         )
         return entry
 
@@ -120,9 +118,7 @@ class CostTracker:
         """Read log entries from the last N days."""
         if not self._log_path.exists():
             return []
-        cutoff = (
-            datetime.now(UTC) - timedelta(days=days)
-        ).isoformat()
+        cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
         entries: list[CostEntry] = []
         for line in self._log_path.read_text().strip().splitlines():
             if not line:

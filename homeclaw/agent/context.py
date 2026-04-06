@@ -198,7 +198,8 @@ def _build_household_profile(workspaces: Path) -> list[str]:
             continue
         # Take the first _PROFILE_MAX_LINES non-empty lines (skip the # heading)
         topic_lines = [
-            ln.strip() for ln in content.splitlines()
+            ln.strip()
+            for ln in content.splitlines()
             if ln.strip() and not ln.strip().startswith("#")
         ][:_PROFILE_MAX_LINES]
         if topic_lines:
@@ -208,7 +209,9 @@ def _build_household_profile(workspaces: Path) -> list[str]:
 
 
 def _build_recent_notes(
-    workspaces: Path, person: str, cfg: ContextConfig,
+    workspaces: Path,
+    person: str,
+    cfg: ContextConfig,
 ) -> list[str]:
     """Collect the last N days of daily notes for a person."""
     notes_dir = workspaces / person / "notes"
@@ -221,9 +224,9 @@ def _build_recent_notes(
         path = notes_dir / f"{date}.md"
         if not path.exists():
             continue
-        content_lines = [
-            ln.strip() for ln in path.read_text().splitlines() if ln.strip()
-        ][:cfg.max_note_lines]
+        content_lines = [ln.strip() for ln in path.read_text().splitlines() if ln.strip()][
+            : cfg.max_note_lines
+        ]
         if content_lines:
             lines.append(f"  [{date}]")
             lines.extend(f"    {ln}" for ln in content_lines)
@@ -239,7 +242,10 @@ def _build_person_memory_summary(workspaces: Path, person: str) -> list[str]:
 
 
 def _build_skill_catalog(
-    workspaces: Path, person: str, *, is_admin: bool = True,
+    workspaces: Path,
+    person: str,
+    *,
+    is_admin: bool = True,
 ) -> list[str]:
     """Build a catalog of available skills for system prompt injection.
 
@@ -253,7 +259,8 @@ def _build_skill_catalog(
         return []
 
     lines: list[str] = [
-        "Available skills (instructions auto-load on first tool use; call read_skill to browse resources):",
+        "Available skills (instructions auto-load on first tool use; "
+        "call read_skill to browse resources):",
     ]
     for entry in catalog:
         scope_tag = f" [{entry.scope}]" if entry.scope != "household" else ""
@@ -280,7 +287,10 @@ def _build_routines_summary(workspaces: Path) -> list[str]:
 
 
 def _build_decisions_summary(
-    workspaces: Path, person: str, cfg: ContextConfig, shared_only: bool,
+    workspaces: Path,
+    person: str,
+    cfg: ContextConfig,
+    shared_only: bool,
 ) -> list[str]:
     """Collect recent decisions — household always, personal in DMs only."""
     lines: list[str] = []
@@ -289,20 +299,20 @@ def _build_decisions_summary(
     hh_path = workspaces / HOUSEHOLD_WORKSPACE / "decisions.md"
     if hh_path.exists():
         entries = [
-            ln.strip() for ln in hh_path.read_text().splitlines()
-            if ln.strip().startswith("- [")
+            ln.strip() for ln in hh_path.read_text().splitlines() if ln.strip().startswith("- [")
         ]
-        lines.extend(f"  {ln}" for ln in entries[-cfg.max_decisions:])
+        lines.extend(f"  {ln}" for ln in entries[-cfg.max_decisions :])
 
     # Personal decisions (only in DMs)
     if not shared_only:
         personal_path = workspaces / person / "decisions.md"
         if personal_path.exists():
             entries = [
-                ln.strip() for ln in personal_path.read_text().splitlines()
+                ln.strip()
+                for ln in personal_path.read_text().splitlines()
                 if ln.strip().startswith("- [")
             ]
-            lines.extend(f"  {ln}" for ln in entries[-cfg.max_decisions:])
+            lines.extend(f"  {ln}" for ln in entries[-cfg.max_decisions :])
 
     return lines
 

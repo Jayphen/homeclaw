@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-
 from pydantic import BaseModel
 
 from homeclaw.api.deps import AdminDep, AuthDep, get_config, get_plugin_registry
@@ -62,8 +61,7 @@ async def list_plugins(
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid plugin_type: {plugin_type}. "
-                f"Must be one of: {_VALID_TYPES}",
+                detail=f"Invalid plugin_type: {plugin_type}. Must be one of: {_VALID_TYPES}",
             ) from e
         entries = [e for e in entries if e.plugin_type == pt]
 
@@ -73,8 +71,7 @@ async def list_plugins(
         except ValueError as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid status: {status}. "
-                f"Must be one of: {_VALID_STATUSES}",
+                detail=f"Invalid status: {status}. Must be one of: {_VALID_STATUSES}",
             ) from e
         entries = [e for e in entries if e.status == ps]
 
@@ -108,7 +105,8 @@ async def browse_marketplace(
             ) from e
 
     plugins = await client.list_available(
-        plugin_type=type_filter, force_refresh=refresh,
+        plugin_type=type_filter,
+        force_refresh=refresh,
     )
     return {
         "plugins": [p.model_dump() for p in plugins],
@@ -132,9 +130,7 @@ async def install_marketplace_plugin(
         workspaces=config.workspaces.resolve(),
     )
     if not client.is_configured:
-        raise HTTPException(
-            status_code=400, detail="Marketplace URL not configured"
-        )
+        raise HTTPException(status_code=400, detail="Marketplace URL not configured")
 
     plugin = await client.get_plugin(name)
     if plugin is None:
@@ -228,7 +224,11 @@ async def install_plugin_from_url(body: PluginInstallRequest) -> dict[str, Any]:
         # Single plugin — derive name from subpath or repo name
         name = subpath.rsplit("/", 1)[-1] if subpath else repo
         result = await _install_single_plugin(
-            original_url, name, plugins_dir, registry, enable=body.enable,
+            original_url,
+            name,
+            plugins_dir,
+            registry,
+            enable=body.enable,
         )
         if "error" in result:
             raise HTTPException(status_code=400, detail=result["error"])
@@ -258,7 +258,11 @@ async def install_plugin_from_url(body: PluginInstallRequest) -> dict[str, Any]:
         sub_url = skill_subpath_url(original_url, plugin_info["path"])
         name = plugin_info["path"].rsplit("/", 1)[-1]
         result = await _install_single_plugin(
-            sub_url, name, plugins_dir, registry, enable=body.enable,
+            sub_url,
+            name,
+            plugins_dir,
+            registry,
+            enable=body.enable,
         )
         results.append(result)
 
@@ -300,7 +304,7 @@ async def _install_single_plugin(
 
         # Hot-load
         plugin = load_plugin(plugins_dir, name)
-        entry = registry.register(plugin, PluginType.PYTHON)
+        registry.register(plugin, PluginType.PYTHON)
         if enable:
             enable_plugin(plugins_dir, registry, name)
 

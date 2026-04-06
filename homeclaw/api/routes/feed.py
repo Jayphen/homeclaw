@@ -37,7 +37,9 @@ EventType = Literal[
 
 
 def _memory_events(
-    workspaces: Path, members: list[str], since: datetime,
+    workspaces: Path,
+    members: list[str],
+    since: datetime,
 ) -> list[dict[str, Any]]:
     """Scan memory files for entries added since the cutoff.
 
@@ -71,19 +73,22 @@ def _memory_events(
                 if ts < since:
                     continue
                 content = line[bracket_end + 1 :].strip()
-                events.append({
-                    "ts": ts.isoformat(),
-                    "type": "memory_save",
-                    "summary": f"Learned about {topic}",
-                    "detail": content[:200],
-                    "person": person,
-                    "meta": {"topic": topic},
-                })
+                events.append(
+                    {
+                        "ts": ts.isoformat(),
+                        "type": "memory_save",
+                        "summary": f"Learned about {topic}",
+                        "detail": content[:200],
+                        "person": person,
+                        "meta": {"topic": topic},
+                    }
+                )
     return events
 
 
 def _routine_events(
-    workspaces: Path, since: datetime,
+    workspaces: Path,
+    since: datetime,
 ) -> list[dict[str, Any]]:
     """Read routine last-run timestamps to find recent executions."""
     last_run_path = workspaces / "household" / ".routine_last_run.json"
@@ -104,19 +109,22 @@ def _routine_events(
             continue
         # Clean up job_id for display: "routine:morning-check" -> "Morning check"
         name = job_id.split(":", 1)[-1].replace("-", " ").replace("_", " ").capitalize()
-        events.append({
-            "ts": ts.isoformat(),
-            "type": "routine_run",
-            "summary": f"Ran routine: {name}",
-            "detail": None,
-            "person": None,
-            "meta": {"job_id": job_id},
-        })
+        events.append(
+            {
+                "ts": ts.isoformat(),
+                "type": "routine_run",
+                "summary": f"Ran routine: {name}",
+                "detail": None,
+                "person": None,
+                "meta": {"job_id": job_id},
+            }
+        )
     return events
 
 
 def _interaction_events(
-    workspaces: Path, since: datetime,
+    workspaces: Path,
+    since: datetime,
 ) -> list[dict[str, Any]]:
     """Pull recent contact interactions."""
     contacts = list_contacts(workspaces)
@@ -125,19 +133,23 @@ def _interaction_events(
         for ix in c.interactions:
             if ix.date < since:
                 continue
-            events.append({
-                "ts": ix.date.isoformat(),
-                "type": "interaction",
-                "summary": f"{ix.type.capitalize()} with {c.name}",
-                "detail": ix.notes[:200] if ix.notes else None,
-                "person": None,
-                "meta": {"contact": c.name, "interaction_type": ix.type},
-            })
+            events.append(
+                {
+                    "ts": ix.date.isoformat(),
+                    "type": "interaction",
+                    "summary": f"{ix.type.capitalize()} with {c.name}",
+                    "detail": ix.notes[:200] if ix.notes else None,
+                    "person": None,
+                    "meta": {"contact": c.name, "interaction_type": ix.type},
+                }
+            )
     return events
 
 
 def _note_events(
-    workspaces: Path, members: list[str], since: datetime,
+    workspaces: Path,
+    members: list[str],
+    since: datetime,
 ) -> list[dict[str, Any]]:
     """Find notes updated since the cutoff."""
     events: list[dict[str, Any]] = []
@@ -159,19 +171,22 @@ def _note_events(
                 if line and not line.startswith("#"):
                     preview = line[:120]
                     break
-            events.append({
-                "ts": mtime.isoformat(),
-                "type": "note_update",
-                "summary": f"{person}'s note for {f.stem}",
-                "detail": preview or None,
-                "person": person,
-                "meta": {"date": f.stem},
-            })
+            events.append(
+                {
+                    "ts": mtime.isoformat(),
+                    "type": "note_update",
+                    "summary": f"{person}'s note for {f.stem}",
+                    "detail": preview or None,
+                    "person": person,
+                    "meta": {"date": f.stem},
+                }
+            )
     return events
 
 
 def _tool_use_events(
-    workspaces: Path, since: datetime,
+    workspaces: Path,
+    since: datetime,
 ) -> list[dict[str, Any]]:
     """Read tool use events from the JSONL log."""
     log_path = workspaces / "household" / "logs" / "tool_use.jsonl"
@@ -194,14 +209,16 @@ def _tool_use_events(
                 continue
             if ts < since:
                 continue
-            events.append({
-                "ts": ts.isoformat(),
-                "type": "tool_use",
-                "summary": entry.get("summary", f"Used {entry.get('tool', '?')}"),
-                "detail": None,
-                "person": entry.get("person"),
-                "meta": {"tool": entry.get("tool", "")},
-            })
+            events.append(
+                {
+                    "ts": ts.isoformat(),
+                    "type": "tool_use",
+                    "summary": entry.get("summary", f"Used {entry.get('tool', '?')}"),
+                    "detail": None,
+                    "person": entry.get("person"),
+                    "meta": {"tool": entry.get("tool", "")},
+                }
+            )
     except OSError:
         pass
     return events

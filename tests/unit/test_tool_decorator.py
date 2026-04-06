@@ -2,7 +2,7 @@
 
 from typing import Annotated, Any, Literal
 
-from homeclaw.agent.tool_decorator import Desc, Enum, ToolRegistration, tool
+from homeclaw.agent.tool_decorator import Desc, Enum, tool
 
 
 class TestBasicTypeMapping:
@@ -11,13 +11,14 @@ class TestBasicTypeMapping:
         async def fn(*, name: str, **_: Any) -> dict[str, Any]:
             return {}
 
-        defn = fn  # type: ignore[assignment]
         # The decorator returns the original function, but we use the
         # ToolRegistration to build the definition.
         # Actually, we need the ToolRegistration object.
         reg = tool(name="t", description="d")
+
         async def fn2(*, name: str, **_: Any) -> dict[str, Any]:
             return {}
+
         reg(fn2)
         d = reg.definition()
         assert d.parameters["properties"]["name"] == {"type": "string"}
@@ -25,24 +26,30 @@ class TestBasicTypeMapping:
 
     def test_int_param(self) -> None:
         reg = tool(name="t", description="d")
+
         async def fn(*, count: int, **_: Any) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         assert d.parameters["properties"]["count"] == {"type": "integer"}
 
     def test_bool_param(self) -> None:
         reg = tool(name="t", description="d")
+
         async def fn(*, flag: bool, **_: Any) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         assert d.parameters["properties"]["flag"] == {"type": "boolean"}
 
     def test_list_str_param(self) -> None:
         reg = tool(name="t", description="d")
+
         async def fn(*, tags: list[str], **_: Any) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         assert d.parameters["properties"]["tags"] == {
@@ -54,8 +61,10 @@ class TestBasicTypeMapping:
 class TestOptionalParams:
     def test_optional_via_union_none(self) -> None:
         reg = tool(name="t", description="d")
+
         async def fn(*, name: str, topic: str | None = None, **_: Any) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         assert d.parameters["required"] == ["name"]
@@ -63,8 +72,10 @@ class TestOptionalParams:
 
     def test_optional_list_via_pep604_union_keeps_array_schema(self) -> None:
         reg = tool(name="t", description="d")
+
         async def fn(*, tags: list[str] | None = None, **_: Any) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         assert d.parameters["properties"]["tags"] == {
@@ -74,8 +85,10 @@ class TestOptionalParams:
 
     def test_optional_via_default(self) -> None:
         reg = tool(name="t", description="d")
+
         async def fn(*, name: str, scope: str = "household", **_: Any) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         assert d.parameters["required"] == ["name"]
@@ -84,8 +97,10 @@ class TestOptionalParams:
 class TestLiteralAndEnum:
     def test_literal_type(self) -> None:
         reg = tool(name="t", description="d")
+
         async def fn(*, scope: Literal["household", "private"], **_: Any) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         prop = d.parameters["properties"]["scope"]
@@ -94,10 +109,12 @@ class TestLiteralAndEnum:
 
     def test_enum_annotation(self) -> None:
         reg = tool(name="t", description="d")
+
         async def fn(
             *, scope: Annotated[str, Enum(["household", "private"])], **_: Any
         ) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         prop = d.parameters["properties"]["scope"]
@@ -107,22 +124,24 @@ class TestLiteralAndEnum:
 class TestDescAnnotation:
     def test_desc_in_schema(self) -> None:
         reg = tool(name="t", description="d")
-        async def fn(
-            *, id: Annotated[str, Desc("Contact ID")], **_: Any
-        ) -> dict[str, Any]:
+
+        async def fn(*, id: Annotated[str, Desc("Contact ID")], **_: Any) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         assert d.parameters["properties"]["id"]["description"] == "Contact ID"
 
     def test_desc_and_enum_combined(self) -> None:
         reg = tool(name="t", description="d")
+
         async def fn(
             *,
             scope: Annotated[str, Desc("Target scope"), Enum(["household", "private"])],
             **_: Any,
         ) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         prop = d.parameters["properties"]["scope"]
@@ -150,14 +169,17 @@ class TestSchemaOverrides:
                 },
             },
         )
+
         async def fn(
             *, name: str, files: list[dict[str, Any]] | None = None, **_: Any
         ) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         assert d.parameters["properties"]["files"]["items"]["required"] == [
-            "filename", "content",
+            "filename",
+            "content",
         ]
         assert d.parameters["required"] == ["name"]
 
@@ -165,8 +187,10 @@ class TestSchemaOverrides:
 class TestNoParams:
     def test_empty_properties(self) -> None:
         reg = tool(name="t", description="d")
+
         async def fn(**_: Any) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         assert d.parameters["properties"] == {}
@@ -179,8 +203,10 @@ class TestRegistration:
 
         registry = ToolRegistry()
         reg = tool(name="my_tool", description="A test tool")
+
         async def fn(*, name: str, **_: Any) -> dict[str, Any]:
             return {"ok": True}
+
         reg(fn)
         reg.register(registry)
 
@@ -191,8 +217,10 @@ class TestRegistration:
 
     def test_definition_metadata(self) -> None:
         reg = tool(name="contact_get", description="Get a contact by ID.")
+
         async def fn(*, id: str, **_: Any) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         assert d.name == "contact_get"
@@ -202,8 +230,10 @@ class TestRegistration:
 class TestKwargsIgnored:
     def test_var_keyword_not_in_schema(self) -> None:
         reg = tool(name="t", description="d")
+
         async def fn(*, name: str, **_: Any) -> dict[str, Any]:
             return {}
+
         reg(fn)
         d = reg.definition()
         assert "_" not in d.parameters["properties"]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -82,7 +82,7 @@ class MarketplaceClient:
         if not force_refresh:
             cached = self._load_cache()
             if cached is not None:
-                age = (datetime.now(timezone.utc) - cached.fetched_at).total_seconds()
+                age = (datetime.now(UTC) - cached.fetched_at).total_seconds()
                 if age < self._cache_ttl:
                     return cached.index
 
@@ -150,7 +150,7 @@ class MarketplaceClient:
     def _save_cache(self, index: MarketplaceIndex) -> None:
         """Write the index to the local cache file."""
         cached = CachedIndex(
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=datetime.now(UTC),
             index=index,
         )
         self._cached = cached

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
 
 import pytest
 
 from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
-from homeclaw.contacts.models import Contact, ContactReminder
+from homeclaw.contacts.models import ContactReminder
 from homeclaw.contacts.store import get_contact, save_contact
 
 
@@ -75,9 +75,7 @@ async def test_contact_get_nonexistent(registry: ToolRegistry) -> None:
 
 
 @pytest.mark.asyncio
-async def test_contact_update_creates_new(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
+async def test_contact_update_creates_new(registry: ToolRegistry, dev_workspaces: Path) -> None:
     handler = registry.get_handler("contact_update")
     assert handler is not None
     result = await handler(id="new-person", name="New Person", relationship="friend")
@@ -91,9 +89,7 @@ async def test_contact_update_creates_new(
 
 
 @pytest.mark.asyncio
-async def test_contact_note_creates_markdown(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
+async def test_contact_note_creates_markdown(registry: ToolRegistry, dev_workspaces: Path) -> None:
     handler = registry.get_handler("contact_note")
     assert handler is not None
     result = await handler(contact_id="james-ko", content="Loves hiking")
@@ -107,9 +103,7 @@ async def test_contact_note_creates_markdown(
 
 
 @pytest.mark.asyncio
-async def test_contact_note_appends(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
+async def test_contact_note_appends(registry: ToolRegistry, dev_workspaces: Path) -> None:
     handler = registry.get_handler("contact_note")
     assert handler is not None
     await handler(contact_id="james-ko", content="First note")
@@ -130,9 +124,7 @@ async def test_contact_note_nonexistent(registry: ToolRegistry) -> None:
 
 
 @pytest.mark.asyncio
-async def test_contact_update_sets_nicknames(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
+async def test_contact_update_sets_nicknames(registry: ToolRegistry, dev_workspaces: Path) -> None:
     handler = registry.get_handler("contact_update")
     assert handler is not None
     result = await handler(id="sarah-chen", nicknames=["Sar", "SC"])
@@ -151,9 +143,7 @@ async def test_interaction_log_adds_interaction(
 ) -> None:
     handler = registry.get_handler("interaction_log")
     assert handler is not None
-    result = await handler(
-        contact_id="james-ko", type="call", notes="Discussed the sprint"
-    )
+    result = await handler(contact_id="james-ko", type="call", notes="Discussed the sprint")
     assert result["status"] == "logged"
     assert result["contact"] == "james-ko"
     contact = get_contact(dev_workspaces, "james-ko")
@@ -166,9 +156,7 @@ async def test_interaction_log_adds_interaction(
 async def test_interaction_log_nonexistent_contact(registry: ToolRegistry) -> None:
     handler = registry.get_handler("interaction_log")
     assert handler is not None
-    result = await handler(
-        contact_id="nobody-here-xyz", type="call", notes="Hello?"
-    )
+    result = await handler(contact_id="nobody-here-xyz", type="call", notes="Hello?")
     assert "error" in result
 
 
@@ -187,9 +175,7 @@ async def test_interaction_log_advances_recurring_reminder(
 
     handler = registry.get_handler("interaction_log")
     assert handler is not None
-    await handler(
-        contact_id="grandma-eleanor", type="call", notes="Weekly check-in"
-    )
+    await handler(contact_id="grandma-eleanor", type="call", notes="Weekly check-in")
 
     updated = get_contact(dev_workspaces, "grandma-eleanor")
     assert updated is not None

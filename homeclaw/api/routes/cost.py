@@ -15,10 +15,7 @@ def _round_breakdown(
     data: dict[str, dict[str, float | int]],
 ) -> dict[str, dict[str, Any]]:
     return {
-        k: {
-            mk: round(mv, 6) if isinstance(mv, float) else mv
-            for mk, mv in v.items()
-        }
+        k: {mk: round(mv, 6) if isinstance(mv, float) else mv for mk, mv in v.items()}
         for k, v in data.items()
     }
 
@@ -34,9 +31,7 @@ async def cost_summary(
     total_cost = 0.0
     total_input = 0
     total_cached = 0
-    by_model: dict[str, dict[str, float | int]] = defaultdict(
-        lambda: {"calls": 0, "cost_usd": 0.0}
-    )
+    by_model: dict[str, dict[str, float | int]] = defaultdict(lambda: {"calls": 0, "cost_usd": 0.0})
     by_call_type: dict[str, dict[str, float | int]] = defaultdict(
         lambda: {"calls": 0, "cost_usd": 0.0}
     )
@@ -52,9 +47,7 @@ async def cost_summary(
         by_call_type[e.call_type]["calls"] += 1  # type: ignore[operator]
         by_call_type[e.call_type]["cost_usd"] += e.estimated_cost_usd
 
-    projected_monthly = (
-        (total_cost / days * 30) if days > 0 and entries else 0.0
-    )
+    projected_monthly = (total_cost / days * 30) if days > 0 and entries else 0.0
     cache_hit_rate = (total_cached / total_input) if total_input > 0 else 0.0
 
     return {

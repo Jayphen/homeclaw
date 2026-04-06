@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+# Import from the source location (plugins/plants/) not workspaces
+import importlib.util
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -10,10 +13,6 @@ import pytest
 
 from homeclaw.agent.providers.base import ToolDefinition
 from homeclaw.plugins.interface import Plugin as PluginProtocol
-
-# Import from the source location (plugins/plants/) not workspaces
-import importlib.util
-import sys
 
 _PLUGIN_FILE = Path(__file__).parent.parent.parent / "plugins" / "plants" / "plugin.py"
 
@@ -115,9 +114,7 @@ class TestPlantLog:
     @pytest.mark.asyncio
     async def test_log_updates_fields_on_existing(self, tmp_path: Path) -> None:
         plugin = _make_plugin(tmp_path)
-        await plugin.handle_tool(
-            "plant_log", {"name": "Cactus", "location": "desk"}
-        )
+        await plugin.handle_tool("plant_log", {"name": "Cactus", "location": "desk"})
         await plugin.handle_tool(
             "plant_log", {"name": "Cactus", "location": "shelf", "water_interval_days": 14}
         )
@@ -162,9 +159,7 @@ class TestPlantStatus:
     @pytest.mark.asyncio
     async def test_shows_overdue_status(self, tmp_path: Path) -> None:
         plugin = _make_plugin(tmp_path)
-        await plugin.handle_tool(
-            "plant_log", {"name": "Thirsty", "water_interval_days": 1}
-        )
+        await plugin.handle_tool("plant_log", {"name": "Thirsty", "water_interval_days": 1})
 
         # Manually backdate the last_watered to make it overdue
         store_data = json.loads((tmp_path / "plants.json").read_text())
@@ -179,9 +174,7 @@ class TestPlantStatus:
     @pytest.mark.asyncio
     async def test_recently_watered_not_overdue(self, tmp_path: Path) -> None:
         plugin = _make_plugin(tmp_path)
-        await plugin.handle_tool(
-            "plant_log", {"name": "Happy", "water_interval_days": 30}
-        )
+        await plugin.handle_tool("plant_log", {"name": "Happy", "water_interval_days": 30})
 
         result = await plugin.handle_tool("plant_status", {})
         plant = result["plants"][0]
@@ -220,9 +213,7 @@ class TestGetOverduePlants:
         assert result[0].name == "Dry"
 
     def test_never_watered_is_overdue(self, tmp_path: Path) -> None:
-        store = PlantStore(
-            plants=[Plant(id="xyz", name="Neglected", last_watered=None)]
-        )
+        store = PlantStore(plants=[Plant(id="xyz", name="Neglected", last_watered=None)])
         (tmp_path / "plants.json").write_text(store.model_dump_json())
 
         result = get_overdue_plants(data_dir=tmp_path)

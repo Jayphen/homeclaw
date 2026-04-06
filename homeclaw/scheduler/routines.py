@@ -67,7 +67,9 @@ def _parse_schedule(text: str) -> tuple[str, dict[str, int | str]]:
     text = text.strip()
 
     # --- Direct cron expression: "30 7 * * 1-5" ---
-    m = re.match(r"^([\d*/,-]+)\s+([\d*/,-]+)\s+([\d*/,-]+)\s+([\d*/,-]+)\s+([\d*/,a-zA-Z-]+)$", text)
+    m = re.match(
+        r"^([\d*/,-]+)\s+([\d*/,-]+)\s+([\d*/,-]+)\s+([\d*/,-]+)\s+([\d*/,a-zA-Z-]+)$", text
+    )
     if m:
         return "cron", {
             "minute": m.group(1),
@@ -97,7 +99,12 @@ def _parse_schedule(text: str) -> tuple[str, dict[str, int | str]]:
         day_code = _DAYS.get(day_word)
         if day_code:
             hour, minute = _parse_time(m.group(2))
-            return "interval", {"weeks": 2, "days": _day_offset(day_code), "hours": hour, "minutes": minute}
+            return "interval", {
+                "weeks": 2,
+                "days": _day_offset(day_code),
+                "hours": hour,
+                "minutes": minute,
+            }
 
     # --- "Every N weeks on <dayname> at TIME" ---
     m = re.match(r"every\s+(\d+)\s+weeks?\s+on\s+(\w+)\s+at\s+(.+)", text, re.IGNORECASE)
@@ -107,12 +114,18 @@ def _parse_schedule(text: str) -> tuple[str, dict[str, int | str]]:
         day_code = _DAYS.get(day_word)
         if day_code:
             hour, minute = _parse_time(m.group(3))
-            return "interval", {"weeks": n_weeks, "days": _day_offset(day_code), "hours": hour, "minutes": minute}
+            return "interval", {
+                "weeks": n_weeks,
+                "days": _day_offset(day_code),
+                "hours": hour,
+                "minutes": minute,
+            }
 
     # --- Ordinal weekday of month: "1st Monday of the month at TIME" ---
     m = re.match(
         r"(1st|2nd|3rd|4th|first|second|third|fourth|last)\s+(\w+)\s+of\s+(?:the\s+)?month\s+at\s+(.+)",
-        text, re.IGNORECASE,
+        text,
+        re.IGNORECASE,
     )
     if m:
         ordinal_str = m.group(1).lower()
@@ -121,7 +134,12 @@ def _parse_schedule(text: str) -> tuple[str, dict[str, int | str]]:
         if day_code:
             hour, minute = _parse_time(m.group(3))
             day_range = _ordinal_day_range(ordinal_str)
-            return "cron", {"day_of_week": day_code, "day": day_range, "hour": hour, "minute": minute}
+            return "cron", {
+                "day_of_week": day_code,
+                "day": day_range,
+                "hour": hour,
+                "minute": minute,
+            }
 
     # --- "Monthly on the Nth at TIME" ---
     m = re.match(r"monthly\s+on\s+the\s+(\d+)(?:st|nd|rd|th)?\s+at\s+(.+)", text, re.IGNORECASE)
@@ -170,10 +188,14 @@ def _ordinal_day_range(ordinal: str) -> str:
     'Nth weekday of the month' behavior with APScheduler's CronTrigger.
     """
     mapping = {
-        "1st": "1-7", "first": "1-7",
-        "2nd": "8-14", "second": "8-14",
-        "3rd": "15-21", "third": "15-21",
-        "4th": "22-28", "fourth": "22-28",
+        "1st": "1-7",
+        "first": "1-7",
+        "2nd": "8-14",
+        "second": "8-14",
+        "3rd": "15-21",
+        "third": "15-21",
+        "4th": "22-28",
+        "fourth": "22-28",
         "last": "25-31",
     }
     return mapping.get(ordinal, "1-7")
@@ -345,9 +367,7 @@ def update_routine(
                 sections[i] = f"## {new_title}"
                 target_line = f"\n- **Target**: {new_target}" if new_target else ""
                 sections[i + 1] = (
-                    f"\n- **Schedule**: {new_schedule}"
-                    f"{target_line}"
-                    f"\n- **Action**: {new_action}\n"
+                    f"\n- **Schedule**: {new_schedule}{target_line}\n- **Action**: {new_action}\n"
                 )
                 break
         i += 1

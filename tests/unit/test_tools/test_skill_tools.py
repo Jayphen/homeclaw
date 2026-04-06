@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 from pathlib import Path
 
 import pytest
@@ -377,7 +378,7 @@ async def test_skill_create_source_notes_missing_topic_skipped(
 
 @pytest.mark.asyncio
 async def test_skill_create_with_source_bookmarks(registry: ToolRegistry, workspaces: Path) -> None:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from homeclaw.bookmarks.models import Bookmark
     from homeclaw.bookmarks.store import save_bookmark
@@ -389,7 +390,7 @@ async def test_skill_create_with_source_bookmarks(registry: ToolRegistry, worksp
         url="https://example.com/french-laundry",
         tags=["fine-dining", "michelin"],
         saved_by="alice",
-        saved_at=datetime.now(timezone.utc),
+        saved_at=datetime.now(UTC),
     )
     save_bookmark(workspaces, bm)
 
@@ -415,22 +416,18 @@ async def test_skill_create_with_source_bookmarks(registry: ToolRegistry, worksp
 async def test_skill_create_source_bookmarks_by_ids(
     registry: ToolRegistry, workspaces: Path
 ) -> None:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from homeclaw.bookmarks.models import Bookmark
     from homeclaw.bookmarks.store import save_bookmark
 
     save_bookmark(
         workspaces,
-        Bookmark(
-            id="keep1", title="Keep This", category="place", saved_at=datetime.now(timezone.utc)
-        ),
+        Bookmark(id="keep1", title="Keep This", category="place", saved_at=datetime.now(UTC)),
     )
     save_bookmark(
         workspaces,
-        Bookmark(
-            id="skip2", title="Skip This", category="place", saved_at=datetime.now(timezone.utc)
-        ),
+        Bookmark(id="skip2", title="Skip This", category="place", saved_at=datetime.now(UTC)),
     )
 
     result = await registry.get_handler("skill_create")(  # type: ignore[misc]

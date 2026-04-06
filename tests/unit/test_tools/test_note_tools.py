@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -44,7 +44,7 @@ async def test_note_get_defaults_to_today(registry: ToolRegistry) -> None:
     handler = registry.get_handler("note_get")
     assert handler is not None
     # Patch datetime.now so we control "today"
-    fake_now = datetime(2026, 3, 12, 12, 0, 0, tzinfo=timezone.utc)
+    fake_now = datetime(2026, 3, 12, 12, 0, 0, tzinfo=UTC)
     with patch("homeclaw.agent.tools.datetime") as mock_dt:
         mock_dt.now.return_value = fake_now
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
@@ -57,12 +57,10 @@ async def test_note_get_defaults_to_today(registry: ToolRegistry) -> None:
 
 
 @pytest.mark.asyncio
-async def test_note_save_creates_new_file(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
+async def test_note_save_creates_new_file(registry: ToolRegistry, dev_workspaces: Path) -> None:
     handler = registry.get_handler("note_save")
     assert handler is not None
-    fake_now = datetime(2026, 4, 1, 10, 0, 0, tzinfo=timezone.utc)
+    fake_now = datetime(2026, 4, 1, 10, 0, 0, tzinfo=UTC)
     with patch("homeclaw.agent.tools.datetime") as mock_dt:
         mock_dt.now.return_value = fake_now
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
@@ -74,12 +72,10 @@ async def test_note_save_creates_new_file(
 
 
 @pytest.mark.asyncio
-async def test_note_save_appends_to_existing(
-    registry: ToolRegistry, dev_workspaces: Path
-) -> None:
+async def test_note_save_appends_to_existing(registry: ToolRegistry, dev_workspaces: Path) -> None:
     handler = registry.get_handler("note_save")
     assert handler is not None
-    fake_now = datetime(2026, 3, 12, 14, 0, 0, tzinfo=timezone.utc)
+    fake_now = datetime(2026, 3, 12, 14, 0, 0, tzinfo=UTC)
     with patch("homeclaw.agent.tools.datetime") as mock_dt:
         mock_dt.now.return_value = fake_now
         mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
@@ -102,7 +98,7 @@ async def test_note_save_multiple_appends_no_duplication(
     path = dev_workspaces / "alice" / "notes" / "2026-04-02.md"
 
     for hour, note in [(9, "Morning standup"), (11, "Call with client"), (15, "Review PR")]:
-        fake_now = datetime(2026, 4, 2, hour, 0, 0, tzinfo=timezone.utc)
+        fake_now = datetime(2026, 4, 2, hour, 0, 0, tzinfo=UTC)
         with patch("homeclaw.agent.tools.datetime") as mock_dt:
             mock_dt.now.return_value = fake_now
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)

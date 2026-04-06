@@ -44,9 +44,7 @@ class TestHealthEndpoint:
 
     def test_no_auth_required(self, workspaces: Path) -> None:
         """Health endpoint works even with passwords configured."""
-        config = HomeclawConfig(
-            workspaces_path=str(workspaces), web_password="secret"
-        )
+        config = HomeclawConfig(workspaces_path=str(workspaces), web_password="secret")
         set_config(config)
         client = TestClient(app)
         resp = client.get("/api/health")
@@ -57,7 +55,9 @@ class TestHealthEndpoint:
         assert data["semantic_memory"]["enabled"] is False
 
     def test_index_size_when_present(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         index_dir = workspaces / ".index"
         index_dir.mkdir()

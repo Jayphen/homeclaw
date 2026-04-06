@@ -6,15 +6,12 @@ import os
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from homeclaw.plugins.skills.loader import (
     SkillDefinition,
     SkillPlugin,
     _load_skill_env,
     _substitute_env,
 )
-
 
 # ---------------------------------------------------------------------------
 # _load_skill_env
@@ -35,12 +32,7 @@ class TestLoadSkillEnv:
         """Lines starting with # and blank lines are skipped."""
         env_file = tmp_path / ".env"
         env_file.write_text(
-            "# This is a comment\n"
-            "\n"
-            "KEY1=value1\n"
-            "  # Another comment\n"
-            "\n"
-            "KEY2=value2\n"
+            "# This is a comment\n\nKEY1=value1\n  # Another comment\n\nKEY2=value2\n"
         )
         result = _load_skill_env(tmp_path)
         assert result == {"KEY1": "value1", "KEY2": "value2"}
@@ -48,10 +40,7 @@ class TestLoadSkillEnv:
     def test_strips_quotes(self, tmp_path: Path) -> None:
         """Double and single quoted values have quotes stripped."""
         env_file = tmp_path / ".env"
-        env_file.write_text(
-            'DOUBLE="hello world"\n'
-            "SINGLE='goodbye world'\n"
-        )
+        env_file.write_text("DOUBLE=\"hello world\"\nSINGLE='goodbye world'\n")
         result = _load_skill_env(tmp_path)
         assert result["DOUBLE"] == "hello world"
         assert result["SINGLE"] == "goodbye world"

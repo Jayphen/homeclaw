@@ -14,7 +14,6 @@ from homeclaw.agent.loop import AgentLoop
 from homeclaw.agent.providers.base import LLMResponse, ToolCall
 from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -83,9 +82,7 @@ async def test_tool_call_response(mock_provider: AsyncMock, dev_workspaces: Path
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_on_tool_call_callback(
-    mock_provider: AsyncMock, dev_workspaces: Path
-) -> None:
+async def test_on_tool_call_callback(mock_provider: AsyncMock, dev_workspaces: Path) -> None:
     """Verify the on_tool_call callback fires with the correct name and args."""
     mock_provider.complete.side_effect = [
         LLMResponse(
@@ -110,9 +107,7 @@ async def test_on_tool_call_callback(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_history_persisted(
-    mock_provider: AsyncMock, dev_workspaces: Path
-) -> None:
+async def test_history_persisted(mock_provider: AsyncMock, dev_workspaces: Path) -> None:
     """After run(), history.jsonl should contain user and assistant turns only."""
     loop = _make_loop(mock_provider, dev_workspaces)
 
@@ -121,9 +116,7 @@ async def test_history_persisted(
     history_path = dev_workspaces / "alice" / "history.jsonl"
     assert history_path.exists(), "history.jsonl was not written"
 
-    lines = [
-        line for line in history_path.read_text().strip().splitlines() if line
-    ]
+    lines = [line for line in history_path.read_text().strip().splitlines() if line]
     # First line is metadata, rest are messages
     assert len(lines) >= 3  # metadata + at least one user + one assistant
 

@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from homeclaw.agent.loop import (
     _advance_consolidation_pointer,
     _load_history,
@@ -14,7 +12,6 @@ from homeclaw.agent.loop import (
     _save_history,
 )
 from homeclaw.agent.providers.base import Message
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -48,13 +45,16 @@ class TestReadHistoryFile:
     def test_with_metadata_line(self, tmp_path: Path) -> None:
         """File with metadata line → returns correct pointer."""
         path = tmp_path / "history.jsonl"
-        _write_jsonl(path, [
-            _metadata_line(2),
-            _msg_dict("user", "hello"),
-            _msg_dict("assistant", "hi"),
-            _msg_dict("user", "how are you?"),
-            _msg_dict("assistant", "good"),
-        ])
+        _write_jsonl(
+            path,
+            [
+                _metadata_line(2),
+                _msg_dict("user", "hello"),
+                _msg_dict("assistant", "hi"),
+                _msg_dict("user", "how are you?"),
+                _msg_dict("assistant", "good"),
+            ],
+        )
 
         last_consolidated, messages = _read_history_file(path)
 
@@ -66,10 +66,13 @@ class TestReadHistoryFile:
     def test_no_metadata_line(self, tmp_path: Path) -> None:
         """File with no metadata → pointer defaults to 0."""
         path = tmp_path / "history.jsonl"
-        _write_jsonl(path, [
-            _msg_dict("user", "hello"),
-            _msg_dict("assistant", "hi"),
-        ])
+        _write_jsonl(
+            path,
+            [
+                _msg_dict("user", "hello"),
+                _msg_dict("assistant", "hi"),
+            ],
+        )
 
         last_consolidated, messages = _read_history_file(path)
 
@@ -98,12 +101,15 @@ class TestReadHistoryFile:
     def test_loads_tool_messages(self, tmp_path: Path) -> None:
         """Tool messages are loaded alongside user and assistant."""
         path = tmp_path / "history.jsonl"
-        _write_jsonl(path, [
-            _metadata_line(0),
-            _msg_dict("user", "save a note"),
-            {"role": "tool", "content": '{"ok": true}', "tool_call_id": "tc_1"},
-            _msg_dict("assistant", "done"),
-        ])
+        _write_jsonl(
+            path,
+            [
+                _metadata_line(0),
+                _msg_dict("user", "save a note"),
+                {"role": "tool", "content": '{"ok": true}', "tool_call_id": "tc_1"},
+                _msg_dict("assistant", "done"),
+            ],
+        )
 
         _, messages = _read_history_file(path)
 
@@ -116,10 +122,13 @@ class TestReadHistoryFile:
         """Invalid JSON lines are silently skipped."""
         path = tmp_path / "history.jsonl"
         path.write_text(
-            json.dumps(_metadata_line(0)) + "\n"
-            + json.dumps(_msg_dict("user", "hello")) + "\n"
+            json.dumps(_metadata_line(0))
+            + "\n"
+            + json.dumps(_msg_dict("user", "hello"))
+            + "\n"
             + "this is not valid json\n"
-            + json.dumps(_msg_dict("assistant", "hi")) + "\n"
+            + json.dumps(_msg_dict("assistant", "hi"))
+            + "\n"
         )
 
         last_consolidated, messages = _read_history_file(path)
@@ -142,13 +151,16 @@ class TestLoadHistory:
         alice_dir = tmp_path / "alice"
         alice_dir.mkdir()
         path = alice_dir / "history.jsonl"
-        _write_jsonl(path, [
-            _metadata_line(2),
-            _msg_dict("user", "old message 1"),
-            _msg_dict("assistant", "old response 1"),
-            _msg_dict("user", "new message 1"),
-            _msg_dict("assistant", "new response 1"),
-        ])
+        _write_jsonl(
+            path,
+            [
+                _metadata_line(2),
+                _msg_dict("user", "old message 1"),
+                _msg_dict("assistant", "old response 1"),
+                _msg_dict("user", "new message 1"),
+                _msg_dict("assistant", "new response 1"),
+            ],
+        )
 
         result = _load_history(tmp_path, "alice")
 
@@ -162,13 +174,16 @@ class TestLoadHistory:
         alice_dir = tmp_path / "alice"
         alice_dir.mkdir()
         path = alice_dir / "history.jsonl"
-        _write_jsonl(path, [
-            _metadata_line(0),
-            _msg_dict("user", "msg1"),
-            _msg_dict("assistant", "resp1"),
-            _msg_dict("user", "msg2"),
-            _msg_dict("assistant", "resp2"),
-        ])
+        _write_jsonl(
+            path,
+            [
+                _metadata_line(0),
+                _msg_dict("user", "msg1"),
+                _msg_dict("assistant", "resp1"),
+                _msg_dict("user", "msg2"),
+                _msg_dict("assistant", "resp2"),
+            ],
+        )
 
         result = _load_history(tmp_path, "alice")
 
@@ -201,11 +216,14 @@ class TestLoadHistory:
         channel_dir = tmp_path / "household" / "channels" / "group-test"
         channel_dir.mkdir(parents=True)
         path = channel_dir / "history.jsonl"
-        _write_jsonl(path, [
-            _metadata_line(0),
-            _msg_dict("user", "group message"),
-            _msg_dict("assistant", "group response"),
-        ])
+        _write_jsonl(
+            path,
+            [
+                _metadata_line(0),
+                _msg_dict("user", "group message"),
+                _msg_dict("assistant", "group response"),
+            ],
+        )
 
         result = _load_history(tmp_path, "group-test")
 
@@ -228,13 +246,16 @@ class TestSaveHistory:
         path = alice_dir / "history.jsonl"
 
         # Existing history with pointer at 2
-        _write_jsonl(path, [
-            _metadata_line(2),
-            _msg_dict("user", "old1"),
-            _msg_dict("assistant", "old_resp1"),
-            _msg_dict("user", "old2"),
-            _msg_dict("assistant", "old_resp2"),
-        ])
+        _write_jsonl(
+            path,
+            [
+                _metadata_line(2),
+                _msg_dict("user", "old1"),
+                _msg_dict("assistant", "old_resp1"),
+                _msg_dict("user", "old2"),
+                _msg_dict("assistant", "old_resp2"),
+            ],
+        )
 
         # New messages from the current turn
         new_messages = [
@@ -311,13 +332,16 @@ class TestAdvanceConsolidationPointer:
         alice_dir.mkdir()
         path = alice_dir / "history.jsonl"
 
-        _write_jsonl(path, [
-            _metadata_line(0),
-            _msg_dict("user", "msg1"),
-            _msg_dict("assistant", "resp1"),
-            _msg_dict("user", "msg2"),
-            _msg_dict("assistant", "resp2"),
-        ])
+        _write_jsonl(
+            path,
+            [
+                _metadata_line(0),
+                _msg_dict("user", "msg1"),
+                _msg_dict("assistant", "resp1"),
+                _msg_dict("user", "msg2"),
+                _msg_dict("assistant", "resp2"),
+            ],
+        )
 
         _advance_consolidation_pointer(tmp_path, "alice", 2)
 
@@ -332,13 +356,16 @@ class TestAdvanceConsolidationPointer:
         alice_dir.mkdir()
         path = alice_dir / "history.jsonl"
 
-        _write_jsonl(path, [
-            _metadata_line(3),
-            _msg_dict("user", "msg1"),
-            _msg_dict("assistant", "resp1"),
-            _msg_dict("user", "msg2"),
-            _msg_dict("assistant", "resp2"),
-        ])
+        _write_jsonl(
+            path,
+            [
+                _metadata_line(3),
+                _msg_dict("user", "msg1"),
+                _msg_dict("assistant", "resp1"),
+                _msg_dict("user", "msg2"),
+                _msg_dict("assistant", "resp2"),
+            ],
+        )
 
         # Try to go backwards — should be a no-op
         _advance_consolidation_pointer(tmp_path, "alice", 1)
@@ -352,11 +379,14 @@ class TestAdvanceConsolidationPointer:
         alice_dir.mkdir()
         path = alice_dir / "history.jsonl"
 
-        _write_jsonl(path, [
-            _metadata_line(2),
-            _msg_dict("user", "msg1"),
-            _msg_dict("assistant", "resp1"),
-        ])
+        _write_jsonl(
+            path,
+            [
+                _metadata_line(2),
+                _msg_dict("user", "msg1"),
+                _msg_dict("assistant", "resp1"),
+            ],
+        )
 
         _advance_consolidation_pointer(tmp_path, "alice", 2)
 
@@ -381,13 +411,16 @@ class TestAdvanceConsolidationPointer:
         alice_dir.mkdir()
         path = alice_dir / "history.jsonl"
 
-        _write_jsonl(path, [
-            _metadata_line(0),
-            _msg_dict("user", "first"),
-            _msg_dict("assistant", "second"),
-            _msg_dict("user", "third"),
-            _msg_dict("assistant", "fourth"),
-        ])
+        _write_jsonl(
+            path,
+            [
+                _metadata_line(0),
+                _msg_dict("user", "first"),
+                _msg_dict("assistant", "second"),
+                _msg_dict("user", "third"),
+                _msg_dict("assistant", "fourth"),
+            ],
+        )
 
         _advance_consolidation_pointer(tmp_path, "alice", 2)
 

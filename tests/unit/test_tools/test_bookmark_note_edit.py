@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -32,7 +32,7 @@ def _save_test_bookmark(workspaces: Path, bookmark_id: str = "bk1") -> Bookmark:
         title="Test Cafe",
         category="place",
         tags=["coffee"],
-        saved_at=datetime.now(timezone.utc),
+        saved_at=datetime.now(UTC),
     )
     save_bookmark(workspaces, b)
     return b

@@ -64,7 +64,10 @@ class WebProviderRegistry:
     # -- high-level dispatch with fallback --
 
     async def search(
-        self, query: str, primary: str, fallback: str | None = None,
+        self,
+        query: str,
+        primary: str,
+        fallback: str | None = None,
     ) -> dict[str, Any]:
         """Run a search with automatic fallback on failure."""
         import httpx
@@ -93,7 +96,10 @@ class WebProviderRegistry:
             fb = self._try_search_fallback(fallback, primary)
             if fb:
                 logger.debug(
-                    "Search %s error, falling back to %s: %s", primary, fallback, result["error"],
+                    "Search %s error, falling back to %s: %s",
+                    primary,
+                    fallback,
+                    result["error"],
                 )
                 try:
                     return await fb.search(query)
@@ -136,14 +142,18 @@ class WebProviderRegistry:
     # -- helpers --
 
     def _try_search_fallback(
-        self, fallback: str | None, primary: str,
+        self,
+        fallback: str | None,
+        primary: str,
     ) -> WebSearchProvider | None:
         if fallback and fallback != primary:
             return self._search.get(fallback)
         return None
 
     def _try_read_fallback(
-        self, fallback: str | None, primary: str,
+        self,
+        fallback: str | None,
+        primary: str,
     ) -> WebReadProvider | None:
         if fallback and fallback != primary:
             return self._read.get(fallback)

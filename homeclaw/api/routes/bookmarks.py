@@ -26,7 +26,7 @@ def _notes_for(workspaces: Path, bookmark: Bookmark) -> str | None:
     # Strip legacy "# Title" header — the UI already shows the bookmark title
     lines = text.splitlines()
     if lines and lines[0].startswith("# "):
-        lines = [l for l in lines[1:] if l.strip()]
+        lines = [ln for ln in lines[1:] if ln.strip()]
         text = "\n".join(lines) + "\n" if lines else ""
     return text or None
 

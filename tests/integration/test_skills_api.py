@@ -89,7 +89,9 @@ class TestListSkills:
         assert data["skills"] == []
 
     def test_lists_household_skill(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         """Household skill appears in the listing."""
         _create_skill(workspaces, "household", "weather", "Check the weather")
@@ -103,7 +105,9 @@ class TestListSkills:
         assert skills[0]["description"] == "Check the weather"
 
     def test_lists_multiple_skills(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         """Multiple skills across owners are listed."""
         _create_skill(workspaces, "household", "weather")
@@ -124,11 +128,15 @@ class TestListSkills:
 
 class TestGetSkill:
     def test_returns_skill_detail(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         """Skill detail includes metadata and file listing."""
         skill_dir = _create_skill(
-            workspaces, "household", "weather",
+            workspaces,
+            "household",
+            "weather",
             description="Check the weather",
             instructions="Use the weather API.",
         )
@@ -162,7 +170,9 @@ class TestGetSkill:
 
 class TestReadSkillFile:
     def test_read_skill_md(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         """Read the SKILL.md file content."""
         _create_skill(workspaces, "household", "weather")
@@ -175,7 +185,9 @@ class TestReadSkillFile:
         assert data["size"] > 0
 
     def test_read_nonexistent_file(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         """Reading a non-existent file → 404."""
         _create_skill(workspaces, "household", "weather")
@@ -196,7 +208,9 @@ class TestReadSkillFile:
 
 class TestWriteSkillFile:
     def test_write_data_file(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         """Write a new data file inside the skill."""
         _create_skill(workspaces, "household", "weather")
@@ -217,7 +231,9 @@ class TestWriteSkillFile:
         assert file_path.read_text() == "# Test Data\nSome content."
 
     def test_write_creates_subdirectories(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         """Writing to a nested path creates intermediate directories."""
         _create_skill(workspaces, "household", "weather")
@@ -247,7 +263,9 @@ class TestWriteSkillFile:
 
 class TestDeleteSkillFile:
     def test_delete_data_file(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         """Delete a data file from a skill."""
         skill_dir = _create_skill(workspaces, "household", "weather")
@@ -266,7 +284,9 @@ class TestDeleteSkillFile:
         assert not data_file.exists()
 
     def test_delete_protected_skill_md(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         """Deleting SKILL.md is rejected (protected file)."""
         _create_skill(workspaces, "household", "weather")
@@ -278,7 +298,9 @@ class TestDeleteSkillFile:
         assert "SKILL.md" in resp.json()["detail"]
 
     def test_delete_nonexistent_file(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         """Deleting a non-existent file → 404."""
         _create_skill(workspaces, "household", "weather")
@@ -296,7 +318,9 @@ class TestDeleteSkillFile:
 
 class TestDeleteSkill:
     def test_archives_skill(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         """Archiving a skill moves it to .archive/ with a timestamp suffix."""
         _create_skill(workspaces, "household", "weather")
@@ -350,7 +374,9 @@ class TestGetSkillSettings:
 
 class TestUpdateSkillSettings:
     def test_updates_settings(
-        self, client: TestClient, workspaces: Path,
+        self,
+        client: TestClient,
+        workspaces: Path,
     ) -> None:
         """Update skill settings with new values."""
         # With web_password="" and no member_passwords, open access is granted
@@ -400,7 +426,9 @@ class TestListRemoteSkills:
         assert "Not a recognised" in resp.json()["detail"]
 
     def test_lists_skills_in_repo(
-        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Returns discovered skills from a GitHub repo."""
         from homeclaw.plugins.skills import github
@@ -429,7 +457,9 @@ class TestListRemoteSkills:
 
 class TestInstallMultiSkill:
     def test_returns_skill_list_when_no_root_skill(
-        self, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Multi-skill repo without install_all returns available skills."""
         import httpx
@@ -458,7 +488,10 @@ class TestInstallMultiSkill:
         assert len(data["skills"]) == 2
 
     def test_install_all_installs_multiple(
-        self, client: TestClient, workspaces: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        client: TestClient,
+        workspaces: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """install_all=true installs all discovered skills."""
         import httpx

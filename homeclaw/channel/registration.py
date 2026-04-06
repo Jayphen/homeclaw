@@ -30,7 +30,9 @@ def load_user_map(workspaces: Path, map_file: str) -> dict[str, str]:
 
 
 def save_user_map(
-    workspaces: Path, map_file: str, user_map: dict[str, str],
+    workspaces: Path,
+    map_file: str,
+    user_map: dict[str, str],
 ) -> None:
     """Persist the user map to disk."""
     path = workspaces / "household" / map_file
@@ -43,6 +45,7 @@ def is_admin(person: str | None) -> bool:
     if person is None:
         return False
     from homeclaw.api.deps import get_config
+
     try:
         return person in get_config().admin_members
     except RuntimeError:
@@ -79,14 +82,18 @@ async def register_self(
             save_contact(workspaces, contact)
             logger.info(
                 "Linked contact '%s' to member workspace '%s'",
-                contact.id, name,
+                contact.id,
+                name,
             )
 
     if dispatcher:
         dispatcher.set_preference_if_unset(name, channel_name)
 
     logger.info(
-        "Registered %s user %s as '%s'", channel_name, identifier, name,
+        "Registered %s user %s as '%s'",
+        channel_name,
+        identifier,
+        name,
     )
     return f"Registered as '{name}'. You can now chat with me!"
 
@@ -127,6 +134,8 @@ async def register_member(
 
     logger.info(
         "Admin registered member '%s' with %s ID %s",
-        name, channel_name, target_identifier,
+        name,
+        channel_name,
+        target_identifier,
     )
     return True, f"Registered '{name}' with {channel_name} ID {target_identifier}."

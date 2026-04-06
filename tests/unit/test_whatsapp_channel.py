@@ -9,7 +9,6 @@ import pytest
 
 from homeclaw.channel.whatsapp import WhatsAppChannel, _extract_text, _has_image, _split_message
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -42,9 +41,7 @@ def _make_channel(
     workspaces = tmp_path / "workspaces"
     (workspaces / "household").mkdir(parents=True)
     if user_map:
-        (workspaces / "household" / "whatsapp_users.json").write_text(
-            json.dumps(user_map)
-        )
+        (workspaces / "household" / "whatsapp_users.json").write_text(json.dumps(user_map))
 
     loop_mock = AsyncMock()
     loop_mock.run.return_value = "I'm homeclaw."
@@ -182,10 +179,14 @@ class TestMessageHandling:
         await channel._handle_message(ev)
 
         channel._loop.run.assert_awaited_once_with(
-            "what's for dinner?", "alice", channel=None, interim_callback=ANY,
+            "what's for dinner?",
+            "alice",
+            channel=None,
+            interim_callback=ANY,
         )
         channel._client.reply_message.assert_awaited_once_with(
-            "I'm homeclaw.", ev,
+            "I'm homeclaw.",
+            ev,
         )
 
     @pytest.mark.asyncio
@@ -223,7 +224,10 @@ class TestMessageHandling:
         await channel._handle_message(ev)
 
         channel._loop.run.assert_awaited_once_with(
-            "[alice] dinner at 7", "alice", channel="group-120363001234567890", interim_callback=ANY,
+            "[alice] dinner at 7",
+            "alice",
+            channel="group-120363001234567890",
+            interim_callback=ANY,
         )
 
     @pytest.mark.asyncio

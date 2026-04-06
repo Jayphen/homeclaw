@@ -24,18 +24,24 @@ SendFn = Callable[[str, str], Awaitable[dict[str, Any]]]
 GroupSendFn = Callable[[str, str], Awaitable[dict[str, Any]]]
 # Signature: (person_name, image_url, caption | None, image_data | None) → result
 SendImageFn = Callable[
-    [str, str, str | None, bytes | None], Awaitable[dict[str, Any]],
+    [str, str, str | None, bytes | None],
+    Awaitable[dict[str, Any]],
 ]
 # Signature: (group_id, image_url, caption | None, image_data | None) → result
 GroupSendImageFn = Callable[
-    [str, str, str | None, bytes | None], Awaitable[dict[str, Any]],
+    [str, str, str | None, bytes | None],
+    Awaitable[dict[str, Any]],
 ]
 
 
 class _ChannelEntry:
     __slots__ = (
-        "send", "has_person", "send_group", "group_ids",
-        "send_image", "send_group_image",
+        "send",
+        "has_person",
+        "send_group",
+        "group_ids",
+        "send_image",
+        "send_group_image",
     )
 
     def __init__(
@@ -76,9 +82,12 @@ class ChannelDispatcher:
     ) -> None:
         """Register a channel adapter for outbound delivery."""
         self._channels[name] = _ChannelEntry(
-            send=send, has_person=has_person,
-            send_group=send_group, group_ids=group_ids,
-            send_image=send_image, send_group_image=send_group_image,
+            send=send,
+            has_person=has_person,
+            send_group=send_group,
+            group_ids=group_ids,
+            send_image=send_image,
+            send_group_image=send_group_image,
         )
         logger.info("Channel dispatcher: registered '%s'", name)
 
@@ -148,14 +157,13 @@ class ChannelDispatcher:
 
     async def send_group(self, group_id: str, text: str) -> dict[str, Any]:
         """Send a message to a group chat."""
-        for name, entry in self._channels.items():
-            if entry.send_group and entry.group_ids:
-                if group_id in entry.group_ids():
-                    return await entry.send_group(group_id, text)
+        for _name, entry in self._channels.items():
+            if entry.send_group and entry.group_ids and group_id in entry.group_ids():
+                return await entry.send_group(group_id, text)
 
         # No specific group found — try sending to the first channel
         # that supports groups at all (household group).
-        for name, entry in self._channels.items():
+        for _name, entry in self._channels.items():
             if entry.send_group and entry.group_ids:
                 ids = entry.group_ids()
                 if ids:
@@ -210,7 +218,10 @@ class ChannelDispatcher:
         for _name, entry in self._channels.items():
             if entry.send_group_image and entry.group_ids and group_id in entry.group_ids():
                 return await entry.send_group_image(
-                    group_id, image_url, caption, image_data,
+                    group_id,
+                    image_url,
+                    caption,
+                    image_data,
                 )
 
         # Fall back to first channel that supports group images.
@@ -219,7 +230,10 @@ class ChannelDispatcher:
                 ids = entry.group_ids()
                 if ids:
                     return await entry.send_group_image(
-                        ids[0], image_url, caption, image_data,
+                        ids[0],
+                        image_url,
+                        caption,
+                        image_data,
                     )
 
         return {

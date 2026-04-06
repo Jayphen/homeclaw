@@ -40,12 +40,14 @@ async def notes_index(
                 continue
             content = f.read_text().strip()
             mtime = datetime.fromtimestamp(f.stat().st_mtime).isoformat()
-            notes.append({
-                "person": person,
-                "date": date_str,
-                "preview": content[:200],
-                "updated_at": mtime,
-            })
+            notes.append(
+                {
+                    "person": person,
+                    "date": date_str,
+                    "preview": content[:200],
+                    "updated_at": mtime,
+                }
+            )
 
     notes.sort(key=lambda n: n["date"], reverse=True)
     return notes
@@ -75,11 +77,13 @@ async def notes_by_person(
             continue
         content = f.read_text().strip()
         mtime = datetime.fromtimestamp(f.stat().st_mtime).isoformat()
-        notes.append({
-            "date": date_str,
-            "preview": content[:200],
-            "updated_at": mtime,
-        })
+        notes.append(
+            {
+                "date": date_str,
+                "preview": content[:200],
+                "updated_at": mtime,
+            }
+        )
 
     notes.sort(key=lambda n: n["date"], reverse=True)
     return notes
@@ -97,8 +101,10 @@ async def note_detail(
     require_person_access(member, person)
     try:
         date.fromisoformat(note_date)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format, expected YYYY-MM-DD")
+    except ValueError as err:
+        raise HTTPException(
+            status_code=400, detail="Invalid date format, expected YYYY-MM-DD"
+        ) from err
 
     path = workspaces / person / "notes" / f"{note_date}.md"
     if not path.is_file():

@@ -148,7 +148,9 @@ def load_all_plugins(
     active = sum(1 for e in entries if e.status == PluginStatus.ACTIVE)
     logger.info(
         "Plugin loading complete: %d discovered, %d active, %d disabled",
-        len(entries), active, len(entries) - active,
+        len(entries),
+        active,
+        len(entries) - active,
     )
     return entries
 

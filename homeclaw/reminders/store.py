@@ -68,7 +68,9 @@ def complete_reminder(workspaces: Path, person: str, reminder_id: str) -> Remind
     return None
 
 
-async def complete_reminder_safe(workspaces: Path, person: str, reminder_id: str) -> Reminder | None:
+async def complete_reminder_safe(
+    workspaces: Path, person: str, reminder_id: str
+) -> Reminder | None:
     """Complete a reminder with per-person locking."""
     async with _lock_pool.lock_for(person):
         return complete_reminder(workspaces, person, reminder_id)

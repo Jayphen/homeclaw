@@ -17,10 +17,14 @@ def register_builtins(
 
     jina = JinaProvider(api_key=jina_api_key)
     web_providers.register(
-        BuiltinProvider.JINA, search=jina, read=jina,
+        BuiltinProvider.JINA,
+        search=jina,
+        read=jina,
     )
 
     tavily = TavilyProvider(api_key=tavily_api_key)
     web_providers.register(
-        BuiltinProvider.TAVILY, search=tavily, read=tavily,
+        BuiltinProvider.TAVILY,
+        search=tavily,
+        read=tavily,
     )

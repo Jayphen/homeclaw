@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+import contextlib
 import logging
 from collections.abc import Callable
 from pathlib import Path
@@ -107,7 +108,9 @@ class TelegramChannel:
         await update.message.reply_text(msg)
 
     async def _handle_register_member(
-        self, update: Update, _context: Any,
+        self,
+        update: Update,
+        _context: Any,
     ) -> None:
         """Handle /register_member <name> <telegram_id> — admin-only."""
         if update.message is None:
@@ -135,7 +138,8 @@ class TelegramChannel:
             dispatcher=self._dispatcher,
             allowed_set=(
                 {str(x) for x in self._allowed_user_ids}
-                if self._allowed_user_ids is not None else None
+                if self._allowed_user_ids is not None
+                else None
             ),
         )
         if ok and self._allowed_user_ids is not None:
@@ -155,8 +159,7 @@ class TelegramChannel:
         if not msg or not msg.entities:
             return False
         mentions = [
-            e for e in msg.entities
-            if e.type in (MessageEntity.MENTION, MessageEntity.TEXT_MENTION)
+            e for e in msg.entities if e.type in (MessageEntity.MENTION, MessageEntity.TEXT_MENTION)
         ]
         if not mentions:
             return False
@@ -170,10 +173,7 @@ class TelegramChannel:
                 if mention == bot_username.lower():
                     return False
             elif e.type == MessageEntity.TEXT_MENTION and e.user and e.user.is_bot:
-                if (
-                    e.user.username
-                    and e.user.username.lower() == bot_username.lower()
-                ):
+                if e.user.username and e.user.username.lower() == bot_username.lower():
                     return False
         return True
 
@@ -186,9 +186,7 @@ class TelegramChannel:
 
         person = self._resolve_person(update)
         if person is None:
-            await update.message.reply_text(
-                "I don't know who you are. Use /register <name> first."
-            )
+            await update.message.reply_text("I don't know who you are. Use /register <name> first.")
             return
 
         user_text = update.message.text
@@ -219,9 +217,7 @@ class TelegramChannel:
 
         person = self._resolve_person(update)
         if person is None:
-            await update.message.reply_text(
-                "I don't know who you are. Use /register <name> first."
-            )
+            await update.message.reply_text("I don't know who you are. Use /register <name> first.")
             return
 
         # Telegram provides multiple sizes; pick the largest
@@ -234,11 +230,7 @@ class TelegramChannel:
         is_group = self._is_group_chat(update)
         if is_group:
             caption = f"[{person}] {caption}" if caption else f"[{person}]"
-            chat_id = (
-                str(update.effective_chat.id)
-                if update.effective_chat
-                else "group"
-            )
+            chat_id = str(update.effective_chat.id) if update.effective_chat else "group"
             channel: str | None = f"group-{chat_id}"
         else:
             channel = None
@@ -279,10 +271,8 @@ class TelegramChannel:
             except Exception:
                 return
             # Telegram typing indicator lasts ~5s; resend every 4s
-            try:
+            with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(done.wait(), timeout=4.0)
-            except TimeoutError:
-                pass
 
     async def _run_and_reply(
         self,
@@ -302,7 +292,10 @@ class TelegramChannel:
 
         try:
             response = await self._loop.run(
-                content, person, channel=channel, interim_callback=_send_interim,
+                content,
+                person,
+                channel=channel,
+                interim_callback=_send_interim,
             )
         except Exception as exc:
             logger.exception("Agent loop failed for message from %s", person)
@@ -312,9 +305,7 @@ class TelegramChannel:
             if len(error_msg) > 300:
                 error_msg = error_msg[:300] + "..."
             if update.message:
-                await update.message.reply_text(
-                    f"Sorry, something went wrong:\n\n{error_msg}"
-                )
+                await update.message.reply_text(f"Sorry, something went wrong:\n\n{error_msg}")
             return
         finally:
             done.set()
@@ -378,7 +369,9 @@ class TelegramChannel:
                     resp.raise_for_status()
                     photo_bytes = resp.content
             await self._app.bot.send_photo(
-                chat_id=int(tid), photo=photo_bytes, caption=caption,
+                chat_id=int(tid),
+                photo=photo_bytes,
+                caption=caption,
             )
             return {"status": "sent", "channel": "telegram", "person": person}
         except Exception as exc:
@@ -402,12 +395,7 @@ class TelegramChannel:
 
     def _build_app(self) -> Application:  # type: ignore[type-arg]
         """Build and configure the Telegram Application."""
-        app = (
-            Application.builder()
-            .token(self._token)
-            .post_init(self._post_init)
-            .build()
-        )
+        app = Application.builder().token(self._token).post_init(self._post_init).build()
         app.add_handler(CommandHandler("start", self._handle_start))
         app.add_handler(CommandHandler("register", self._handle_register))
         app.add_handler(CommandHandler("register_member", self._handle_register_member))
@@ -484,9 +472,7 @@ def _to_telegram_markdown(text: str) -> str:
     return telegramify_markdown.markdownify(text)
 
 
-async def _send_markdown(
-    message: Any, text: str, *, chat_id: int | None = None
-) -> None:
+async def _send_markdown(message: Any, text: str, *, chat_id: int | None = None) -> None:
     """Send a message with MarkdownV2 formatting, falling back to plain text.
 
     If *chat_id* is provided, *message* is treated as a Bot and

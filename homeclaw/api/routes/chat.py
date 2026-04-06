@@ -49,7 +49,8 @@ def _history_file(workspaces: Path, key: str) -> Path:
 
 
 def _load_visible_history(
-    workspaces: Path, person: str,
+    workspaces: Path,
+    person: str,
 ) -> list[dict[str, str]]:
     """Read the JSONL history and return recent user/assistant pairs."""
     hist = _history_file(workspaces, person)
@@ -83,7 +84,7 @@ def _load_visible_history(
         messages.append({"role": role, "content": content})
 
     # Return last N pairs (2 messages per pair)
-    return messages[-(_MAX_HISTORY_PAIRS * 2):]
+    return messages[-(_MAX_HISTORY_PAIRS * 2) :]
 
 
 @router.get("/history")
@@ -143,9 +144,11 @@ async def chat(request: Request) -> StreamingResponse:
 
         result_task = asyncio.create_task(
             loop.run(
-                content, person,
+                content,
+                person,
                 channel=channel,
-                interim_callback=_on_interim, metadata=meta,
+                interim_callback=_on_interim,
+                metadata=meta,
             ),
         )
 
@@ -154,7 +157,8 @@ async def chat(request: Request) -> StreamingResponse:
             while not result_task.done():
                 try:
                     interim = await asyncio.wait_for(
-                        interim_q.get(), timeout=0.3,
+                        interim_q.get(),
+                        timeout=0.3,
                     )
                     has_interim = True
                     yield f"*{interim}*\n"

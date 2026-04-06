@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -109,7 +109,7 @@ class _FakeAsyncClient:
     async def get(self, url: str) -> None:
         raise self._error
 
-    async def __aenter__(self) -> "_FakeAsyncClient":
+    async def __aenter__(self) -> _FakeAsyncClient:
         return self
 
     async def __aexit__(self, *args: object) -> None:
@@ -131,7 +131,7 @@ async def test_client_fetches_remote(tmp_path: Path) -> None:
     assert client.is_configured
 
     with _patch_httpx(SAMPLE_INDEX):
-            plugins = await client.list_available()
+        plugins = await client.list_available()
 
     assert len(plugins) == 3
     assert plugins[0].name == "weather"
@@ -145,7 +145,7 @@ async def test_client_filters_by_type(tmp_path: Path) -> None:
     )
 
     with _patch_httpx(SAMPLE_INDEX):
-            skills = await client.list_available(plugin_type=MarketplacePluginType.SKILL)
+        skills = await client.list_available(plugin_type=MarketplacePluginType.SKILL)
 
     assert len(skills) == 1
     assert skills[0].name == "weather"
@@ -159,7 +159,7 @@ async def test_client_get_plugin(tmp_path: Path) -> None:
     )
 
     with _patch_httpx(SAMPLE_INDEX):
-            plugin = await client.get_plugin("budget")
+        plugin = await client.get_plugin("budget")
 
     assert plugin is not None
     assert plugin.type == MarketplacePluginType.PYTHON
@@ -173,7 +173,7 @@ async def test_client_get_plugin_not_found(tmp_path: Path) -> None:
     )
 
     with _patch_httpx(SAMPLE_INDEX):
-            plugin = await client.get_plugin("nonexistent")
+        plugin = await client.get_plugin("nonexistent")
 
     assert plugin is None
 
@@ -191,7 +191,7 @@ async def test_client_caches_to_disk(tmp_path: Path) -> None:
     )
 
     with _patch_httpx(SAMPLE_INDEX):
-            await client.list_available()
+        await client.list_available()
 
     cache_path = tmp_path / "plugins" / ".marketplace_cache.json"
     assert cache_path.exists()
@@ -208,7 +208,7 @@ async def test_client_uses_fresh_cache(tmp_path: Path) -> None:
     cache_path = tmp_path / "plugins" / ".marketplace_cache.json"
     cache_path.parent.mkdir(parents=True)
     cached = CachedIndex(
-        fetched_at=datetime.now(timezone.utc),
+        fetched_at=datetime.now(UTC),
         index=MarketplaceIndex.model_validate(SAMPLE_INDEX),
     )
     cache_path.write_text(cached.model_dump_json(indent=2))
@@ -230,7 +230,7 @@ async def test_client_refetches_stale_cache(tmp_path: Path) -> None:
     cache_path = tmp_path / "plugins" / ".marketplace_cache.json"
     cache_path.parent.mkdir(parents=True)
     cached = CachedIndex(
-        fetched_at=datetime.now(timezone.utc) - timedelta(hours=2),
+        fetched_at=datetime.now(UTC) - timedelta(hours=2),
         index=MarketplaceIndex(version=1, plugins=[]),
     )
     cache_path.write_text(cached.model_dump_json(indent=2))
@@ -241,7 +241,7 @@ async def test_client_refetches_stale_cache(tmp_path: Path) -> None:
     )
 
     with _patch_httpx(SAMPLE_INDEX):
-            plugins = await client.list_available()
+        plugins = await client.list_available()
 
     # Got fresh data from the "fetch", not the empty stale cache
     assert len(plugins) == 3
@@ -253,7 +253,7 @@ async def test_client_force_refresh_ignores_cache(tmp_path: Path) -> None:
     cache_path = tmp_path / "plugins" / ".marketplace_cache.json"
     cache_path.parent.mkdir(parents=True)
     cached = CachedIndex(
-        fetched_at=datetime.now(timezone.utc),
+        fetched_at=datetime.now(UTC),
         index=MarketplaceIndex(version=1, plugins=[]),
     )
     cache_path.write_text(cached.model_dump_json(indent=2))
@@ -264,7 +264,7 @@ async def test_client_force_refresh_ignores_cache(tmp_path: Path) -> None:
     )
 
     with _patch_httpx(SAMPLE_INDEX):
-            plugins = await client.list_available(force_refresh=True)
+        plugins = await client.list_available(force_refresh=True)
 
     assert len(plugins) == 3
 
@@ -280,7 +280,7 @@ async def test_client_falls_back_to_cache_on_fetch_error(tmp_path: Path) -> None
     cache_path = tmp_path / "plugins" / ".marketplace_cache.json"
     cache_path.parent.mkdir(parents=True)
     cached = CachedIndex(
-        fetched_at=datetime.now(timezone.utc) - timedelta(hours=2),
+        fetched_at=datetime.now(UTC) - timedelta(hours=2),
         index=MarketplaceIndex.model_validate(SAMPLE_INDEX),
     )
     cache_path.write_text(cached.model_dump_json(indent=2))

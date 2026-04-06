@@ -80,17 +80,14 @@ class LLMRecorder:
         if not self._record:
             if not path.exists():
                 raise FileNotFoundError(
-                    f"No recorded response at {path}. "
-                    f"Run with --record to capture it first."
+                    f"No recorded response at {path}. Run with --record to capture it first."
                 )
             data = json.loads(path.read_text())
             return LLMResponse.model_validate(data["response"])
 
         # Record mode — call the real provider
-        complete_fn = getattr(provider, "complete")
-        response: LLMResponse = await complete_fn(
-            messages=messages, tools=tools, system=system
-        )
+        complete_fn = provider.complete
+        response: LLMResponse = await complete_fn(messages=messages, tools=tools, system=system)
 
         data = {
             "fixture_name": fixture_name,

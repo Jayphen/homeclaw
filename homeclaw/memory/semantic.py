@@ -69,9 +69,7 @@ class SemanticMemory:
 
             provider = self._embedding_provider
             if provider == "local":
-                logger.info(
-                    "Loading local embedding model (first run downloads ~80 MB)…"
-                )
+                logger.info("Loading local embedding model (first run downloads ~80 MB)…")
             else:
                 logger.info("Initializing %s embedding provider…", provider)
 
@@ -105,14 +103,16 @@ class SemanticMemory:
             self._enabled = True
             logger.info(
                 "Semantic memory ready — %d chunks indexed, watching %d paths",
-                n, len(paths),
+                n,
+                len(paths),
             )
         except ImportError as exc:
             if "memsearch" in str(exc):
                 logger.debug("memsearch not installed — semantic memory disabled")
             else:
                 logger.warning(
-                    "Semantic memory disabled — missing dependency: %s", exc,
+                    "Semantic memory disabled — missing dependency: %s",
+                    exc,
                 )
             self._enabled = False
         except Exception:
@@ -162,7 +162,4 @@ class SemanticMemory:
                 filtered.append(r)
             # Other members' data is silently excluded
 
-        return [
-            {"text": r["content"], "score": r.get("score", 0.0)}
-            for r in filtered[:top_k]
-        ]
+        return [{"text": r["content"], "score": r.get("score", 0.0)} for r in filtered[:top_k]]
