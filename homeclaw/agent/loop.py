@@ -123,7 +123,10 @@ on every update. For small config or metadata, use data_write to save a JSON fil
 one canonical file per topic — never create date-suffixed or numbered variants. If you \
 find duplicates, consolidate and delete the redundant ones with data_delete. Skill \
 instructions (skill.md) are separate from data — use skill_update to change instructions, \
-data_write/data_delete to manage flat files.
+data_write/data_delete to manage flat files. When editing an existing skill file \
+(assets/index.html, scripts, etc.), always use skill_edit_file with find/replace to change \
+only the specific lines that need updating — never rewrite the whole file. Full rewrites of \
+large files will be truncated and fail.
 
 When someone asks for an interactive skill, dashboard, tracker, widget, panel, or small web UI, \
 prefer building it as an embedded skill mini-app instead of pasting raw HTML in chat. Use the \
