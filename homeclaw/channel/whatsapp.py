@@ -482,9 +482,10 @@ class WhatsAppChannel:
             formatted = _md_to_whatsapp(text)
             await self._client.reply_message(formatted, ev)
 
-        self._loop.set_interim_callback(_send_interim)
         try:
-            response = await self._loop.run(content, person, channel=channel)
+            response = await self._loop.run(
+                content, person, channel=channel, interim_callback=_send_interim,
+            )
         except Exception as exc:
             logger.exception("Agent loop failed for message from %s", person)
             error_msg = str(exc)

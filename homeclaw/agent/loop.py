@@ -69,7 +69,9 @@ Your final response (after all tool calls complete) is the main message the user
 If you include text alongside a tool call, the user may see it as a brief status update — \
 so keep it useful ("Checking your Home Assistant lights..." not just "Let me check"). \
 If you don't call a tool, your text IS the final response — never promise action without \
-actually calling a tool in the same turn.
+actually calling a tool in the same turn. Never say "I'll let you know when it's done" or \
+promise a follow-up message — your final response is delivered automatically when all tool \
+calls complete.
 
 Act on what you hear. If you don't call a tool to save something, you WILL forget it next \
 conversation. These are the kinds of moments to save — not an exhaustive list, use your \
@@ -121,7 +123,10 @@ on every update. For small config or metadata, use data_write to save a JSON fil
 one canonical file per topic — never create date-suffixed or numbered variants. If you \
 find duplicates, consolidate and delete the redundant ones with data_delete. Skill \
 instructions (skill.md) are separate from data — use skill_update to change instructions, \
-data_write/data_delete to manage flat files.
+data_write/data_delete to manage flat files. When editing an existing skill file \
+(assets/index.html, scripts, etc.), always use skill_edit_file with find/replace to change \
+only the specific lines that need updating — never rewrite the whole file. Full rewrites of \
+large files will be truncated and fail.
 
 When someone asks for an interactive skill, dashboard, tracker, widget, panel, or small web UI, \
 prefer building it as an embedded skill mini-app instead of pasting raw HTML in chat. Use the \
@@ -166,6 +171,11 @@ _ROUTINE_PREAMBLE = (
 # Short filler like "Let me check" / "Un momento" / "ちょっと待って" are all
 # under this threshold regardless of language.
 _INTERIM_MIN_CHARS = 40
+
+# Send a proactive progress message after this many consecutive silent tool
+# rounds (no LLM-produced interim text). Keeps the user informed during
+# long-running multi-step operations like bulk database writes.
+_PROGRESS_INTERVAL = 2
 
 # Phrases that indicate the LLM is planning/deliberating, not addressing the user.
 # When 3+ of these appear in a single interim block, it's a self-talk chain.
@@ -680,6 +690,7 @@ class AgentLoop:
         t0 = time.monotonic()
         tool_names_used: list[str] = []
         tool_rounds = 0
+        rounds_since_interim = 0
 
         # Reset per-run state
         self._household_confirmed.clear()
@@ -792,6 +803,7 @@ class AgentLoop:
             # Send interim text to user if the LLM said something substantive
             # alongside its tool calls (e.g. "Connecting to Home Assistant...")
             on_interim = interim_callback or self._on_interim
+            interim_sent = False
             if response.content and on_interim:
                 text = response.content.strip()
                 if _is_substantive_interim(text):
@@ -799,6 +811,7 @@ class AgentLoop:
                     # Support both sync and async callbacks
                     if hasattr(result, "__await__"):
                         await result
+                    interim_sent = True
 
             # Dispatch tool calls
             tool_rounds += 1
@@ -815,6 +828,26 @@ class AgentLoop:
                         tool_call_id=tc.id,
                     )
                 )
+
+            # Track consecutive silent rounds and send a proactive heartbeat
+            # so the user knows the agent is still working during long operations
+            # (e.g. bulk db_execute calls that produce no LLM-generated text).
+            if interim_sent:
+                rounds_since_interim = 0
+            else:
+                rounds_since_interim += 1
+                if rounds_since_interim >= _PROGRESS_INTERVAL and on_interim:
+                    tool_summary = ", ".join(
+                        dict.fromkeys(tc.name for tc in response.tool_calls)
+                    )
+                    progress_text = (
+                        f"Still working\u2026 (step {tool_rounds}, "
+                        f"using {tool_summary})"
+                    )
+                    prog_result = on_interim(progress_text)
+                    if hasattr(prog_result, "__await__"):
+                        await prog_result
+                    rounds_since_interim = 0
 
             # After the vision model's first response, strip image blocks
             # from history so subsequent rounds can use the fast model.

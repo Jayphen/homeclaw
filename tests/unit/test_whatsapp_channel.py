@@ -3,7 +3,7 @@
 import asyncio
 import json
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import ANY, AsyncMock, MagicMock
 
 import pytest
 
@@ -182,7 +182,7 @@ class TestMessageHandling:
         await channel._handle_message(ev)
 
         channel._loop.run.assert_awaited_once_with(
-            "what's for dinner?", "alice", channel=None,
+            "what's for dinner?", "alice", channel=None, interim_callback=ANY,
         )
         channel._client.reply_message.assert_awaited_once_with(
             "I'm homeclaw.", ev,
@@ -223,7 +223,7 @@ class TestMessageHandling:
         await channel._handle_message(ev)
 
         channel._loop.run.assert_awaited_once_with(
-            "[alice] dinner at 7", "alice", channel="group-120363001234567890",
+            "[alice] dinner at 7", "alice", channel="group-120363001234567890", interim_callback=ANY,
         )
 
     @pytest.mark.asyncio

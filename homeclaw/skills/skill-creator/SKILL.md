@@ -361,6 +361,10 @@ skill_edit_file(
 **Notes:**
 - The app runs on the same origin as homeclaw, so `fetch('/api/...')` works
 - Use `localStorage.getItem('homeclaw_token')` for the Bearer token
+- **When editing an existing `assets/index.html`, always use find/replace — never pass
+  `content=` with the full file.** Large HTML files exceed LLM output limits and the write
+  will be truncated and silently fail. Use `find=` / `replace=` to change only the lines
+  that need updating.
 - **Always include the owner in API paths** — `/api/skills/budget/...` is wrong,
   `/api/skills/household/budget/...` is correct. The owner is `household` for shared
   skills or the member's name for private skills

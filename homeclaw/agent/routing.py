@@ -57,6 +57,17 @@ _SIMPLE_WRITE_TOOLS = frozenset({
     "bookmark_save", "decision_log", "interaction_log",
 })
 
+# Tools that generate large content (file writes, skill edits) — the LLM
+# needs the full output-token budget to produce complete content without
+# being cut off mid-write.
+_LARGE_WRITE_TOOLS = frozenset({
+    "skill_edit_file",
+    "skill_create",
+    "skill_update",
+    "run_skill_script",
+    "note_save",
+})
+
 
 def classify_tool_round(tool_names: list[str]) -> CallType:
     """Classify a set of dispatched tool calls to pick the model for the next round.
@@ -65,7 +76,7 @@ def classify_tool_round(tool_names: list[str]) -> CallType:
     a cheaper model if the tools are simple read/write operations.
     """
     names = set(tool_names)
-    if names & _REASONING_TOOLS:
+    if names & (_REASONING_TOOLS | _LARGE_WRITE_TOOLS):
         return CallType.CONVERSATION
     if names and names <= _SIMPLE_WRITE_TOOLS:
         return CallType.MEMORY_WRITE

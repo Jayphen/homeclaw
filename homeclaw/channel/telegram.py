@@ -300,9 +300,10 @@ class TelegramChannel:
             if update.message:
                 await _send_markdown(update.message, text)
 
-        self._loop.set_interim_callback(_send_interim)
         try:
-            response = await self._loop.run(content, person, channel=channel)
+            response = await self._loop.run(
+                content, person, channel=channel, interim_callback=_send_interim,
+            )
         except Exception as exc:
             logger.exception("Agent loop failed for message from %s", person)
             # Surface a useful error message to the user

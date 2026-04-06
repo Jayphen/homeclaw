@@ -52,9 +52,10 @@ async def run_repl(
         def _print_interim(text: str) -> None:
             print(f"\n  … {text}")
 
-        loop.set_interim_callback(_print_interim)
         try:
-            response = await loop.run(message, person)
+            response = await loop.run(
+                message, person, interim_callback=_print_interim,
+            )
         except KeyboardInterrupt:
             print("\n[interrupted]")
             continue
