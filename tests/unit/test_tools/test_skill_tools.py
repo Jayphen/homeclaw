@@ -923,3 +923,55 @@ def test_skill_creator_builtin_instructions_cover_existing_skill_mini_apps() -> 
     assert "Never use `{name}__data_write` for `SKILL.md` or `assets/index.html`" in skill_md
     assert "https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs" in skill_md
     assert "dist/index.js" not in skill_md
+
+
+@pytest.mark.asyncio
+async def test_skill_edit_file_can_read_builtin_skill_files(
+    tmp_path: Path, workspaces: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reading files from built-in skills should be allowed; writing should not."""
+    # Create a fake builtin skill with a reference file
+    builtin_dir = tmp_path / "builtins"
+    skill_dir = builtin_dir / "my-builtin" / "references"
+    skill_dir.mkdir(parents=True)
+    (builtin_dir / "my-builtin" / "SKILL.md").write_text(
+        "---\nname: my-builtin\ndescription: Built-in test skill\n---\nDo the thing.\n"
+    )
+    (skill_dir / "api.md").write_text("# API\nSome reference content.")
+    monkeypatch.setattr(
+        "homeclaw.plugins.skills.loader._builtin_skills_dir",
+        lambda: builtin_dir,
+    )
+
+    reg = ToolRegistry()
+    register_builtin_tools(reg, workspaces)
+
+    # Read should succeed
+    result = await reg.get_handler("skill_edit_file")(  # type: ignore[misc]
+        person="alice",
+        name="my-builtin",
+        file="references/api.md",
+    )
+    assert result["content"] == "# API\nSome reference content."
+    assert result["file"] == "references/api.md"
+
+    # Write should be blocked
+    write_result = await reg.get_handler("skill_edit_file")(  # type: ignore[misc]
+        person="alice",
+        name="my-builtin",
+        file="references/api.md",
+        content="# overwritten",
+    )
+    assert "error" in write_result
+    assert "Cannot edit built-in skill" in write_result["error"]
+
+    # Find/replace should also be blocked
+    edit_result = await reg.get_handler("skill_edit_file")(  # type: ignore[misc]
+        person="alice",
+        name="my-builtin",
+        file="references/api.md",
+        find="# API",
+        replace="# REPLACED",
+    )
+    assert "error" in edit_result
+    assert "Cannot edit built-in skill" in edit_result["error"]
