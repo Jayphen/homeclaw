@@ -36,7 +36,7 @@ class RoutingConfig(BaseSettings):
     context_window: int = 200_000
 
     # Output token limits
-    max_output_tokens: int = 4096
+    max_output_tokens: int = 8192
     fast_max_output_tokens: int = 2048
 
     @model_validator(mode="after")

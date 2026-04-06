@@ -447,6 +447,49 @@ async def get_skill(owner: str, name: str) -> dict[str, Any]:
     }
 
 
+class DbQuery(BaseModel):
+    sql: str
+    params: list[Any] | None = None
+
+
+@router.post("/{owner}/{name}/db/query", dependencies=[AuthDep])
+async def skill_db_query(owner: str, name: str, body: DbQuery) -> dict[str, Any]:
+    """Run a read-only SELECT query against a skill's SQLite database.
+
+    Intended for Arrow.js web UIs that need to display skill data without
+    loading the full dataset.
+    """
+    import sqlite3
+
+    workspaces = get_config().workspaces.resolve()
+    skill_dir = _safe_relative(workspaces / owner / "skills", name)
+    if not skill_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Skill not found")
+
+    db_path = skill_dir / "data" / f"{name}.db"
+    if not db_path.is_file():
+        raise HTTPException(status_code=404, detail="No database found for this skill")
+
+    sql_upper = body.sql.strip().upper()
+    if not sql_upper.startswith("SELECT") and not sql_upper.startswith("WITH"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only SELECT queries are allowed from the API",
+        )
+
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        try:
+            cur = conn.execute(body.sql, body.params or [])
+            rows = [dict(row) for row in cur.fetchall()]
+            return {"rows": rows, "count": len(rows)}
+        finally:
+            conn.close()
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=400, detail=str(e)) from None
+
+
 @router.get("/{owner}/{name}/files/{file_path:path}", dependencies=[AuthDep])
 async def read_skill_file(owner: str, name: str, file_path: str) -> dict[str, Any]:
     """Read the content of a file inside a skill directory.

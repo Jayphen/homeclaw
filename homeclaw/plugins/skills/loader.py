@@ -345,10 +345,11 @@ def _substitute_env(text: str, env: dict[str, str]) -> str:
 class SkillPlugin:
     """Adapts a ``SkillDefinition`` into the Plugin Protocol.
 
-    Every skill gets ``data_list``, ``data_read``, ``data_write``, and
-    ``data_delete`` tools for managing files in its data directory.  Skills
-    that declare ``allowed_domains`` also get an ``http_call`` tool scoped
-    to those domains.
+    Every skill gets ``data_list``, ``data_read``, ``data_write``,
+    ``data_delete``, ``db_execute``, and ``db_query`` tools for managing
+    files and a SQLite database in its data directory.  Skills that declare
+    ``allowed_domains`` also get an ``http_call`` tool scoped to those
+    domains.
 
     Attributes:
         data_dir: The skill's data directory (``skill_dir/data/``).
@@ -392,9 +393,10 @@ class SkillPlugin:
     def tools(self) -> list[ToolDefinition]:
         """Return tool definitions for this skill.
 
-        Every skill gets ``data_list``, ``data_read``, ``data_write``, and
-        ``data_delete`` for managing files in its directory.  If the skill
-        declares ``allowed_domains``, it also gets ``http_call``.
+        Every skill gets ``data_list``, ``data_read``, ``data_write``,
+        ``data_delete``, ``db_execute``, and ``db_query`` for managing files
+        and a SQLite database in its directory.  If the skill declares
+        ``allowed_domains``, it also gets ``http_call``.
         """
         defs: list[ToolDefinition] = [
             ToolDefinition(
@@ -461,6 +463,57 @@ class SkillPlugin:
                         },
                     },
                     "required": ["filename"],
+                },
+            ),
+            ToolDefinition(
+                name="db_execute",
+                description=(
+                    f"Execute a SQL statement against the '{self.name}' skill's "
+                    f"SQLite database (CREATE TABLE, INSERT, UPDATE, DELETE). "
+                    f"Use for schema setup and data writes. The database is at "
+                    f"data/{self.name}.db and is created on first use."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "sql": {
+                            "type": "string",
+                            "description": "SQL statement to execute",
+                        },
+                        "params": {
+                            "type": "array",
+                            "items": {},
+                            "description": (
+                                "Optional positional parameters for "
+                                "parameterized queries"
+                            ),
+                        },
+                    },
+                    "required": ["sql"],
+                },
+            ),
+            ToolDefinition(
+                name="db_query",
+                description=(
+                    f"Run a read-only SELECT query against the '{self.name}' "
+                    f"skill's SQLite database. Returns rows as a list of "
+                    f"objects. Arrow.js web UIs can also call this via "
+                    f"POST /api/skills/{{owner}}/{self.name}/db/query."
+                ),
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "sql": {
+                            "type": "string",
+                            "description": "SELECT statement",
+                        },
+                        "params": {
+                            "type": "array",
+                            "items": {},
+                            "description": "Optional positional parameters",
+                        },
+                    },
+                    "required": ["sql"],
                 },
             ),
         ]
@@ -597,6 +650,14 @@ class SkillPlugin:
                 body=body,
                 config=config,
             )
+        if name == "db_execute":
+            return self._handle_db_execute(
+                args.get("sql", ""), args.get("params"),
+            )
+        if name == "db_query":
+            return self._handle_db_query(
+                args.get("sql", ""), args.get("params"),
+            )
         if name == "get_env":
             return self._handle_get_env(args.get("key", ""))
         return {"error": f"Unknown tool: {name}"}
@@ -666,6 +727,60 @@ class SkillPlugin:
             return {"error": f"File not found: {filename}"}
         path.unlink()
         return {"filename": filename, "status": "deleted"}
+
+    @property
+    def _db_path(self) -> Path:
+        """Path to this skill's SQLite database."""
+        return self.data_dir / f"{self.name}.db"
+
+    def _handle_db_execute(
+        self, sql: str, params: list[Any] | None = None,
+    ) -> dict[str, Any]:
+        import sqlite3
+
+        if not sql:
+            return {"error": "sql is required"}
+        try:
+            conn = sqlite3.connect(self._db_path)
+            try:
+                cur = conn.execute(sql, params or [])
+                conn.commit()
+                return {
+                    "rowcount": cur.rowcount,
+                    "lastrowid": cur.lastrowid,
+                    "status": "ok",
+                }
+            finally:
+                conn.close()
+        except sqlite3.Error as e:
+            return {"error": str(e)}
+
+    def _handle_db_query(
+        self, sql: str, params: list[Any] | None = None,
+    ) -> dict[str, Any]:
+        import sqlite3
+
+        if not sql:
+            return {"error": "sql is required"}
+        sql_upper = sql.strip().upper()
+        if not sql_upper.startswith("SELECT") and not sql_upper.startswith("WITH"):
+            return {
+                "error": (
+                    "db_query only allows SELECT statements; "
+                    "use db_execute for writes"
+                ),
+            }
+        try:
+            conn = sqlite3.connect(self._db_path)
+            conn.row_factory = sqlite3.Row
+            try:
+                cur = conn.execute(sql, params or [])
+                rows = [dict(row) for row in cur.fetchall()]
+                return {"rows": rows, "count": len(rows)}
+            finally:
+                conn.close()
+        except sqlite3.Error as e:
+            return {"error": str(e)}
 
     def _handle_get_env(self, key: str) -> dict[str, Any]:
         import os

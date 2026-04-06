@@ -155,9 +155,29 @@ it becomes active. Check pending skills with `skill_pending_list`.
 
 ## Data management
 
-Skills with persistent state use the `data/` directory:
-- Use one canonical file per topic (e.g., `spending.md`)
-- Append new entries — don't create date-suffixed files
+### Choosing a storage format
+
+| Data type | Format | Tools |
+|-----------|--------|-------|
+| Structured growing data (transactions, logs, health records) | SQLite | `db_execute` (write), `db_query` (read) |
+| Small config / metadata | JSON | `data_write`, `data_read` |
+| Freeform notes, diary | Markdown | `data_write`, `data_read` |
+
+**Use SQLite for any data that grows over time.** A budget skill used for a
+year accumulates hundreds of transactions — SQLite handles queries like
+"sum spending by category last month" with a single SELECT, without reading
+the entire history into context. The database lives at `data/{skill_name}.db`.
+
+**Schema setup:** On first use, call `db_execute` with
+`CREATE TABLE IF NOT EXISTS ...` to initialize the schema.
+
+**Web UI access:** Arrow.js apps can query SQLite via
+`POST /api/skills/{owner}/{name}/db/query` with `{sql, params}` — SELECT only.
+Writes go through the agent (LLM calls `db_execute`).
+
+### Rules
+- One canonical database per skill (auto-located at `data/{skill_name}.db`)
+- Use `data_write` only for small JSON config files, never for growing lists
 - Always call `data_list` before `data_write` to check for existing files
 - Consolidate duplicates if found
 
@@ -272,12 +292,22 @@ tiny (~5KB). Load it from CDN or vendor it into `assets/`:
   const token = localStorage.getItem('homeclaw_token') ?? ''
   const headers = { Authorization: `Bearer ${token}` }
 
-  // Load skill data from the files API
+  // Load skill data — use SQLite for structured/growing data:
   const state = reactive({ items: [], loading: true })
 
-  fetch('/api/skills/household/my-skill/files/data/items.json', { headers })
-    .then(r => r.ok ? r.json() : { items: [] })
-    .then(d => { state.items = d.items ?? []; state.loading = false })
+  // SQLite query (preferred for growing data):
+  fetch('/api/skills/household/my-skill/db/query', {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sql: 'SELECT * FROM items ORDER BY created_at DESC' })
+  })
+    .then(r => r.ok ? r.json() : { rows: [] })
+    .then(d => { state.items = d.rows ?? []; state.loading = false })
+
+  // Or for small JSON config files:
+  // fetch('/api/skills/household/my-skill/files/data/config.json', { headers })
+  //   .then(r => r.ok ? r.json() : {})
+  //   .then(d => { ... })
 
   html`
     ${() => state.loading
@@ -331,6 +361,10 @@ skill_edit_file(
 **Notes:**
 - The app runs on the same origin as homeclaw, so `fetch('/api/...')` works
 - Use `localStorage.getItem('homeclaw_token')` for the Bearer token
-- Data lives in `data/` — read via `/api/skills/{owner}/{name}/files/data/filename`
-- Write data back via the agent using `{name}__data_write`; the UI is read-only by default
+- **Always include the owner in API paths** — `/api/skills/budget/...` is wrong,
+  `/api/skills/household/budget/...` is correct. The owner is `household` for shared
+  skills or the member's name for private skills
+- JSON data files: `GET /api/skills/{owner}/{name}/files/data/filename`
+- SQLite queries: `POST /api/skills/{owner}/{name}/db/query` with `{sql, params}` body (SELECT only)
+- Writes go through the agent (LLM calls `db_execute` / `data_write`); the UI is read-only
 - LAN-only installs: vendor Arrow.js into `assets/arrow.js` and use a relative import
