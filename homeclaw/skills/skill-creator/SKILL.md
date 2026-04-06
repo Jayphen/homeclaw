@@ -271,7 +271,18 @@ ui-app:
 ```
 
 **Arrow.js is the preferred framework** — zero build step, reactive,
-tiny (~5KB). Load it from CDN or vendor it into `assets/`:
+tiny (~5KB). Load it from CDN or vendor it into `assets/`.
+
+Before writing Arrow.js code, read the bundled references for correct API usage:
+- `references/api.md` — reactive state, html templates, components, watch semantics
+- `references/examples.md` — counter, list rendering, event handlers, keyed lists
+- `references/getting-started.md` — no-build pattern, CDN import, mental model
+
+Read them with:
+```
+skill_edit_file(name="skill-creator", file="references/api.md")
+skill_edit_file(name="skill-creator", file="references/examples.md")
+```
 
 ```html
 <!-- assets/index.html -->

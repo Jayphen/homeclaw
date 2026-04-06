@@ -2158,7 +2158,6 @@ def register_builtin_tools(
         locations = [sk for sk in discover_skills(workspaces, person) if sk.name == name]
         if owner is not None:
             locations = [sk for sk in locations if sk.scope == owner]
-        locations = [sk for sk in locations if sk.scope != "builtin"]
 
         if not locations:
             return None, {
@@ -2260,22 +2259,24 @@ def register_builtin_tools(
         if err is not None:
             return err
         assert loc is not None
-        if loc.scope == "builtin":
-            return {
-                "error": f"Cannot edit built-in skill '{name}'. Install a copy to household or personal skills first."
-            }
 
         # Resolve and validate path
         path = (loc.skill_dir / file).resolve()
         if not path.is_relative_to(loc.skill_dir.resolve()):
             return {"error": f"Invalid file path: {file}"}
 
-        # Read mode
+        # Read mode — allowed for built-in skills too
         if content is None and find is None:
             if not path.is_file():
                 return {"error": f"File not found: {file}"}
             text = path.read_text()
             return {"file": file, "content": text, "size": len(text)}
+
+        # Write/edit mode — built-in skills are read-only
+        if loc.scope == "builtin":
+            return {
+                "error": f"Cannot edit built-in skill '{name}'. Install a copy to household or personal skills first."
+            }
 
         # Find/replace mode
         if find is not None:
