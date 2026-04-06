@@ -876,6 +876,108 @@ def register_builtin_tools(
 
         return result
 
+    # --- Browser tool — requires agent-browser CLI and Chrome/Chromium ---
+
+    if config and config.browser_enabled:
+        import shutil
+
+        if shutil.which("agent-browser"):
+
+            @_reg(
+                name="web_browse",
+                description=(
+                    "Browse a web page using a real browser (handles JavaScript-rendered "
+                    "content). Returns the page's accessibility tree by default — a "
+                    "structured text representation suitable for reasoning. Can also "
+                    "take screenshots, click elements, or fill forms. Use this when "
+                    "web_read fails on JavaScript-heavy sites, for skill UI verification, "
+                    "or when you need to interact with a page. Requires agent-browser."
+                ),
+            )
+            async def web_browse(
+                *,
+                url: Annotated[str, Desc("The URL to open")],
+                action: Annotated[
+                    Literal["snapshot", "screenshot", "click", "fill"],
+                    Desc(
+                        "Action after loading: snapshot (accessibility tree), "
+                        "screenshot, click (requires selector), fill (requires selector + value)"
+                    ),
+                ] = "snapshot",
+                selector: Annotated[
+                    str | None,
+                    Desc("CSS selector for the element to click or fill"),
+                ] = None,
+                value: Annotated[
+                    str | None,
+                    Desc("Text to type into the element (for fill action)"),
+                ] = None,
+                **_: Any,
+            ) -> dict[str, Any]:
+                import asyncio
+                import urllib.parse
+
+                _BLOCKED_SCHEMES = {"file", "javascript", "data", "chrome", "chrome-extension"}
+                _MAX_OUTPUT_CHARS = 50_000
+                _TIMEOUT_SECS = 30
+
+                parsed = urllib.parse.urlparse(url)
+                if parsed.scheme.lower() in _BLOCKED_SCHEMES:
+                    return {"error": f"URL scheme '{parsed.scheme}' is not allowed"}
+
+                async def _run(*args: str) -> tuple[str, str, int]:
+                    proc = await asyncio.create_subprocess_exec(
+                        "agent-browser",
+                        *args,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    try:
+                        stdout_b, stderr_b = await asyncio.wait_for(
+                            proc.communicate(), timeout=_TIMEOUT_SECS
+                        )
+                    except TimeoutError:
+                        proc.kill()
+                        await proc.communicate()
+                        return "", "agent-browser timed out", -1
+                    return (
+                        stdout_b.decode(errors="replace"),
+                        stderr_b.decode(errors="replace"),
+                        proc.returncode or 0,
+                    )
+
+                # Open the URL
+                _out, err, code = await _run("open", url)
+                if code != 0:
+                    return {"error": f"Failed to open URL: {err.strip() or 'unknown error'}"}
+
+                # Perform the requested action
+                if action == "snapshot":
+                    out, err, code = await _run("snapshot")
+                elif action == "screenshot":
+                    out, err, code = await _run("screenshot")
+                elif action == "click":
+                    if not selector:
+                        return {"error": "selector is required for click action"}
+                    out, err, code = await _run("click", selector)
+                elif action == "fill":
+                    if not selector:
+                        return {"error": "selector is required for fill action"}
+                    if value is None:
+                        return {"error": "value is required for fill action"}
+                    out, err, code = await _run("fill", selector, value)
+                else:
+                    return {"error": f"Unknown action: {action}"}
+
+                if code != 0:
+                    msg = err.strip() or "unknown error"
+                    return {"error": f"agent-browser {action} failed: {msg}"}
+
+                if len(out) > _MAX_OUTPUT_CHARS:
+                    out = out[:_MAX_OUTPUT_CHARS] + "\n\n[… truncated]"
+
+                return {"url": url, "action": action, "output": out}
+
     # --- Message tool — delivers via channel dispatcher ---
 
     @_reg(

@@ -82,3 +82,43 @@ Each capability (search, read) has a **primary** and optional **fallback** provi
 Custom web providers are added via [Python plugins](/guides/plugins#custom-web-providers). A plugin implements the `WebSearchProvider` or `WebReadProvider` protocol and declares providers via `web_providers()`. See the [Plugins guide](/guides/plugins#custom-web-providers) for a full example.
 
 Then set `web_search_provider: "your-provider"` in config. The Settings UI dynamically lists all registered providers.
+
+## Browser automation
+
+homeclaw can browse JavaScript-rendered pages and verify skill UIs using the [agent-browser](https://github.com/vercel-labs/agent-browser) CLI.
+
+### Setup
+
+1. Install agent-browser and Chrome:
+   - macOS: `brew install agent-browser` (Chrome is detected automatically)
+   - npm: `npm i -g agent-browser`
+   - Docker: add `chromium` and `npm` to `workspaces/household/packages.txt`, then add `npm install -g agent-browser` to your entrypoint
+
+2. Enable browser automation in Settings or `config.json`:
+
+```json
+{ "browser_enabled": true }
+```
+
+### `web_browse` tool
+
+When enabled, the agent gains a `web_browse` tool:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `url` | string | URL to open |
+| `action` | `snapshot` \| `screenshot` \| `click` \| `fill` | Action to perform (default: `snapshot`) |
+| `selector` | string | CSS selector (required for `click`/`fill`) |
+| `value` | string | Text to type (required for `fill`) |
+
+`snapshot` returns the page's accessibility tree — a structured text representation ideal for LLM reasoning. `screenshot` returns base64-encoded image data.
+
+### Skill UI verification
+
+Skills with embedded Arrow.js UIs can be verified after creation:
+
+```
+web_browse(url="http://localhost:8080/api/skills/household/my-skill/assets/index.html")
+```
+
+This lets the agent confirm the UI renders correctly before reporting back to the user.

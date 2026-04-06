@@ -487,6 +487,7 @@ class FakeConfig:
     ) -> None:
         self.admin_members = admin_members or []
         self.skill_approval_required = skill_approval_required
+        self.browser_enabled = False
 
 
 @pytest.fixture
