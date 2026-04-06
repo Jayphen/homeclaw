@@ -114,12 +114,14 @@ When someone asks for suggestions — what to do, where to eat, what to cook —
 bookmarks with bookmark_search before answering. The household has been collecting these \
 recommendations for a reason.
 
-When working with skill data files: always call data_list before writing to check what \
-files already exist. Use one canonical file per topic (e.g. 'spending.md') and append to \
-it — never create date-suffixed or numbered variants like 'spending_march_2026.md' or \
-'spending_1.md'. If you find duplicates, consolidate into the canonical file and delete \
-the redundant ones with data_delete. Skill instructions (skill.md) are separate from data \
-— use skill_update to change instructions, data_write/data_delete to manage data files.
+When working with skill data: for structured data that grows over time (transactions, \
+logs, records, contacts), use the skill's SQLite database via db_execute (CREATE TABLE, \
+INSERT, UPDATE, DELETE) and db_query (SELECT). This avoids rewriting the entire dataset \
+on every update. For small config or metadata, use data_write to save a JSON file. Use \
+one canonical file per topic — never create date-suffixed or numbered variants. If you \
+find duplicates, consolidate and delete the redundant ones with data_delete. Skill \
+instructions (skill.md) are separate from data — use skill_update to change instructions, \
+data_write/data_delete to manage flat files.
 
 When someone asks for an interactive skill, dashboard, tracker, widget, panel, or small web UI, \
 prefer building it as an embedded skill mini-app instead of pasting raw HTML in chat. Use the \
@@ -127,8 +129,11 @@ skill-creator guidance, and prefer the dedicated `skill_enable_ui_app` tool when
 SKILL.md and `assets/index.html` are written deterministically. Add `ui-app:` to the skill frontmatter, \
 write the app to `assets/index.html`, and prefer Arrow.js for the UI. For browser-loaded Arrow apps, use an ESM import such as \
 `https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs`. The app should read the auth token \
-from `localStorage.getItem('homeclaw_token')` and call the homeclaw `/api/skills/...` endpoints so \
-it renders directly inside the web UI skill page.
+from `localStorage.getItem('homeclaw_token')` and call the homeclaw skill API endpoints. \
+Data files: `GET /api/skills/{{owner}}/{{name}}/files/data/{{filename}}`. \
+SQLite queries: `POST /api/skills/{{owner}}/{{name}}/db/query` with `{{sql, params}}`. \
+The `{{owner}}` is `household` for shared skills or the member's name for private ones — \
+always include it (`/api/skills/household/budget/...` not `/api/skills/budget/...`).
 
 Be proactive, not just reactive. When you notice something relevant in the context, mention \
 it briefly — a birthday coming up, a contact overdue for a check-in, a reminder that is due, \
@@ -839,6 +844,22 @@ class AgentLoop:
                     logger.debug("Re-routed after tools %s → %s (%s)", tool_names, model, current_call_type.value)
                 self._current_model = model
                 extra = {"model": model}
+
+        if response and response.stop_reason == "max_tokens":
+            logger.warning("LLM output truncated at max_tokens — suppressing raw content")
+            _save_history(self._workspaces, history_key, history)
+            if metadata is not None:
+                metadata.update(
+                    model=self._current_model, tools=tool_names_used,
+                    tool_rounds=tool_rounds,
+                    prompt_sections=[section.name for section in prompt_sections],
+                    duration_ms=int((time.monotonic() - t0) * 1000),
+                )
+            return (
+                "Sorry, I ran out of output space before finishing. "
+                "The data might be too large for a single response — "
+                "try breaking it into smaller requests, or start a fresh conversation."
+            )
 
         if response and response.stop_reason == "tool_use":
             logger.warning(
