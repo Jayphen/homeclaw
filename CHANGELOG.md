@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.0](https://github.com/Jayphen/homeclaw/compare/v0.26.1...v0.27.0) (2026-04-06)
+
+
+### Features
+
+* bundle Arrow.js skill references into skill-creator ([#135](https://github.com/Jayphen/homeclaw/issues/135)) ([8d421ec](https://github.com/Jayphen/homeclaw/commit/8d421ecc848d07e01f4c6adeee5e80142f6197f8))
+
 ## [0.26.1](https://github.com/Jayphen/homeclaw/compare/v0.26.0...v0.26.1) (2026-04-06)
 
 
