@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.2](https://github.com/Jayphen/homeclaw/compare/v0.28.1...v0.28.2) (2026-04-07)
+
+
+### Bug Fixes
+
+* bump neonize to &gt;=0.3.16 to fix WhatsApp 405 client outdated error ([#145](https://github.com/Jayphen/homeclaw/issues/145)) ([c9aef4c](https://github.com/Jayphen/homeclaw/commit/c9aef4c1798b6f0b93bbe11938fb2c8c6d37b79e))
+* skip package install on boot if already installed ([#143](https://github.com/Jayphen/homeclaw/issues/143)) ([b275c71](https://github.com/Jayphen/homeclaw/commit/b275c71dcf4df89f18849aaf85d758ab5161fd59))
+
 ## [0.28.1](https://github.com/Jayphen/homeclaw/compare/v0.28.0...v0.28.1) (2026-04-06)
 
 
