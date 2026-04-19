@@ -5,7 +5,7 @@ from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import EllipsisType
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Protocol, runtime_checkable
 
 from homeclaw import HOUSEHOLD_WORKSPACE
 from homeclaw.agent.providers.base import ToolDefinition
@@ -111,6 +111,20 @@ def load_skill_instructions(workspaces: Path, person: str, skill_name: str) -> s
     defn = skill_md_to_definition(skill_path.read_text())
     activated_skills.add(skill_name)
     return defn.instructions
+
+
+@runtime_checkable
+class ToolManifest(Protocol):
+    """Read-only view of registered tool schemas and policies.
+
+    Consumers that only need to inspect tools (not dispatch them) should
+    depend on this instead of ToolRegistry. ToolRegistry satisfies this
+    protocol structurally — no changes to callers that already hold one.
+    """
+
+    def get_definitions(self) -> list[ToolDefinition]: ...
+    def get_policy(self, name: str) -> ToolPolicy | None: ...
+    def has_tool(self, name: str) -> bool: ...
 
 
 class ToolRegistry:

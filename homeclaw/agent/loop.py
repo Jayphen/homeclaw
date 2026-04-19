@@ -30,7 +30,7 @@ from homeclaw.agent.runtime_state import (
     now_utc,
 )
 from homeclaw.agent.tool_decorator import ToolPolicy
-from homeclaw.agent.tools import ToolRegistry
+from homeclaw.agent.tools import ToolManifest, ToolRegistry
 from homeclaw.locking import LockPool
 from homeclaw.memory.semantic import SemanticMemory
 
@@ -278,10 +278,10 @@ def _policy_to_entry(tool_name: str, policy: ToolPolicy | None) -> ToolPolicyEnt
     )
 
 
-def describe_tool_policies(registry: ToolRegistry) -> list[ToolPolicyEntry]:
+def describe_tool_policies(manifest: ToolManifest) -> list[ToolPolicyEntry]:
     """Return deterministic policy classifications for all registered tools."""
-    tool_names = sorted(defn.name for defn in registry.get_definitions())
-    return [_policy_to_entry(name, registry.get_policy(name)) for name in tool_names]
+    tool_names = sorted(defn.name for defn in manifest.get_definitions())
+    return [_policy_to_entry(name, manifest.get_policy(name)) for name in tool_names]
 
 
 def _estimate_message_tokens(msg: Message) -> int:
