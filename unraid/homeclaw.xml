@@ -26,9 +26,9 @@
 
   <Config Name="Anthropic API Key" Target="ANTHROPIC_API_KEY" Default="" Description="Can also be set via web UI at Settings" Type="Variable" Display="advanced" Required="false"></Config>
 
-  <Config Name="OpenAI API Key" Target="OPENAI_API_KEY" Default="" Description="For OpenAI or OpenRouter. Can also be set via web UI at Settings" Type="Variable" Display="advanced" Required="false"></Config>
+  <Config Name="OpenAI API Key" Target="OPENAI_API_KEY" Default="" Description="For OpenAI, OpenRouter, Kimi, Gemini, or another OpenAI-compatible provider. Can also be set via web UI at Settings" Type="Variable" Display="advanced" Required="false"></Config>
 
-  <Config Name="OpenAI Base URL" Target="OPENAI_BASE_URL" Default="" Description="Custom endpoint (OpenRouter, Ollama, etc.). Can also be set via web UI" Type="Variable" Display="advanced" Required="false"></Config>
+  <Config Name="OpenAI Base URL" Target="OPENAI_BASE_URL" Default="" Description="Custom endpoint (OpenRouter, Kimi, Gemini, Ollama, etc.). Can also be set via web UI" Type="Variable" Display="advanced" Required="false"></Config>
 
   <Config Name="Model" Target="MODEL" Default="claude-sonnet-4-6" Description="LLM model name. Can also be set via web UI" Type="Variable" Display="advanced" Required="false"></Config>
 
