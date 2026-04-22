@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.29.1](https://github.com/Jayphen/homeclaw/compare/v0.29.0...v0.29.1) (2026-04-22)
+
+
+### Bug Fixes
+
+* preserve Gemini thought signatures across tool rounds ([#151](https://github.com/Jayphen/homeclaw/issues/151)) ([87d3420](https://github.com/Jayphen/homeclaw/commit/87d3420b72763c15fd533e27f076757b1f7c3161))
+
 ## [0.29.0](https://github.com/Jayphen/homeclaw/compare/v0.28.2...v0.29.0) (2026-04-22)
 
 
