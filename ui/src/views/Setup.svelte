@@ -11,7 +11,7 @@
 
   // Form state
   let setupToken: string = $state("");
-  type SetupProvider = "anthropic" | "openai" | "openrouter" | "kimi";
+  type SetupProvider = "anthropic" | "openai" | "openrouter" | "kimi" | "gemini";
   let provider: SetupProvider = $state("anthropic");
   let anthropicKey: string = $state("");
   let openaiKey: string = $state("");
@@ -28,6 +28,7 @@
     openai: { protocol: "openai", model: "gpt-4o", fastModel: "gpt-4o-mini", baseUrl: "https://api.openai.com/v1" },
     openrouter: { protocol: "openai", model: "anthropic/claude-sonnet-4-6", fastModel: "anthropic/claude-haiku-4-5", baseUrl: "https://openrouter.ai/api/v1" },
     kimi: { protocol: "openai", model: "kimi-k2.6", fastModel: "kimi-k2.5", baseUrl: "https://api.moonshot.ai/v1" },
+    gemini: { protocol: "openai", model: "gemini-2.5-flash", fastModel: "gemini-2.5-flash", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/" },
   };
 
   function switchProvider(p: SetupProvider) {
@@ -220,6 +221,9 @@
           <button class:selected={provider === "kimi"} onclick={() => switchProvider("kimi")}>
             Kimi
           </button>
+          <button class:selected={provider === "gemini"} onclick={() => switchProvider("gemini")}>
+            Gemini
+          </button>
         </div>
 
         {#if providerDefaults[provider].protocol === "anthropic"}
@@ -233,6 +237,7 @@
           <div class="presets">
             {#each [
               ["Kimi", "https://api.moonshot.ai/v1"],
+              ["Gemini", "https://generativelanguage.googleapis.com/v1beta/openai/"],
               ["OpenRouter", "https://openrouter.ai/api/v1"],
               ["Ollama", "http://localhost:11434/v1"],
               ["Groq", "https://api.groq.com/openai/v1"],

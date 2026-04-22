@@ -196,7 +196,7 @@
   }
 
   // ---- Provider: simple / advanced ----
-  type SimpleProvider = "anthropic" | "openai" | "openrouter" | "minimax" | "kimi";
+  type SimpleProvider = "anthropic" | "openai" | "openrouter" | "minimax" | "kimi" | "gemini";
   let providerMode: "simple" | "advanced" = $state("simple");
   let simpleProvider: SimpleProvider = $state("anthropic");
   let simpleApiKey: string = $state("");
@@ -209,6 +209,7 @@
       ["MiniMax", "https://api.minimax.io/anthropic"],
     ],
     openai: [
+      ["Gemini", "https://generativelanguage.googleapis.com/v1beta/openai/"],
       ["Kimi", "https://api.moonshot.ai/v1"],
       ["OpenRouter", "https://openrouter.ai/api/v1"],
       ["Ollama", "http://localhost:11434/v1"],
@@ -230,6 +231,7 @@
     openrouter: { label: "OpenRouter", protocol: "openai", baseUrl: "https://openrouter.ai/api/v1", keyHint: "sk-or-...", modelHint: "e.g. anthropic/claude-sonnet-4-6" },
     minimax: { label: "MiniMax", protocol: "openai", baseUrl: "https://api.minimax.io/v1", keyHint: "eyJ...", modelHint: "e.g. MiniMax-M1-80k" },
     kimi: { label: "Kimi", protocol: "openai", baseUrl: "https://api.moonshot.ai/v1", keyHint: "sk-...", modelHint: "e.g. kimi-k2.6" },
+    gemini: { label: "Gemini", protocol: "openai", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/", keyHint: "AIza...", modelHint: "e.g. gemini-2.5-flash" },
   };
 
   let simpleCurrentKey = $derived(
@@ -242,6 +244,7 @@
     if (aUrl.includes("openrouter") || oUrl.includes("openrouter")) return "openrouter";
     if (aUrl.includes("minimax") || oUrl.includes("minimax")) return "minimax";
     if (aUrl.includes("moonshot") || oUrl.includes("moonshot")) return "kimi";
+    if (aUrl.includes("generativelanguage.googleapis.com") || oUrl.includes("generativelanguage.googleapis.com")) return "gemini";
     if (s.provider === "anthropic") return "anthropic";
     if (s.provider === "openai") return "openai";
     return s.anthropic_api_key ? "anthropic" : "openai";
@@ -253,6 +256,7 @@
       if (anthropicBaseUrl.includes("minimax")) return "minimax";
       return "anthropic";
     }
+    if (openaiBaseUrl.includes("generativelanguage.googleapis.com")) return "gemini";
     if (openaiBaseUrl.includes("moonshot")) return "kimi";
     if (openaiBaseUrl.includes("openrouter")) return "openrouter";
     if (openaiBaseUrl.includes("minimax")) return "minimax";
@@ -718,7 +722,7 @@ $effect(() => {
           <div class="field">
             <span class="field-label">Provider</span>
             <div class="provider-grid">
-              {#each (["anthropic", "openai", "openrouter", "minimax", "kimi"] as SimpleProvider[]) as p}
+              {#each (["anthropic", "openai", "openrouter", "minimax", "kimi", "gemini"] as SimpleProvider[]) as p}
                 <button class:selected={simpleProvider === p} onclick={() => { simpleProvider = p; }}>
                   {SIMPLE_PROVIDERS[p].label}
                 </button>
