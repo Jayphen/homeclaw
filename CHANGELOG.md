@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.29.0](https://github.com/Jayphen/homeclaw/compare/v0.28.2...v0.29.0) (2026-04-22)
+
+
+### Features
+
+* add Kimi and Gemini OpenAI-compatible provider presets ([#149](https://github.com/Jayphen/homeclaw/issues/149)) ([2e6445e](https://github.com/Jayphen/homeclaw/commit/2e6445ed726965922ad6585125f45040fe24dcfd))
+
 ## [0.28.2](https://github.com/Jayphen/homeclaw/compare/v0.28.1...v0.28.2) (2026-04-07)
 
 
