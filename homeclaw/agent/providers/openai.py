@@ -116,6 +116,7 @@ def _to_api_message(message: Message) -> dict[str, Any]:
                         "name": tc.name,
                         "arguments": json.dumps(tc.arguments),
                     },
+                    **({"thought_signature": tc.thought_signature} if tc.thought_signature else {}),
                 }
                 for tc in message.tool_calls
             ]
@@ -192,6 +193,7 @@ def _parse_response(response: ChatCompletion) -> LLMResponse:
                     id=tc.id,
                     name=tc.function.name,
                     arguments=arguments,
+                    thought_signature=getattr(tc, "thought_signature", None),
                 )
             )
 
