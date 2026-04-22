@@ -11,22 +11,30 @@
 
   // Form state
   let setupToken: string = $state("");
-  let provider: "anthropic" | "openai" = $state("anthropic");
+  type SetupProvider = "anthropic" | "openai" | "openrouter" | "kimi";
+  let provider: SetupProvider = $state("anthropic");
   let anthropicKey: string = $state("");
   let openaiKey: string = $state("");
   let openaiBaseUrl: string = $state("https://openrouter.ai/api/v1");
   let model: string = $state("claude-sonnet-4-6");
 
-  const providerDefaults: Record<string, { model: string; fastModel: string; baseUrl?: string }> = {
-    anthropic: { model: "claude-sonnet-4-6", fastModel: "claude-haiku-4-5" },
-    openai: { model: "anthropic/claude-sonnet-4-6", fastModel: "anthropic/claude-haiku-4-5", baseUrl: "https://openrouter.ai/api/v1" },
+  const providerDefaults: Record<SetupProvider, {
+    protocol: "anthropic" | "openai";
+    model: string;
+    fastModel: string;
+    baseUrl?: string;
+  }> = {
+    anthropic: { protocol: "anthropic", model: "claude-sonnet-4-6", fastModel: "claude-haiku-4-5" },
+    openai: { protocol: "openai", model: "gpt-4o", fastModel: "gpt-4o-mini", baseUrl: "https://api.openai.com/v1" },
+    openrouter: { protocol: "openai", model: "anthropic/claude-sonnet-4-6", fastModel: "anthropic/claude-haiku-4-5", baseUrl: "https://openrouter.ai/api/v1" },
+    kimi: { protocol: "openai", model: "kimi-k2.6", fastModel: "kimi-k2.5", baseUrl: "https://api.moonshot.ai/v1" },
   };
 
-  function switchProvider(p: "anthropic" | "openai") {
+  function switchProvider(p: SetupProvider) {
     provider = p;
     const defaults = providerDefaults[p];
     model = defaults.model;
-    if (defaults.baseUrl) openaiBaseUrl = defaults.baseUrl;
+    openaiBaseUrl = defaults.baseUrl || "";
   }
   let telegramToken: string = $state("");
   let telegramAllowedUsers: string = $state("");
@@ -83,12 +91,12 @@
         const defaults = providerDefaults[provider];
         const body: Record<string, string | boolean | null> = {
           setup_token: setupToken || null,
-          provider,
+          provider: defaults.protocol,
           model,
           conversation_model: model,
           fast_model: defaults.fastModel,
         };
-        if (provider === "anthropic") {
+        if (defaults.protocol === "anthropic") {
           body.anthropic_api_key = anthropicKey;
           body.openai_api_key = "";
           body.openai_base_url = "";
@@ -204,20 +212,27 @@
             Anthropic
           </button>
           <button class:selected={provider === "openai"} onclick={() => switchProvider("openai")}>
-            OpenAI / OpenRouter
+            OpenAI
+          </button>
+          <button class:selected={provider === "openrouter"} onclick={() => switchProvider("openrouter")}>
+            OpenRouter
+          </button>
+          <button class:selected={provider === "kimi"} onclick={() => switchProvider("kimi")}>
+            Kimi
           </button>
         </div>
 
-        {#if provider === "anthropic"}
+        {#if providerDefaults[provider].protocol === "anthropic"}
           <label for="anthropic-key">Anthropic API key</label>
           <input id="anthropic-key" type="password" bind:value={anthropicKey} placeholder="sk-ant-..." />
         {:else}
           <label for="openai-key">API key</label>
           <input id="openai-key" type="password" bind:value={openaiKey} placeholder="sk-..." />
           <label for="base-url">Base URL</label>
-          <input id="base-url" type="url" bind:value={openaiBaseUrl} placeholder="https://openrouter.ai/api/v1" />
+          <input id="base-url" type="url" bind:value={openaiBaseUrl} placeholder={providerDefaults[provider].baseUrl || "https://api.openai.com/v1"} />
           <div class="presets">
             {#each [
+              ["Kimi", "https://api.moonshot.ai/v1"],
               ["OpenRouter", "https://openrouter.ai/api/v1"],
               ["Ollama", "http://localhost:11434/v1"],
               ["Groq", "https://api.groq.com/openai/v1"],

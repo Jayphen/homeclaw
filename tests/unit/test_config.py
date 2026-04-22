@@ -38,3 +38,13 @@ def test_config_workspaces_path():
     with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
         config = HomeclawConfig(workspaces_path="/tmp/test-ws")
         assert config.workspaces == Path("/tmp/test-ws")
+
+
+def test_config_treats_openai_compatible_base_url_as_configured():
+    """Custom OpenAI-compatible base URLs count as provider configuration."""
+    with patch.dict(os.environ, {}, clear=True):
+        config = HomeclawConfig(
+            workspaces_path="./test-workspaces",
+            openai_base_url="https://api.moonshot.ai/v1",
+        )
+        assert config.is_provider_configured is True

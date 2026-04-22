@@ -18,7 +18,7 @@ assistant, homeclaw is your family's.
 | **Memory** | Markdown files + semantic recall, scoped per person | Session-based |
 | **Contacts & relationships** | First-class — tracks people in your lives with interactions, reminders | Not built-in |
 | **Channels** | Telegram, WhatsApp, Web UI, REPL | 20+ (WhatsApp, Telegram, Slack, Discord, Signal, iMessage, etc.) |
-| **LLM providers** | Anthropic, OpenAI, OpenRouter, Ollama, any OpenAI-compatible | OpenAI (primary), multi-profile failover |
+| **LLM providers** | Anthropic, OpenAI, OpenRouter, Kimi, Ollama, any OpenAI-compatible | OpenAI (primary), multi-profile failover |
 | **Language** | Python 3.12 | TypeScript / Node.js |
 | **Plugin system** | Python plugins, Skill markdown, MCP sidecars | ClawHub skills platform |
 | **Scheduler** | ROUTINES.md — natural language cron for household tasks | Cron jobs, webhooks, Gmail Pub/Sub |
@@ -41,7 +41,7 @@ platform support, device companions, voice control, and a large ecosystem.
 You need an LLM API key — one of:
 
 - `ANTHROPIC_API_KEY` (direct Anthropic)
-- `OPENAI_API_KEY` + optional `OPENAI_BASE_URL` (OpenAI or OpenRouter)
+- `OPENAI_API_KEY` + optional `OPENAI_BASE_URL` (OpenAI, OpenRouter, Kimi, or another OpenAI-compatible provider)
 
 ### Docker (recommended)
 
@@ -115,8 +115,8 @@ overrides — useful for Docker deployments or CI:
 | Variable | Description |
 |----------|-------------|
 | `ANTHROPIC_API_KEY` | Anthropic API key |
-| `OPENAI_API_KEY` | OpenAI or OpenRouter API key |
-| `OPENAI_BASE_URL` | Custom endpoint (OpenRouter, Ollama, etc.) |
+| `OPENAI_API_KEY` | OpenAI-compatible API key (OpenAI, OpenRouter, Kimi, etc.) |
+| `OPENAI_BASE_URL` | Custom endpoint (OpenRouter, Kimi, Ollama, etc.) |
 | `MODEL` | Model name (e.g. `anthropic/claude-sonnet-4-6`) |
 | `TELEGRAM_TOKEN` | Telegram bot token |
 | `TELEGRAM_ALLOWED_USERS` | Comma-separated Telegram user IDs |

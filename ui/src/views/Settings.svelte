@@ -196,7 +196,7 @@
   }
 
   // ---- Provider: simple / advanced ----
-  type SimpleProvider = "anthropic" | "openai" | "openrouter" | "minimax";
+  type SimpleProvider = "anthropic" | "openai" | "openrouter" | "minimax" | "kimi";
   let providerMode: "simple" | "advanced" = $state("simple");
   let simpleProvider: SimpleProvider = $state("anthropic");
   let simpleApiKey: string = $state("");
@@ -209,6 +209,7 @@
       ["MiniMax", "https://api.minimax.io/anthropic"],
     ],
     openai: [
+      ["Kimi", "https://api.moonshot.ai/v1"],
       ["OpenRouter", "https://openrouter.ai/api/v1"],
       ["Ollama", "http://localhost:11434/v1"],
       ["Groq", "https://api.groq.com/openai/v1"],
@@ -228,6 +229,7 @@
     openai: { label: "OpenAI", protocol: "openai", baseUrl: null, keyHint: "sk-...", modelHint: "e.g. gpt-4o" },
     openrouter: { label: "OpenRouter", protocol: "openai", baseUrl: "https://openrouter.ai/api/v1", keyHint: "sk-or-...", modelHint: "e.g. anthropic/claude-sonnet-4-6" },
     minimax: { label: "MiniMax", protocol: "openai", baseUrl: "https://api.minimax.io/v1", keyHint: "eyJ...", modelHint: "e.g. MiniMax-M1-80k" },
+    kimi: { label: "Kimi", protocol: "openai", baseUrl: "https://api.moonshot.ai/v1", keyHint: "sk-...", modelHint: "e.g. kimi-k2.6" },
   };
 
   let simpleCurrentKey = $derived(
@@ -239,6 +241,7 @@
     const oUrl = s.openai_base_url || "";
     if (aUrl.includes("openrouter") || oUrl.includes("openrouter")) return "openrouter";
     if (aUrl.includes("minimax") || oUrl.includes("minimax")) return "minimax";
+    if (aUrl.includes("moonshot") || oUrl.includes("moonshot")) return "kimi";
     if (s.provider === "anthropic") return "anthropic";
     if (s.provider === "openai") return "openai";
     return s.anthropic_api_key ? "anthropic" : "openai";
@@ -250,6 +253,7 @@
       if (anthropicBaseUrl.includes("minimax")) return "minimax";
       return "anthropic";
     }
+    if (openaiBaseUrl.includes("moonshot")) return "kimi";
     if (openaiBaseUrl.includes("openrouter")) return "openrouter";
     if (openaiBaseUrl.includes("minimax")) return "minimax";
     if (!openaiBaseUrl || openaiBaseUrl.includes("openai.com")) return "openai";
@@ -714,7 +718,7 @@ $effect(() => {
           <div class="field">
             <span class="field-label">Provider</span>
             <div class="provider-grid">
-              {#each (["anthropic", "openai", "openrouter", "minimax"] as SimpleProvider[]) as p}
+              {#each (["anthropic", "openai", "openrouter", "minimax", "kimi"] as SimpleProvider[]) as p}
                 <button class:selected={simpleProvider === p} onclick={() => { simpleProvider = p; }}>
                   {SIMPLE_PROVIDERS[p].label}
                 </button>

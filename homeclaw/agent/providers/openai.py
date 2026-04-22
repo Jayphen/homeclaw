@@ -1,4 +1,4 @@
-"""OpenAI-compatible LLM provider — covers OpenAI, Ollama, OpenRouter, Groq, etc."""
+"""OpenAI-compatible LLM provider — covers OpenAI, Kimi, Ollama, OpenRouter, Groq, etc."""
 
 import json
 import logging
