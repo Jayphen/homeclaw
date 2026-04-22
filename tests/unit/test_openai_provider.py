@@ -28,8 +28,8 @@ def test_to_api_message_preserves_tool_call_thought_signature() -> None:
 
     api_message = _to_api_message(message)
 
-    assert api_message["tool_calls"][0]["thought_signature"] == "SIG_A"
-    assert "thought_signature" not in api_message["tool_calls"][1]
+    assert api_message["tool_calls"][0]["extra_content"]["google"]["thought_signature"] == "SIG_A"
+    assert "extra_content" not in api_message["tool_calls"][1]
 
 
 def test_parse_response_reads_tool_call_thought_signature() -> None:
@@ -55,7 +55,7 @@ def test_parse_response_reads_tool_call_thought_signature() -> None:
                                     "name": "budget__db_query",
                                     "arguments": '{"sql":"select 1"}',
                                 },
-                                "thought_signature": "SIG_A",
+                                "extra_content": {"google": {"thought_signature": "SIG_A"}},
                             }
                         ],
                     },

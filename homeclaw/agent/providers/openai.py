@@ -116,7 +116,11 @@ def _to_api_message(message: Message) -> dict[str, Any]:
                         "name": tc.name,
                         "arguments": json.dumps(tc.arguments),
                     },
-                    **({"thought_signature": tc.thought_signature} if tc.thought_signature else {}),
+                    **(
+                        {"extra_content": {"google": {"thought_signature": tc.thought_signature}}}
+                        if tc.thought_signature
+                        else {}
+                    ),
                 }
                 for tc in message.tool_calls
             ]
@@ -193,7 +197,7 @@ def _parse_response(response: ChatCompletion) -> LLMResponse:
                     id=tc.id,
                     name=tc.function.name,
                     arguments=arguments,
-                    thought_signature=getattr(tc, "thought_signature", None),
+                    thought_signature=_tool_call_thought_signature(tc),
                 )
             )
 
@@ -229,3 +233,23 @@ def _parse_response(response: ChatCompletion) -> LLMResponse:
         stop_reason=finish_reason_map.get(choice.finish_reason or "stop", "end_turn"),
         reasoning=reasoning,
     )
+
+
+def _tool_call_thought_signature(tc: ChatCompletionMessageToolCall) -> str | None:
+    """Extract Gemini tool-call signatures from OpenAI-compatible payloads."""
+    top_level = getattr(tc, "thought_signature", None)
+    if isinstance(top_level, str) and top_level:
+        return top_level
+
+    extra = getattr(tc, "extra_content", None)
+    if not isinstance(extra, dict):
+        extra = getattr(tc, "model_extra", {}).get("extra_content")
+    if not isinstance(extra, dict):
+        return None
+
+    google = extra.get("google")
+    if not isinstance(google, dict):
+        return None
+
+    thought_signature = google.get("thought_signature")
+    return thought_signature if isinstance(thought_signature, str) and thought_signature else None
