@@ -183,6 +183,7 @@ class TestMessageHandling:
             "alice",
             channel=None,
             interim_callback=ANY,
+            source_channel="whatsapp_dm",
         )
         channel._client.reply_message.assert_awaited_once_with(
             "I'm homeclaw.",
@@ -228,6 +229,7 @@ class TestMessageHandling:
             "alice",
             channel="group-120363001234567890",
             interim_callback=ANY,
+            source_channel="whatsapp_group",
         )
 
     @pytest.mark.asyncio

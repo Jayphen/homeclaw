@@ -376,12 +376,14 @@ class WhatsAppChannel:
                 return
             user_text = f"[{person}] {text}"
             channel: str | None = f"group-{chat.User}"
+            source_channel = "whatsapp_group"
         else:
             user_text = text
             channel = None
+            source_channel = "whatsapp_dm"
 
         logger.info("[%s%s] %s", person, f" in {channel}" if channel else "", user_text)
-        await self._run_and_reply(ev, user_text, person, channel)
+        await self._run_and_reply(ev, user_text, person, channel, source_channel)
 
     async def _handle_photo(self, ev: Any, phone: str) -> None:
         """Handle incoming image — download, base64-encode, send as multimodal."""
@@ -408,8 +410,10 @@ class WhatsAppChannel:
         if is_group:
             caption = f"[{person}] {caption}" if caption else f"[{person}]"
             channel: str | None = f"group-{chat.User}"
+            source_channel = "whatsapp_group"
         else:
             channel = None
+            source_channel = "whatsapp_dm"
 
         content: list[dict[str, Any]] = [
             {
@@ -433,7 +437,7 @@ class WhatsAppChannel:
             len(image_bytes) // 1024,
             f": {caption}" if caption else "",
         )
-        await self._run_and_reply(ev, content, person, channel)
+        await self._run_and_reply(ev, content, person, channel, source_channel)
 
     async def _handle_register(self, phone: str, text: str, ev: Any) -> None:
         """Handle /register <name> — link this WhatsApp number to a household member."""
@@ -491,6 +495,7 @@ class WhatsAppChannel:
         content: str | list[dict[str, Any]],
         person: str,
         channel: str | None,
+        source_channel: str,
     ) -> None:
         """Run content through the agent loop and reply with the response."""
 
@@ -505,6 +510,7 @@ class WhatsAppChannel:
                 person,
                 channel=channel,
                 interim_callback=_send_interim,
+                source_channel=source_channel,
             )
         except Exception as exc:
             logger.exception("Agent loop failed for message from %s", person)

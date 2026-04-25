@@ -202,11 +202,13 @@ class TelegramChannel:
             user_text = f"[{person}] {user_text}"
             chat_id = str(update.effective_chat.id) if update.effective_chat else "group"
             channel = f"group-{chat_id}"
+            source_channel = "telegram_group"
         else:
             channel = None
+            source_channel = "telegram_dm"
 
         logger.info("[%s%s] %s", person, f" in {channel}" if channel else "", user_text)
-        await self._run_and_reply(update, user_text, person, channel)
+        await self._run_and_reply(update, user_text, person, channel, source_channel)
 
     async def _handle_photo(self, update: Update, _context: Any) -> None:
         """Handle incoming photos — download, base64-encode, send as multimodal."""
@@ -232,8 +234,10 @@ class TelegramChannel:
             caption = f"[{person}] {caption}" if caption else f"[{person}]"
             chat_id = str(update.effective_chat.id) if update.effective_chat else "group"
             channel: str | None = f"group-{chat_id}"
+            source_channel = "telegram_group"
         else:
             channel = None
+            source_channel = "telegram_dm"
 
         # Build multimodal content blocks
         content: list[dict[str, Any]] = [
@@ -258,7 +262,7 @@ class TelegramChannel:
             len(photo_bytes) // 1024,
             f": {caption}" if caption else "",
         )
-        await self._run_and_reply(update, content, person, channel)
+        await self._run_and_reply(update, content, person, channel, source_channel)
 
     async def _send_typing_until_done(self, update: Update, done: asyncio.Event) -> None:
         """Send 'typing' chat action every 4s until the done event is set."""
@@ -280,6 +284,7 @@ class TelegramChannel:
         content: str | list[dict[str, Any]],
         person: str,
         channel: str | None,
+        source_channel: str,
     ) -> None:
         """Send content through the agent loop and reply with the response."""
         done = asyncio.Event()
@@ -296,6 +301,7 @@ class TelegramChannel:
                 person,
                 channel=channel,
                 interim_callback=_send_interim,
+                source_channel=source_channel,
             )
         except Exception as exc:
             logger.exception("Agent loop failed for message from %s", person)

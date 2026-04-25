@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from homeclaw.agent.additional_context import strip_additional_context
 from homeclaw.agent.providers.base import LLMProvider, Message
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,8 @@ async def consolidate_chunk(
     for msg in messages:
         role = "User" if msg.role == "user" else "homeclaw"
         text = msg.content if isinstance(msg.content, str) else str(msg.content)
+        if msg.role == "user":
+            text = strip_additional_context(text)
         lines.append(f"{role}: {text}")
 
     conversation_text = "\n".join(lines)

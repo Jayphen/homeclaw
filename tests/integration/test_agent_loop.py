@@ -10,8 +10,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from homeclaw.agent.additional_context import strip_additional_context
 from homeclaw.agent.loop import AgentLoop
 from homeclaw.agent.providers.base import LLMResponse, ToolCall
+from homeclaw.agent.routing import CallType
 from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
 
 # ---------------------------------------------------------------------------
@@ -134,9 +136,28 @@ async def test_history_persisted(mock_provider: AsyncMock, dev_workspaces: Path)
     user_msg = json.loads(msg_lines[-2])
     assistant_msg = json.loads(msg_lines[-1])
     assert user_msg["role"] == "user"
-    assert user_msg["content"] == "Remember to buy milk"
+    assert strip_additional_context(user_msg["content"]) == "Remember to buy milk"
+    assert "<additional_context>" in user_msg["content"]
     assert assistant_msg["role"] == "assistant"
     assert assistant_msg["content"] == "I've noted that."
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_additional_context_only_for_conversation_calls(
+    mock_provider: AsyncMock,
+    dev_workspaces: Path,
+) -> None:
+    loop = _make_loop(mock_provider, dev_workspaces)
+
+    await loop.run("Run the briefing", person="alice", call_type=CallType.ROUTINE)
+
+    history_path = dev_workspaces / "alice" / "history.jsonl"
+    lines = [line for line in history_path.read_text().strip().splitlines() if line]
+    user_msg = json.loads(lines[-2])
+
+    assert user_msg["role"] == "user"
+    assert "<additional_context>" not in user_msg["content"]
 
 
 @pytest.mark.integration

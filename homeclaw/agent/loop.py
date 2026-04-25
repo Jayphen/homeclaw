@@ -11,6 +11,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from homeclaw.agent.additional_context import (
+    append_additional_context_to_text,
+    build_additional_context,
+)
 from homeclaw.agent.context import HOUSEHOLD_WORKSPACE, build_context, estimate_tokens
 from homeclaw.agent.providers.base import LLMProvider, LLMResponse, Message, ToolCall
 from homeclaw.agent.routing import (
@@ -445,6 +449,29 @@ def _build_system_prompt(
     return system, sections
 
 
+def _append_additional_context(
+    user_message: str | list[Any],
+    additional_context: Any,
+) -> str | list[Any]:
+    """Append per-turn context to the final text block in a user message."""
+    if isinstance(user_message, str):
+        return append_additional_context_to_text(user_message, additional_context)
+
+    rendered = additional_context.render()
+    if not rendered:
+        return user_message
+
+    blocks = copy.deepcopy(user_message)
+    for block in reversed(blocks):
+        if isinstance(block, dict) and block.get("type") == "text":
+            text = str(block.get("text") or "")
+            block["text"] = append_additional_context_to_text(text, additional_context)
+            return blocks
+
+    blocks.append({"type": "text", "text": rendered})
+    return blocks
+
+
 InterimCallback = Callable[[str], Any]
 
 
@@ -684,6 +711,7 @@ class AgentLoop:
         call_type: CallType = CallType.CONVERSATION,
         interim_callback: InterimCallback | None = None,
         metadata: dict[str, Any] | None = None,
+        source_channel: str | None = None,
     ) -> str:
         """Run the agent loop for a message.
 
@@ -700,6 +728,8 @@ class AgentLoop:
                 multiple callers share the same AgentLoop.
             metadata: If provided, populated with debug info (model, tools,
                 rounds, duration_ms) after execution completes.
+            source_channel: User-facing channel label for per-turn context
+                (e.g. telegram_dm, whatsapp_group, web).
         """
         person = person.lower()
         history_key = channel or person
@@ -712,6 +742,7 @@ class AgentLoop:
                 history_key,
                 interim_callback=interim_callback,
                 metadata=metadata,
+                source_channel=source_channel,
             )
             # Record activity for idle-based consolidation
             self._last_activity[history_key] = time.monotonic()
@@ -726,6 +757,7 @@ class AgentLoop:
         history_key: str,
         interim_callback: InterimCallback | None = None,
         metadata: dict[str, Any] | None = None,
+        source_channel: str | None = None,
     ) -> str:
         t0 = time.monotonic()
         tool_names_used: list[str] = []
@@ -763,6 +795,15 @@ class AgentLoop:
         # Prepend routine preamble so the LLM knows to use web tools
         if call_type == CallType.ROUTINE and isinstance(user_message, str):
             user_message = _ROUTINE_PREAMBLE + user_message
+
+        if call_type == CallType.CONVERSATION:
+            additional_context = build_additional_context(
+                workspaces=self._workspaces,
+                person=person,
+                channel_label=source_channel,
+                include_sender=channel is not None,
+            )
+            user_message = _append_additional_context(user_message, additional_context)
 
         history.append(Message(role="user", content=user_message))
 

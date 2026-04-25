@@ -57,6 +57,7 @@ async def run_repl(
                 message,
                 person,
                 interim_callback=_print_interim,
+                source_channel="repl",
             )
         except KeyboardInterrupt:
             print("\n[interrupted]")
