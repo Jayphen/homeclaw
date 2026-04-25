@@ -156,3 +156,24 @@ class TestChatHistory:
         resp = client.get("/api/chat/history")
         data = resp.json()
         assert len(data) == 2
+
+    def test_strips_additional_context_from_visible_history(
+        self,
+        client: TestClient,
+        workspaces: Path,
+    ):
+        person_dir = workspaces / "user"
+        person_dir.mkdir(parents=True)
+        content = "hello\n\n<additional_context>\n<channel>\nweb\n</channel>\n</additional_context>"
+        (person_dir / "history.jsonl").write_text(
+            "\n".join(
+                [
+                    json.dumps({"role": "user", "content": content}),
+                    json.dumps({"role": "assistant", "content": "hi"}),
+                ]
+            )
+        )
+
+        resp = client.get("/api/chat/history")
+        data = resp.json()
+        assert data[0] == {"role": "user", "content": "hello"}

@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from homeclaw.agent.additional_context import strip_additional_context
 from homeclaw.api.deps import get_agent_loop, get_config, get_current_member
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,8 @@ def _load_visible_history(
                 for b in content
                 if isinstance(b, dict) and b.get("type") == "text"
             )
+        if isinstance(content, str):
+            content = strip_additional_context(content)
         if not content:
             continue
         messages.append({"role": role, "content": content})
@@ -149,6 +152,7 @@ async def chat(request: Request) -> StreamingResponse:
                 channel=channel,
                 interim_callback=_on_interim,
                 metadata=meta,
+                source_channel="web",
             ),
         )
 

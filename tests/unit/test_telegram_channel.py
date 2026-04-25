@@ -208,6 +208,7 @@ class TestMessageHandling:
             "alice",
             channel=None,
             interim_callback=ANY,
+            source_channel="telegram_dm",
         )
         from telegram.constants import ParseMode
 
@@ -253,6 +254,7 @@ class TestMessageHandling:
             "alice",
             channel="group--100999",
             interim_callback=ANY,
+            source_channel="telegram_group",
         )
 
     @pytest.mark.asyncio
@@ -267,6 +269,7 @@ class TestMessageHandling:
             "alice",
             channel=None,
             interim_callback=ANY,
+            source_channel="telegram_dm",
         )
 
     @pytest.mark.asyncio

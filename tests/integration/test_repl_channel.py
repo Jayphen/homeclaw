@@ -4,7 +4,7 @@ Tests mock builtins.input and the AgentLoop to verify REPL behaviour
 without requiring a real LLM provider.
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import ANY, AsyncMock, patch
 
 import pytest
 
@@ -38,7 +38,12 @@ async def test_repl_processes_message() -> None:
     with patch("builtins.input", side_effect=["hello there", "exit"]):
         await run_repl(person="alice", loop=mock_loop)
 
-    mock_loop.run.assert_awaited_once_with("hello there", "alice")
+    mock_loop.run.assert_awaited_once_with(
+        "hello there",
+        "alice",
+        interim_callback=ANY,
+        source_channel="repl",
+    )
 
 
 @pytest.mark.integration
@@ -52,4 +57,9 @@ async def test_repl_multiline() -> None:
     with patch("builtins.input", side_effect=["hello\\", "world", "exit"]):
         await run_repl(person="alice", loop=mock_loop)
 
-    mock_loop.run.assert_awaited_once_with("hello\nworld", "alice")
+    mock_loop.run.assert_awaited_once_with(
+        "hello\nworld",
+        "alice",
+        interim_callback=ANY,
+        source_channel="repl",
+    )
