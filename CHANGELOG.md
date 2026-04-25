@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.30.0](https://github.com/Jayphen/homeclaw/compare/v0.29.1...v0.30.0) (2026-04-25)
+
+
+### Features
+
+* add per-turn additional_context envelope ([#153](https://github.com/Jayphen/homeclaw/issues/153)) ([88d4cf8](https://github.com/Jayphen/homeclaw/commit/88d4cf844db2701162bc8808d518b814c8c760a9))
+
 ## [0.29.1](https://github.com/Jayphen/homeclaw/compare/v0.29.0...v0.29.1) (2026-04-22)
 
 
