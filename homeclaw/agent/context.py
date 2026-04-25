@@ -65,10 +65,7 @@ async def build_context(
 
     # --- Priority 1: always keep ---
 
-    # Current time (local timezone so the LLM gives time-aware answers)
-    now = datetime.now().astimezone()
     parts.append(f"You are talking to: {person}")
-    parts.append(f"Current time: {now.strftime('%Y-%m-%d %H:%M %Z')}")
 
     # System info — lets the agent answer questions about itself
     parts.append(_build_system_info(model))
@@ -82,6 +79,7 @@ async def build_context(
 
     # Active reminders due today (never dropped)
     contacts = list_contacts(workspaces)
+    now = datetime.now().astimezone()
     today = now.date()
     today_reminders: list[str] = []
     upcoming_reminders: list[str] = []

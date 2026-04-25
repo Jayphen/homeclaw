@@ -166,11 +166,11 @@ class TestEdgeCases:
         # "nobody" has no workspace directory — should not raise
         ctx = await build_context("hello", "nobody", dev_workspaces)
         assert isinstance(ctx, str)
-        assert "Current time:" in ctx
+        assert "You are talking to: nobody" in ctx
 
-    async def test_includes_current_time(self, dev_workspaces: Path) -> None:
+    async def test_current_time_lives_outside_system_context(self, dev_workspaces: Path) -> None:
         ctx = await build_context("hello", "alice", dev_workspaces)
-        assert "Current time:" in ctx
+        assert "Current time:" not in ctx
 
     async def test_includes_speaker_name(self, dev_workspaces: Path) -> None:
         ctx = await build_context("hello", "alice", dev_workspaces)

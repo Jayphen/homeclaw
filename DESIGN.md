@@ -2,7 +2,7 @@
 
 ## Agent Context Envelope
 
-Conversation user turns may persist a trailing `<additional_context>` block with compact, machine-parseable per-turn runtime context such as the current household time, channel source, shared-chat sender, and recent routine executions. The block is appended after the user's visible message to preserve prompt-cache stability, and any UI, title, or summarisation path must strip it with the shared helper before presenting or summarising chat text.
+Conversation user turns may persist a trailing `<additional_context>` block with compact, machine-parseable per-turn runtime context such as the current household time, channel source, shared-chat sender, and recent routine executions. Current time belongs in this envelope rather than the system prompt so the stable prompt prefix remains cacheable. The block is appended after the user's visible message, and any UI, title, or summarisation path must strip it with the shared helper before presenting or summarising chat text.
 
 ## 1. Overview & Creative North Star
 
