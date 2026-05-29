@@ -973,3 +973,132 @@ async def test_skill_edit_file_can_read_builtin_skill_files(
     )
     assert "error" in edit_result
     assert "Cannot edit built-in skill" in edit_result["error"]
+
+
+# ---------------------------------------------------------------------------
+# Arrow.js write-time lint on assets/*.html (TASK-18)
+# ---------------------------------------------------------------------------
+
+_BAD_ARROW_HTML = (
+    "<script type='module'>\n"
+    "import { reactive, html } from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs'\n"
+    "const state = reactive({count: 0})\n"
+    'html`<button onclick="${() => state.count++}">${state.count}</button>`(document.body)\n'
+    "</script>"
+)
+
+_GOOD_ARROW_HTML = (
+    "<script type='module'>\n"
+    "import { reactive, html } from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs'\n"
+    "const state = reactive({count: 0})\n"
+    'html`<button @click="${() => state.count++}">${() => state.count}</button>`(document.body)\n'
+    "</script>"
+)
+
+
+@pytest.mark.asyncio
+async def test_skill_edit_file_lints_bad_arrow_asset(
+    registry: ToolRegistry, workspaces: Path
+) -> None:
+    make_skill(workspaces, "household", "counter", WEATHER_SKILL_MD.replace("weather", "counter"))
+    result = await registry.get_handler("skill_edit_file")(  # type: ignore[misc]
+        person="alice",
+        name="counter",
+        file="assets/index.html",
+        content=_BAD_ARROW_HTML,
+    )
+    assert result["status"] == "written"  # non-blocking
+    warnings = "\n".join(result["arrow_warnings"]).lower()
+    assert "onclick" in warnings
+    assert "render only once" in warnings
+
+
+@pytest.mark.asyncio
+async def test_skill_edit_file_no_warnings_for_good_arrow_asset(
+    registry: ToolRegistry, workspaces: Path
+) -> None:
+    make_skill(workspaces, "household", "counter", WEATHER_SKILL_MD.replace("weather", "counter"))
+    result = await registry.get_handler("skill_edit_file")(  # type: ignore[misc]
+        person="alice",
+        name="counter",
+        file="assets/index.html",
+        content=_GOOD_ARROW_HTML,
+    )
+    assert result["status"] == "written"
+    assert "arrow_warnings" not in result
+
+
+@pytest.mark.asyncio
+async def test_skill_edit_file_does_not_lint_non_assets_html(
+    registry: ToolRegistry, workspaces: Path
+) -> None:
+    make_skill(workspaces, "household", "counter", WEATHER_SKILL_MD.replace("weather", "counter"))
+    # Same bad content, but not under assets/ — should not be linted
+    result = await registry.get_handler("skill_edit_file")(  # type: ignore[misc]
+        person="alice",
+        name="counter",
+        file="references/notes.html",
+        content=_BAD_ARROW_HTML,
+    )
+    assert result["status"] == "written"
+    assert "arrow_warnings" not in result
+
+
+@pytest.mark.asyncio
+async def test_skill_edit_file_lints_find_replace_into_asset(
+    registry: ToolRegistry, workspaces: Path
+) -> None:
+    make_skill(workspaces, "household", "counter", WEATHER_SKILL_MD.replace("weather", "counter"))
+    skill_dir = workspaces / "household" / "skills" / "counter"
+    (skill_dir / "assets").mkdir(parents=True)
+    (skill_dir / "assets" / "index.html").write_text(_GOOD_ARROW_HTML)
+
+    # Introduce the onclick footgun via find/replace
+    result = await registry.get_handler("skill_edit_file")(  # type: ignore[misc]
+        person="alice",
+        name="counter",
+        file="assets/index.html",
+        find="@click",
+        replace="onclick",
+    )
+    assert result["status"] == "edited"
+    assert any("onclick" in w for w in result["arrow_warnings"])
+
+
+@pytest.mark.asyncio
+async def test_skill_enable_ui_app_lints_bad_html_content(
+    registry: ToolRegistry, workspaces: Path
+) -> None:
+    make_skill(
+        workspaces,
+        "household",
+        "dash",
+        "---\nname: dash\ndescription: Dash skill\n---\nUse dash.\n",
+    )
+    result = await registry.get_handler("skill_enable_ui_app")(  # type: ignore[misc]
+        person="alice",
+        name="dash",
+        owner="household",
+        html_content=_BAD_ARROW_HTML,
+    )
+    assert result["status"] == "ui_app_enabled"  # non-blocking
+    assert any("onclick" in w for w in result["arrow_warnings"])
+
+
+@pytest.mark.asyncio
+async def test_skill_enable_ui_app_default_scaffold_has_no_warnings(
+    registry: ToolRegistry, workspaces: Path
+) -> None:
+    make_skill(
+        workspaces,
+        "household",
+        "dash2",
+        "---\nname: dash2\ndescription: Dash skill\n---\nUse dash.\n",
+    )
+    result = await registry.get_handler("skill_enable_ui_app")(  # type: ignore[misc]
+        person="alice",
+        name="dash2",
+        owner="household",
+    )
+    assert result["status"] == "ui_app_enabled"
+    assert "arrow_warnings" not in result
