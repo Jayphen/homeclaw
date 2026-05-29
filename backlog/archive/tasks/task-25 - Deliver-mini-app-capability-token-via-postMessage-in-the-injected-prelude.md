@@ -4,13 +4,13 @@ title: Deliver mini-app capability token via postMessage in the injected prelude
 status: To Do
 assignee: []
 created_date: '2026-05-29 10:14'
+updated_date: '2026-05-29 11:37'
 labels:
   - ui
   - skills
   - mini-app
   - security
-dependencies:
-  - TASK-24
+dependencies: []
 priority: high
 ordinal: 25000
 ---
@@ -36,3 +36,9 @@ Depends on TASK-24.
 - [ ] #2 Injected prelude receives the token, holds it in memory, and authenticates db/query + db/schema calls transparently
 - [ ] #3 Reference mini-app and SKILL.md updated to drop manual token handling
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+SUPERSEDED by the @arrow-js/sandbox adoption arc (TASK-27..30). The iframe + scoped-capability-token approach is obsolete: Arrow's WASM sandbox gives stronger isolation rendered inline, with no iframe and no tokens (host mediates all data via hostBridge). Verified by spike on branch spike/arrow-sandbox.
+<!-- SECTION:NOTES:END -->

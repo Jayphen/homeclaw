@@ -206,3 +206,45 @@ class TestDbSchemaEndpoint:
         (skill_ws / "household" / "skills" / "nodb" / "assets").mkdir(parents=True)
         resp = client.get("/api/skills/household/nodb/db/schema")
         assert resp.status_code == 404
+
+
+def _make_sandbox_skill(ws: Path, name: str = "jobs", *, with_css: bool = True) -> Path:
+    """Create a skill that declares a sandbox (@arrow-js/sandbox) mini-app."""
+    skill = ws / "household" / "skills" / name
+    (skill / "app").mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        f"---\nname: {name}\ndescription: jobs\n"
+        "ui-app:\n  entry: app/main.ts\n  title: Jobs\n---\nBody.\n"
+    )
+    (skill / "app" / "main.ts").write_text("export default html`<div>jobs</div>`")
+    if with_css:
+        (skill / "app" / "main.css").write_text("div { color: red }")
+    return skill
+
+
+class TestAppSourceEndpoint:
+    def test_returns_source_map(self, client: TestClient, skill_ws: Path) -> None:
+        _make_sandbox_skill(skill_ws)
+        resp = client.get("/api/skills/household/jobs/app-source")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["title"] == "Jobs"
+        assert body["source"]["main.ts"] == "export default html`<div>jobs</div>`"
+        assert body["source"]["main.css"] == "div { color: red }"
+
+    def test_omits_css_when_absent(self, client: TestClient, skill_ws: Path) -> None:
+        _make_sandbox_skill(skill_ws, name="nocss", with_css=False)
+        resp = client.get("/api/skills/household/nocss/app-source")
+        assert resp.status_code == 200
+        assert set(resp.json()["source"]) == {"main.ts"}
+
+    def test_404_for_iframe_skill(self, client: TestClient) -> None:
+        # The fixture's "tracker" skill is a legacy iframe app, not a sandbox one.
+        resp = client.get("/api/skills/household/tracker/app-source")
+        assert resp.status_code == 404
+
+    def test_404_when_entry_file_missing(self, client: TestClient, skill_ws: Path) -> None:
+        skill = _make_sandbox_skill(skill_ws, name="broken")
+        (skill / "app" / "main.ts").unlink()
+        resp = client.get("/api/skills/household/broken/app-source")
+        assert resp.status_code == 404
