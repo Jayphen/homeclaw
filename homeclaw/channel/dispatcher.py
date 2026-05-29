@@ -7,11 +7,12 @@ household members via their preferred channel.
 
 from __future__ import annotations
 
-import json
 import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
+
+from homeclaw.atomicio import atomic_write_json, read_json_safe
 
 logger = logging.getLogger(__name__)
 
@@ -97,15 +98,10 @@ class ChannelDispatcher:
     # -- preferences --
 
     def _load_prefs(self) -> dict[str, str]:
-        path = self._workspaces / _PREFS_FILE
-        if not path.exists():
-            return {}
-        return json.loads(path.read_text())  # type: ignore[no-any-return]
+        return read_json_safe(self._workspaces / _PREFS_FILE, {})
 
     def _save_prefs(self, prefs: dict[str, str]) -> None:
-        path = self._workspaces / _PREFS_FILE
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(prefs, indent=2) + "\n")
+        atomic_write_json(self._workspaces / _PREFS_FILE, prefs)
 
     def get_preference(self, person: str) -> str | None:
         return self._load_prefs().get(person)

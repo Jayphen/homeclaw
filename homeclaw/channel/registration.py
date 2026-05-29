@@ -7,11 +7,11 @@ by centralizing the register/register_member commands.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from pathlib import Path
 from typing import Any
 
+from homeclaw.atomicio import atomic_write_json, read_json_safe
 from homeclaw.channel.dispatcher import ChannelDispatcher
 from homeclaw.contacts.store import get_contact, save_contact
 
@@ -20,13 +20,7 @@ logger = logging.getLogger(__name__)
 
 def load_user_map(workspaces: Path, map_file: str) -> dict[str, str]:
     """Load {identifier: member_name} map from a JSON file."""
-    path = workspaces / "household" / map_file
-    if not path.exists():
-        return {}
-    try:
-        return json.loads(path.read_text())  # type: ignore[no-any-return]
-    except (json.JSONDecodeError, OSError):
-        return {}
+    return read_json_safe(workspaces / "household" / map_file, {})
 
 
 def save_user_map(
@@ -35,9 +29,7 @@ def save_user_map(
     user_map: dict[str, str],
 ) -> None:
     """Persist the user map to disk."""
-    path = workspaces / "household" / map_file
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(user_map, indent=2) + "\n")
+    atomic_write_json(workspaces / "household" / map_file, user_map)
 
 
 def is_admin(person: str | None) -> bool:
