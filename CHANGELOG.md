@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.33.0](https://github.com/Jayphen/homeclaw/compare/v0.32.0...v0.33.0) (2026-05-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove the iframe mini-app path and token-in-URL ([#169](https://github.com/Jayphen/homeclaw/issues/169))
+
+### Features
+
+* add Apps launcher page and per-app routes for skill mini-apps ([#164](https://github.com/Jayphen/homeclaw/issues/164)) ([a3ce7f5](https://github.com/Jayphen/homeclaw/commit/a3ce7f5f75a8924c2366aac8fefa7b4a5c5a78ca))
+* add sandbox mini-app source artifact + app-source endpoint ([#166](https://github.com/Jayphen/homeclaw/issues/166)) ([491f3de](https://github.com/Jayphen/homeclaw/commit/491f3de39fc3e5955ce92c26b49d8ae7ff6dbcfc))
+* author skill mini-apps as Arrow sandbox source payloads ([#168](https://github.com/Jayphen/homeclaw/issues/168)) ([69e7569](https://github.com/Jayphen/homeclaw/commit/69e7569a8c6ec040f1dee664b0b25625ff7a0392))
+* remove the iframe mini-app path and token-in-URL ([#169](https://github.com/Jayphen/homeclaw/issues/169)) ([03f8f6e](https://github.com/Jayphen/homeclaw/commit/03f8f6e2bd006fcce359824df1a7d0ef14fbc10a))
+* render skill mini-apps inline via @arrow-js/sandbox + host db bridge ([#167](https://github.com/Jayphen/homeclaw/issues/167)) ([25e39b6](https://github.com/Jayphen/homeclaw/commit/25e39b6f682ffe8380ca8a612aab2421de9ffd28))
+
 ## [0.32.0](https://github.com/Jayphen/homeclaw/compare/v0.31.0...v0.32.0) (2026-05-29)
 
 
