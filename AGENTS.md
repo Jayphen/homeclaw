@@ -1,6 +1,6 @@
 # Agent Instructions
 
-Use `br` for all task tracking. Run `br quickstart` at the start of each session.
+Use [Backlog.md](https://backlog.md) (`backlog`) for all task tracking. Check `backlog task list --plain` at the start of each session.
 This project is called homeclaw. Read HOMECLAW.md before starting any work.
 All Python code must pass Pyright (standard mode): run `make typecheck`.
 All data models use Pydantic BaseModel. All interfaces use Protocol classes.
@@ -9,16 +9,16 @@ Do not conflate them. Layer 1 is always on. Layer 2 requires enhanced memory mod
 When ending a session, land the plane: file remaining work, close completed
 issues, push.
 
-This project uses **br** (beads_rust) for issue tracking. Run `br onboard` to get started.
+This project uses **Backlog.md** for issue tracking. Tasks live as markdown files under `backlog/`.
 
 ## Quick Reference
 
 ```bash
-br ready              # Find available work
-br show <id>          # View issue details
-br update <id> --claim  # Claim work atomically
-br close <id>         # Complete work
-br sync               # Sync with git
+backlog task list --plain                       # Find available work
+backlog task <id> --plain                        # View task details
+backlog task edit <id> -s "In Progress" -a @me   # Claim and start work
+backlog task edit <id> -s Done                   # Complete work
+backlog task create "Title" -d "..."             # File new work
 ```
 
 ## Non-Interactive Shell Commands
@@ -45,94 +45,70 @@ cp -rf source dest          # NOT: cp -r source dest
 - `apt-get` - use `-y` flag
 - `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
 
-<!-- BEGIN BEADS INTEGRATION -->
-## Issue Tracking with br (beads_rust)
+## Issue Tracking with Backlog.md
 
-**Note:** `br` is non-invasive and never executes git commands. After `br sync --flush-only`, you must manually run `git add .beads/ && git commit`.
-
-**IMPORTANT**: This project uses **br (beads_rust)** for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
-
-### Why br?
-
-- Dependency-aware: Track blockers and relationships between issues
-- Git-friendly: Version control with native sync
-- Agent-optimized: JSON output, ready work detection, discovered-from links
-- Prevents duplicate tracking systems and confusion
+**IMPORTANT**: This project uses **Backlog.md** for ALL issue tracking. Do NOT use ad-hoc
+markdown TODOs, scratch task lists, or other tracking methods. Tasks are markdown files
+committed under `backlog/`, so they version with the code.
 
 ### Quick Start
 
-**Check for ready work:**
+**Check for available work:**
 
 ```bash
-br ready --json
+backlog task list --plain
 ```
 
-**Create new issues:**
+**Create new tasks:**
 
 ```bash
-br create "Issue title" --description="Detailed context" -t bug|feature|task -p 0-4 --json
-br create "Issue title" --description="What this issue is about" -p 1 --deps discovered-from:br-123 --json
+backlog task create "Task title" -d "Detailed context" --priority high
+backlog task create "Found bug" -d "What was found" --priority high --dep <parent-id>
 ```
 
 **Claim and update:**
 
 ```bash
-br update <id> --claim --json
-br update br-42 --priority 1 --json
+backlog task edit <id> -s "In Progress" -a @me
+backlog task edit <id> --priority high
 ```
 
 **Complete work:**
 
 ```bash
-br close br-42 --reason "Completed" --json
+backlog task edit <id> -s Done
 ```
 
-### Issue Types
+### Statuses
 
-- `bug` - Something broken
-- `feature` - New functionality
-- `task` - Work item (tests, docs, refactoring)
-- `epic` - Large feature with subtasks
-- `chore` - Maintenance (dependencies, tooling)
+- `To Do` - Not started (default)
+- `In Progress` - Being worked on
+- `Done` - Completed
 
 ### Priorities
 
-- `0` - Critical (security, data loss, broken builds)
-- `1` - High (major features, important bugs)
-- `2` - Medium (default, nice-to-have)
-- `3` - Low (polish, optimization)
-- `4` - Backlog (future ideas)
+- `high` - Critical / important (security, data loss, broken builds, major bugs)
+- `medium` - Default, nice-to-have
+- `low` - Polish, optimization, future ideas
 
 ### Workflow for AI Agents
 
-1. **Check ready work**: `br ready` shows unblocked issues
-2. **Claim your task atomically**: `br update <id> --claim`
-3. **Work on it**: Implement, test, document
-4. **Discover new work?** Create linked issue:
-   - `br create "Found bug" --description="Details about what was found" -p 1 --deps discovered-from:<parent-id>`
-5. **Complete**: `br close <id> --reason "Done"`
-
-### Sync
-
-After updating issues, sync and commit manually:
-
-```bash
-br sync --flush-only
-git add .beads/
-git commit -m "sync beads"
-```
+1. **Check available work**: `backlog task list --plain`
+2. **Read the task**: `backlog task <id> --plain`
+3. **Claim it**: `backlog task edit <id> -s "In Progress" -a @me`
+4. **Work on it**: Implement, test, document
+5. **Discover new work?** File a linked task: `backlog task create "..." -d "..." --dep <parent-id>`
+6. **Complete**: `backlog task edit <id> -s Done`
 
 ### Important Rules
 
-- ✅ Use br for ALL task tracking
-- ✅ Always use `--json` flag for programmatic use
-- ✅ Link discovered work with `discovered-from` dependencies
-- ✅ Check `br ready` before asking "what should I work on?"
-- ❌ Do NOT create markdown TODO lists
+- ✅ Use Backlog.md for ALL task tracking
+- ✅ Use `--plain` for non-interactive / programmatic output
+- ✅ Link discovered work with `--dep <parent-id>`
+- ✅ Check `backlog task list --plain` before asking "what should I work on?"
+- ❌ Do NOT create ad-hoc markdown TODO lists
 - ❌ Do NOT use external issue trackers
 - ❌ Do NOT duplicate tracking systems
-
-For more details, see README.md and docs/QUICKSTART.md.
 
 ## Landing the Plane (Session Completion)
 
@@ -140,15 +116,14 @@ For more details, see README.md and docs/QUICKSTART.md.
 
 **MANDATORY WORKFLOW:**
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
+1. **File tasks for remaining work** - Create backlog tasks for anything that needs follow-up
 2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
+3. **Update task status** - Mark finished work Done, update in-progress items
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   br sync --flush-only
-   git add .beads/
-   git commit -m "sync beads"
+   git add backlog/
+   git commit -m "chore: update backlog tasks"
    git push
    git status  # MUST show "up to date with origin"
    ```
@@ -161,5 +136,3 @@ For more details, see README.md and docs/QUICKSTART.md.
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
-
-<!-- END BEADS INTEGRATION -->
