@@ -702,7 +702,7 @@ class AgentLoop:
 
         # Only advance the pointer after successfully extracting memories.
         # Take the per-key lock so the read-modify-write races neither the
-        # request path's _save_history nor another consolidation pass. The
+        # request path's _append_turn nor another consolidation pass. The
         # advance re-reads the file fresh, so any turn saved while the (slow)
         # LLM extraction ran above is preserved rather than overwritten.
         async with self._lock_pool.lock_for(history_key):
@@ -813,7 +813,12 @@ class AgentLoop:
             )
             user_message = _append_additional_context(user_message, additional_context)
 
-        history.append(Message(role="user", content=user_message))
+        user_turn_message = Message(role="user", content=user_message)
+        history.append(user_turn_message)
+        # Persistence is append-only and must NOT be driven by the (bounded,
+        # truncated) LLM context window — track only this turn's new messages so
+        # unconsolidated history truncated out of the window is never lost on save.
+        new_messages: list[Message] = [user_turn_message]
 
         # Truncate history to fit within the model's context window.
         context_window = getattr(self._provider, "context_window", _DEFAULT_CONTEXT_WINDOW)
@@ -884,14 +889,14 @@ class AgentLoop:
             # Always append the assistant message — include tool_calls and
             # reasoning so providers can round-trip thinking blocks between
             # tool rounds (required by OpenRouter reasoning models, MiniMax, etc.)
-            history.append(
-                Message(
-                    role="assistant",
-                    content=response.content or "",
-                    tool_calls=response.tool_calls,
-                    reasoning=response.reasoning,
-                )
+            assistant_message = Message(
+                role="assistant",
+                content=response.content or "",
+                tool_calls=response.tool_calls,
+                reasoning=response.reasoning,
             )
+            history.append(assistant_message)
+            new_messages.append(assistant_message)
 
             if response.stop_reason != "tool_use" or not response.tool_calls:
                 break
@@ -919,13 +924,13 @@ class AgentLoop:
                 call_type=call_type,
             )
             for tc, result in zip(response.tool_calls, tool_results, strict=False):
-                history.append(
-                    Message(
-                        role="tool",
-                        content=json.dumps(result),
-                        tool_call_id=tc.id,
-                    )
+                tool_message = Message(
+                    role="tool",
+                    content=json.dumps(result),
+                    tool_call_id=tc.id,
                 )
+                history.append(tool_message)
+                new_messages.append(tool_message)
 
             # Track consecutive silent rounds and send a proactive heartbeat
             # so the user knows the agent is still working during long operations
@@ -979,7 +984,7 @@ class AgentLoop:
 
         if response and response.stop_reason == "max_tokens":
             logger.warning("LLM output truncated at max_tokens — suppressing raw content")
-            _save_history(self._workspaces, history_key, history)
+            _append_turn(self._workspaces, history_key, new_messages)
             if metadata is not None:
                 metadata.update(
                     model=self._current_model,
@@ -999,7 +1004,7 @@ class AgentLoop:
                 "Agent loop exhausted %d tool rounds without completing", MAX_TOOL_ROUNDS
             )
             # Surface the exhaustion to the user instead of returning partial content.
-            _save_history(self._workspaces, history_key, history)
+            _append_turn(self._workspaces, history_key, new_messages)
             if metadata is not None:
                 metadata.update(
                     model=self._current_model,
@@ -1017,7 +1022,7 @@ class AgentLoop:
                 "Try a simpler request or ask me to continue."
             )
 
-        _save_history(self._workspaces, history_key, history)
+        _append_turn(self._workspaces, history_key, new_messages)
 
         # Log group chat exchanges so memsearch can index them — lets
         # members reference group conversations from private DMs.
@@ -1384,23 +1389,28 @@ def _persistable_messages(messages: list[Message]) -> list[Message]:
     return persistent
 
 
-def _save_history(workspaces: Path, person: str, messages: list[Message]) -> None:
-    """Save history, preserving consolidated messages before the pointer.
+def _append_turn(workspaces: Path, person: str, new_messages: list[Message]) -> None:
+    """Append this turn's new messages to history, preserving all prior messages.
 
-    Reads existing file to get consolidated (old) messages, then appends
-    the new turn's persistable messages. All messages are kept for future
-    consolidation.
+    Persistence is append-only: every message already on disk — consolidated and
+    not-yet-consolidated alike — is retained, and only ``new_messages`` (the
+    user/assistant/tool messages produced this turn) are added.
+
+    Only the new turn is persisted because the in-memory history the loop works
+    with is a *bounded* view: ``_load_history`` caps it and ``_truncate_history``
+    drops the oldest messages to fit the context window. Reconstructing the file
+    from that view would silently delete unconsolidated messages that fell
+    outside it, losing them before consolidation could fold them into memory.
     """
+    new_persistent = _persistable_messages(new_messages)
+    if not new_persistent:
+        return
+
     path = _history_path(workspaces, person)
     last_consolidated, old_messages = _read_history_file(path)
 
-    # Old messages up to the pointer are already consolidated — keep them.
-    # Messages after the pointer came from _load_history and are in `messages`.
-    consolidated = old_messages[:last_consolidated]
-    new_persistent = _persistable_messages(messages)
-
     lines = [json.dumps({"_type": _METADATA_TYPE, "last_consolidated": last_consolidated})]
-    lines.extend(m.model_dump_json() for m in consolidated)
+    lines.extend(m.model_dump_json() for m in old_messages)
     lines.extend(m.model_dump_json() for m in new_persistent)
     atomic_write_text(path, "\n".join(lines) + "\n")
 

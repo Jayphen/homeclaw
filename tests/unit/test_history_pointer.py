@@ -7,9 +7,9 @@ from pathlib import Path
 
 from homeclaw.agent.loop import (
     _advance_consolidation_pointer,
+    _append_turn,
     _load_history,
     _read_history_file,
-    _save_history,
 )
 from homeclaw.agent.providers.base import Message
 
@@ -232,15 +232,15 @@ class TestLoadHistory:
 
 
 # ---------------------------------------------------------------------------
-# _save_history
+# _append_turn
 # ---------------------------------------------------------------------------
 
 
-class TestSaveHistory:
-    """Tests for _save_history."""
+class TestAppendTurn:
+    """Tests for _append_turn (append-only history persistence)."""
 
-    def test_preserves_pointer_and_consolidated(self, tmp_path: Path) -> None:
-        """Saving preserves the consolidation pointer and old messages."""
+    def test_preserves_pointer_and_all_prior_messages(self, tmp_path: Path) -> None:
+        """Appending a turn keeps the pointer and every message already on disk."""
         alice_dir = tmp_path / "alice"
         alice_dir.mkdir()
         path = alice_dir / "history.jsonl"
@@ -257,30 +257,28 @@ class TestSaveHistory:
             ],
         )
 
-        # New messages from the current turn
+        # Only this turn's *new* messages are passed (not the loaded window).
         new_messages = [
-            Message(role="user", content="old2"),
-            Message(role="assistant", content="old_resp2"),
             Message(role="user", content="new question"),
             Message(role="assistant", content="new answer"),
         ]
 
-        _save_history(tmp_path, "alice", new_messages)
+        _append_turn(tmp_path, "alice", new_messages)
 
-        # Re-read and verify
         last_consolidated, all_messages = _read_history_file(path)
         assert last_consolidated == 2
-        # Should have consolidated (2) + new persistent messages
-        assert len(all_messages) >= 4
+        # All 4 prior messages preserved + 2 new = 6, in order.
+        contents = [m.content for m in all_messages]
+        assert contents == ["old1", "old_resp1", "old2", "old_resp2", "new question", "new answer"]
 
     def test_creates_new_file(self, tmp_path: Path) -> None:
-        """Saving to a non-existent file creates it properly."""
+        """Appending to a non-existent file creates it properly."""
         messages = [
             Message(role="user", content="first message"),
             Message(role="assistant", content="first response"),
         ]
 
-        _save_history(tmp_path, "bob", messages)
+        _append_turn(tmp_path, "bob", messages)
 
         path = tmp_path / "bob" / "history.jsonl"
         assert path.is_file()
@@ -289,8 +287,13 @@ class TestSaveHistory:
         assert last_consolidated == 0
         assert len(all_messages) == 2
 
-    def test_preserves_tool_chain_on_save(self, tmp_path: Path) -> None:
-        """Full tool chain (including tool results) is preserved on save."""
+    def test_empty_turn_is_a_noop(self, tmp_path: Path) -> None:
+        """Appending no persistable messages must not create or clobber a file."""
+        _append_turn(tmp_path, "ghost", [])
+        assert not (tmp_path / "ghost" / "history.jsonl").exists()
+
+    def test_preserves_tool_chain(self, tmp_path: Path) -> None:
+        """Full tool chain (including tool results) is preserved on append."""
         from homeclaw.agent.providers.base import ToolCall
 
         messages = [
@@ -304,7 +307,7 @@ class TestSaveHistory:
             Message(role="assistant", content="done!"),
         ]
 
-        _save_history(tmp_path, "alice", messages)
+        _append_turn(tmp_path, "alice", messages)
 
         path = tmp_path / "alice" / "history.jsonl"
         _, saved_messages = _read_history_file(path)
@@ -316,6 +319,44 @@ class TestSaveHistory:
         assert saved_messages[2].role == "tool"
         assert saved_messages[3].role == "assistant"
         assert saved_messages[3].content == "done!"
+
+    def test_unconsolidated_history_beyond_the_window_is_never_lost(self, tmp_path: Path) -> None:
+        """The bug this fixes: a long unconsolidated history must survive a save.
+
+        Previously the in-memory window (capped by _load_history and trimmed by
+        _truncate_history) was rewritten over the whole post-pointer file, so any
+        unconsolidated message outside that window was deleted before it could be
+        consolidated. Append-only persistence retains them all.
+        """
+        alice_dir = tmp_path / "alice"
+        alice_dir.mkdir()
+        path = alice_dir / "history.jsonl"
+
+        # 300 unconsolidated messages on disk (pointer 0) — larger than the
+        # _load_history cap of 200, the regime where the old code lost data.
+        lines: list[dict] = [_metadata_line(0)]
+        for i in range(300):
+            lines.append(_msg_dict("user" if i % 2 == 0 else "assistant", f"m{i}"))
+        _write_jsonl(path, lines)
+
+        # The loop would only load/keep a small window — but a save appends only
+        # the new turn, so the on-disk count can only grow.
+        _append_turn(
+            tmp_path,
+            "alice",
+            [
+                Message(role="user", content="newest q"),
+                Message(role="assistant", content="newest a"),
+            ],
+        )
+
+        pointer, all_messages = _read_history_file(path)
+        assert pointer == 0
+        assert len(all_messages) == 302
+        # Oldest unconsolidated message still present (not truncated away)...
+        assert all_messages[0].content == "m0"
+        # ...and the new turn is at the end.
+        assert [m.content for m in all_messages[-2:]] == ["newest q", "newest a"]
 
 
 # ---------------------------------------------------------------------------
@@ -468,11 +509,15 @@ class TestConsolidationSaveInterleaving:
         last_consolidated, _ = _read_history_file(path)
         chunk_end = 2
 
-        # ...meanwhile a new user turn lands on the request path and is saved.
-        existing = _load_history(tmp_path, "alice")
-        existing.append(Message(role="user", content="q3"))
-        existing.append(Message(role="assistant", content="a3"))
-        _save_history(tmp_path, "alice", existing)
+        # ...meanwhile a new user turn lands on the request path and is appended.
+        _append_turn(
+            tmp_path,
+            "alice",
+            [
+                Message(role="user", content="q3"),
+                Message(role="assistant", content="a3"),
+            ],
+        )
 
         # Now consolidation advances the pointer using its stale chunk_end.
         _advance_consolidation_pointer(tmp_path, "alice", last_consolidated + chunk_end)
