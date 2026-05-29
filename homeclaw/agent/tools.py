@@ -2316,63 +2316,41 @@ def register_builtin_tools(
             }
         return locations[0], None
 
-    def _default_ui_app_html(*, owner: str, skill_name: str, title: str) -> str:
-        data_url = f"/api/skills/{owner}/{skill_name}/files/data/state.json"
-        return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{title}</title>
-  <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            margin: 0; padding: 1rem; }}
-    .status {{ color: #666; font-size: 0.9rem; }}
-  </style>
-</head>
-<body>
-<script type="module">
-  // Arrow mini-app contract: import only {{ reactive, html }} from @arrow-js/core;
-  // mount with html`...`(el); live values are ${{() => x}}; events are @click (NEVER
-  // onclick). No render()/boundary()/hydrate()/@arrow-js/framework — those need a build.
-  // Two patterns throw "Invalid HTML position" and render BLANK: (1) any HTML comment
-  // inside an html`...` template, (2) a partial attribute like class="x ${{...}}" — the
-  // ${{...}} must be the WHOLE attribute value. Keep comments in JS, like these.
-  import {{ reactive, html }} from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs'
+    def _default_sandbox_main(*, title: str) -> str:
+        """Default `app/main.ts` for a skill mini-app rendered via @arrow-js/sandbox.
 
-  const token = localStorage.getItem('homeclaw_token') ?? ''
-  const headers = token ? {{ Authorization: `Bearer ${{token}}` }} : {{}}
-  const state = reactive({{ loading: true, message: 'Loading…', data: null }})
+        Runs inside a WASM VM: import `{ reactive, html }` from `@arrow-js/core`
+        and reach skill data only through the `homeclaw` host bridge (no fetch,
+        no token). Live values must be `() => ...`; events use `@click`.
+        """
+        return f"""import {{ reactive, html }} from '@arrow-js/core'
+import {{ query }} from 'homeclaw'
 
-  fetch('{data_url}', {{ headers }})
-    .then(async (r) => {{
-      if (!r.ok) throw new Error(`HTTP ${{r.status}}`)
-      return r.json()
-    }})
-    .then((data) => {{
-      state.data = data
-      state.message = 'Live'
-      state.loading = false
-    }})
-    .catch((err) => {{
-      state.message = `Could not load data: ${{err.message}}`
-      state.loading = false
-    }})
+// State — mutate fields directly. In templates, wrap any live value in `() =>`.
+const state = reactive({{ rows: [], loading: true, error: null }})
 
-  html`
-    <h1>{title}</h1>
-    ${{() => state.loading
-      ? html`<p class="status">${{() => state.message}}</p>`
-      : html`
-          <pre>${{() => JSON.stringify(state.data, null, 2)}}</pre>
-          <p class="status">${{() => state.message}}</p>
-        `
-    }}
-  `(document.body)
-</script>
-</body>
-</html>
+// Data comes from the host bridge — never fetch() and never a token. `query`
+// runs a read-only SELECT against this skill's SQLite db, host-side. Surface
+// failures into state.error; never swallow them into an empty list.
+query('SELECT name FROM sqlite_master WHERE type = $1', ['table'])
+  .then((rows) => {{ state.rows = rows; state.loading = false }})
+  .catch((err) => {{ state.error = String((err && err.message) || err); state.loading = false }})
+
+export default html`
+  <h1>{title}</h1>
+  ${{() => state.loading ? html`<p>Loading…</p>` : null}}
+  ${{() => state.error ? html`<p class="error">${{() => state.error}}</p>` : null}}
+  ${{() => !state.loading && !state.error
+    ? html`<ul>${{() => state.rows.map((r) => html`<li>${{() => JSON.stringify(r)}}</li>`)}}</ul>`
+    : null}}
+`
 """
+
+    def _default_sandbox_css() -> str:
+        return (
+            "body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; }\n"
+            ".error { color: #b3261e; white-space: pre-wrap; }\n"
+        )
 
     @_reg(
         name="skill_edit_file",
@@ -2487,11 +2465,14 @@ def register_builtin_tools(
     @_reg(
         name="skill_enable_ui_app",
         description=(
-            "Deterministically enable an embedded web UI for an existing skill. "
-            "This updates SKILL.md with a top-level ui-app declaration and creates or "
-            "overwrites assets/index.html with the provided content "
-            "(or a default Arrow.js scaffold). "
-            "Use this instead of data_write for SKILL.md or assets files."
+            "Deterministically enable an embedded mini-app for an existing skill. "
+            "Updates SKILL.md with a top-level ui-app declaration and writes the app "
+            "source — app/main.ts (Arrow source) and optional app/main.css. The app "
+            "runs inline in a sandboxed WASM VM (@arrow-js/sandbox): import "
+            "{ reactive, html } from '@arrow-js/core' and read skill data via the "
+            "'homeclaw' bridge (import { query, schema } from 'homeclaw') — never "
+            "fetch() and never a token. Omit main_ts for a working default scaffold. "
+            "Use this instead of data_write for SKILL.md or app files."
         ),
         policy=ToolPolicy(access="write", scope="personal"),
     )
@@ -2506,20 +2487,22 @@ def register_builtin_tools(
                 "Required if the name is ambiguous."
             ),
         ] = None,
-        title: Annotated[str | None, Desc("Display title for the embedded UI panel")] = None,
-        entry: Annotated[
-            str, Desc("Entry file for the embedded UI, relative to assets/")
-        ] = "assets/index.html",
-        html_content: Annotated[
+        title: Annotated[str | None, Desc("Display title for the mini-app")] = None,
+        main_ts: Annotated[
             str | None,
-            Desc("Full HTML content for the UI. Omit to create a default Arrow.js scaffold."),
+            Desc(
+                "Arrow source for app/main.ts. Must `export default` an html`...` "
+                "template (or component result). Omit for a default scaffold."
+            ),
+        ] = None,
+        main_css: Annotated[
+            str | None, Desc("Optional CSS for app/main.css (styles the sandbox root)")
         ] = None,
         **_: Any,
     ) -> dict[str, Any]:
         from homeclaw.plugins.registry import PluginType
         from homeclaw.plugins.skills.loader import (
             SkillUiApp,
-            _normalize_ui_app_entry,
             load_skill,
             render_skill_md,
             skill_md_to_definition,
@@ -2541,11 +2524,12 @@ def register_builtin_tools(
 
         resolved_title = title or (defn.ui_app.title if defn.ui_app else None)
         ui_app = SkillUiApp(
-            entry=_normalize_ui_app_entry(entry),
+            entry="app/main.ts",
             title=resolved_title,
+            kind="sandbox",
         )
         if ui_app.title is None:
-            ui_app.title = title or defn.name.replace("-", " ").replace("_", " ").title()
+            ui_app.title = defn.name.replace("-", " ").replace("_", " ").title()
 
         updated_md = render_skill_md(
             name=defn.name,
@@ -2557,18 +2541,15 @@ def register_builtin_tools(
         )
         skill_md_path.write_text(updated_md)
 
-        asset_rel = ui_app.entry
-        asset_path = loc.skill_dir / "assets" / asset_rel
-        asset_path.parent.mkdir(parents=True, exist_ok=True)
-        final_html = html_content or _default_ui_app_html(
-            owner=loc.scope,
-            skill_name=defn.name,
-            title=ui_app.title,
-        )
-        if err := _check_content_length(final_html, field="html_content"):
+        main_source = main_ts or _default_sandbox_main(title=ui_app.title)
+        if err := _check_content_length(main_source, field="main_ts"):
             return err
-        asset_path.write_text(final_html)
-        arrow_warnings = _arrow_lint_warnings(f"assets/{asset_rel}", final_html)
+
+        app_dir = loc.skill_dir / "app"
+        app_dir.mkdir(parents=True, exist_ok=True)
+        (app_dir / "main.ts").write_text(main_source)
+        css_source = main_css if main_css is not None else _default_sandbox_css()
+        (app_dir / "main.css").write_text(css_source)
 
         loaded = False
         warning: str | None = None
@@ -2590,14 +2571,12 @@ def register_builtin_tools(
             "owner": loc.scope,
             "ui_app": ui_app.model_dump(exclude_none=True),
             "skill_md": "updated",
-            "asset_file": f"assets/{asset_rel}",
+            "asset_file": "app/main.ts",
             "asset_status": "written",
             "loaded": loaded,
         }
         if warning:
             result["warning"] = warning
-        if arrow_warnings:
-            result["arrow_warnings"] = arrow_warnings
         result.update(
             _verify_skill(
                 skill_dir=loc.skill_dir,

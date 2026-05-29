@@ -3,11 +3,11 @@ id: TASK-28
 title: >-
   Frontend: render skill mini-apps inline via @arrow-js/sandbox (lazy-loaded) +
   host db bridge
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-05-29 11:37'
-updated_date: '2026-05-29 14:47'
+updated_date: '2026-05-29 15:16'
 labels:
   - ui
   - skills
@@ -47,3 +47,9 @@ Note (spike findings): sandbox fails under Vite dev (WASM MIME) but works in pro
 <!-- SECTION:NOTES:BEGIN -->
 AppView renders sandbox apps (ui_app.kind=='sandbox') inline via @arrow-js/sandbox, lazy-loaded with dynamic import() so the VM+compiler (~1.5MB) only loads on the /apps route — main bundle stays 133KB gz (verified in build output). New $lib/sandbox.ts: fetchAppSource + mountMiniApp + a 'homeclaw' host bridge exposing query/schema that call the existing authenticated db endpoints from the host (session token never enters the VM). Legacy iframe apps still render via the old path. onError -> visible banner. Runtime-verified via throwaway harness (now removed): mountMiniApp mounts inline, bridge round-trips with Bearer token host-side, in-VM localStorage is undefined (isolation holds), rows render. svelte-check clean for AppView + sandbox.ts. Dev caveat: @arrow-js/sandbox needs the production build (Vite dev mis-serves the WASM); optimizeDeps.exclude added as best-effort.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in PR #167. Sandbox apps render inline via @arrow-js/sandbox (lazy-loaded), host 'homeclaw' bridge mediates db access (token stays host-side), runtime-verified isolation. Main bundle unchanged.
+<!-- SECTION:FINAL_SUMMARY:END -->

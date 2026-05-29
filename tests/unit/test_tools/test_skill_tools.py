@@ -687,7 +687,7 @@ async def test_skill_create_includes_verification(
 
 
 @pytest.mark.asyncio
-async def test_skill_enable_ui_app_updates_skill_md_and_creates_asset(
+async def test_skill_enable_ui_app_writes_sandbox_app(
     registry: ToolRegistry, workspaces: Path
 ) -> None:
     make_skill(
@@ -712,53 +712,52 @@ Use the budget skill.
 
     assert result["status"] == "ui_app_enabled"
     assert result["ui_app"] == {
-        "entry": "index.html",
+        "entry": "app/main.ts",
         "title": "Budget Dashboard",
-        "kind": "iframe",
+        "kind": "sandbox",
     }
-    assert result["asset_file"] == "assets/index.html"
+    assert result["asset_file"] == "app/main.ts"
 
     skill_dir = workspaces / "household" / "skills" / "budget"
     skill_md = (skill_dir / "SKILL.md").read_text()
     assert "ui-app:" in skill_md
-    assert "entry: index.html" in skill_md
+    assert "entry: app/main.ts" in skill_md
     assert "title: Budget Dashboard" in skill_md
 
-    asset_html = (skill_dir / "assets" / "index.html").read_text()
-    assert "https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs" in asset_html
-    assert "/api/skills/household/budget/files/data/state.json" in asset_html
+    main_ts = (skill_dir / "app" / "main.ts").read_text()
+    # Default scaffold uses the host bridge, not fetch/token.
+    assert "from '@arrow-js/core'" in main_ts
+    assert "from 'homeclaw'" in main_ts
+    assert "export default" in main_ts
+    assert "fetch('" not in main_ts
+    assert "localStorage" not in main_ts
+    assert (skill_dir / "app" / "main.css").is_file()
 
 
 @pytest.mark.asyncio
-async def test_skill_enable_ui_app_with_custom_html_content_writes_asset(
+async def test_skill_enable_ui_app_accepts_custom_source(
     registry: ToolRegistry, workspaces: Path
 ) -> None:
     make_skill(
         workspaces,
         "household",
-        "dashboard",
-        """\
----
-name: dashboard
-description: Dashboard skill
----
-Use the dashboard skill.
-""",
+        "budget",
+        "---\nname: budget\ndescription: Track the budget\n---\nUse it.\n",
     )
 
-    html = "<!DOCTYPE html><html><body><h1>Custom UI</h1></body></html>"
+    custom = "import { html } from '@arrow-js/core'\nexport default html`<h1>hi</h1>`\n"
     result = await registry.get_handler("skill_enable_ui_app")(  # type: ignore[misc]
         person="alice",
-        name="dashboard",
+        name="budget",
         owner="household",
-        html_content=html,
+        main_ts=custom,
+        main_css="h1 { color: red }",
     )
 
     assert result["status"] == "ui_app_enabled"
-    written = (
-        workspaces / "household" / "skills" / "dashboard" / "assets" / "index.html"
-    ).read_text()
-    assert written == html
+    skill_dir = workspaces / "household" / "skills" / "budget"
+    assert (skill_dir / "app" / "main.ts").read_text() == custom
+    assert (skill_dir / "app" / "main.css").read_text() == "h1 { color: red }"
 
 
 @pytest.mark.asyncio
@@ -919,12 +918,15 @@ def test_skill_creator_builtin_instructions_cover_existing_skill_mini_apps() -> 
         "/Users/beepboop/dev/homeclaw/homeclaw/skills/skill-creator/SKILL.md"
     ).read_text()
     assert "If the skill already exists, do NOT call `skill_create` again." in skill_md
-    assert "Do NOT return raw HTML to the user" in skill_md
-    assert "assets/index.html" in skill_md
     assert "skill_enable_ui_app" in skill_md
-    assert "Never use `{name}__data_write` for `SKILL.md` or `assets/index.html`" in skill_md
-    assert "https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs" in skill_md
-    assert "dist/index.js" not in skill_md
+    # Sandbox source-payload model (TASK-29), not the legacy single-HTML iframe.
+    assert "app/main.ts" in skill_md
+    assert "from 'homeclaw'" in skill_md  # the host bridge
+    assert "export default" in skill_md
+    assert "sandbox" in skill_md.lower()
+    # The mini-app no longer fetches over the network or loads Arrow from a CDN.
+    assert "https://cdn.jsdelivr.net/npm/@arrow-js/core" not in skill_md
+    assert "assets/index.html" not in skill_md
 
 
 @pytest.mark.asyncio
@@ -1067,42 +1069,3 @@ async def test_skill_edit_file_lints_find_replace_into_asset(
     )
     assert result["status"] == "edited"
     assert any("onclick" in w for w in result["arrow_warnings"])
-
-
-@pytest.mark.asyncio
-async def test_skill_enable_ui_app_lints_bad_html_content(
-    registry: ToolRegistry, workspaces: Path
-) -> None:
-    make_skill(
-        workspaces,
-        "household",
-        "dash",
-        "---\nname: dash\ndescription: Dash skill\n---\nUse dash.\n",
-    )
-    result = await registry.get_handler("skill_enable_ui_app")(  # type: ignore[misc]
-        person="alice",
-        name="dash",
-        owner="household",
-        html_content=_BAD_ARROW_HTML,
-    )
-    assert result["status"] == "ui_app_enabled"  # non-blocking
-    assert any("onclick" in w for w in result["arrow_warnings"])
-
-
-@pytest.mark.asyncio
-async def test_skill_enable_ui_app_default_scaffold_has_no_warnings(
-    registry: ToolRegistry, workspaces: Path
-) -> None:
-    make_skill(
-        workspaces,
-        "household",
-        "dash2",
-        "---\nname: dash2\ndescription: Dash skill\n---\nUse dash.\n",
-    )
-    result = await registry.get_handler("skill_enable_ui_app")(  # type: ignore[misc]
-        person="alice",
-        name="dash2",
-        owner="household",
-    )
-    assert result["status"] == "ui_app_enabled"
-    assert "arrow_warnings" not in result

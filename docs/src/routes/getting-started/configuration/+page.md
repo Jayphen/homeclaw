@@ -113,21 +113,18 @@ When enabled, the agent gains a `web_browse` tool:
 
 `snapshot` returns the page's accessibility tree — a structured text representation ideal for LLM reasoning. `screenshot` returns base64-encoded image data.
 
-### Skill UI verification
+### Skill mini-apps
 
-Skills with embedded Arrow.js UIs can be verified after creation:
+Skills can ship an embedded mini-app that renders inline in the web UI's **Apps**
+section. Mini-apps run in a sandboxed WASM VM (`@arrow-js/sandbox`): the app is
+Arrow source (`app/main.ts` + optional `app/main.css`), declared via `ui-app:` in
+the skill frontmatter. The sandboxed code is isolated — it cannot read the session
+token, cannot make network requests, and cannot touch the host page. It reads
+skill data only through a host bridge (`import { query, schema } from 'homeclaw'`),
+which runs read-only SELECTs server-side on the app's behalf.
 
-```
-web_browse(url="http://localhost:8080/api/skills/household/my-skill/assets/index.html")
-```
-
-This lets the agent confirm the UI renders correctly before reporting back to the user.
-
-`web_browse` is optional. Even without it, every served mini-app gets an **error boundary**
-injected automatically: a mount or runtime error shows as a banner in the page (instead of a
-blank screen) and is recorded server-side, where the agent can read it with the
-`skill_render_status` tool. Two Arrow patterns throw `Invalid HTML position` at mount and
-render the app blank — an HTML comment inside an Arrow `html` template, and a partial attribute
-like `class="x ${...}"` — and both are flagged at write time in the tool result's
-`arrow_warnings`. The agent can also discover a skill database's tables and columns with
-`skill_db_schema` (or `GET /api/skills/{owner}/{name}/db/schema`) before writing a query.
+The agent authors these with the `skill_enable_ui_app` tool (writes the source and
+the `ui-app:` block). A compile, mount, or runtime error surfaces as a banner in
+the panel and via the `skill_render_status` tool. The agent can discover a skill
+database's tables and columns with `skill_db_schema` (or
+`GET /api/skills/{owner}/{name}/db/schema`) before writing a query.
