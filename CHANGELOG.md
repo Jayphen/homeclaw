@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.0](https://github.com/Jayphen/homeclaw/compare/v0.31.0...v0.32.0) (2026-05-29)
+
+
+### Features
+
+* make skill mini-apps reliable to one-shot (fix broken reference, lint fatals, error boundary, schema, /new) ([#162](https://github.com/Jayphen/homeclaw/issues/162)) ([83eedfc](https://github.com/Jayphen/homeclaw/commit/83eedfc7d0a92e73c70c8ecd3463759fb7c7685b))
+
 ## [0.31.0](https://github.com/Jayphen/homeclaw/compare/v0.30.0...v0.31.0) (2026-05-29)
 
 
