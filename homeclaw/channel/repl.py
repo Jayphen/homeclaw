@@ -17,7 +17,10 @@ async def run_repl(
     ``exit``, ``quit``, or Ctrl-D (EOFError).
     """
     print(f"homeclaw — chatting as {person}")
-    print("Type 'exit' or 'quit' to leave. Use \\ for multiline input.\n")
+    print(
+        "Type 'exit' or 'quit' to leave, '/new' for a fresh conversation. "
+        "Use \\ for multiline input.\n"
+    )
 
     while True:
         try:
@@ -48,6 +51,10 @@ async def run_repl(
             continue
         if message in ("exit", "quit"):
             break
+        if message == "/new":
+            cleared = await loop.reset_conversation(person)
+            print(f"\n[fresh conversation — cleared {cleared} message(s)]\n")
+            continue
 
         def _print_interim(text: str) -> None:
             print(f"\n  … {text}")

@@ -7,19 +7,22 @@
   <!--
     CANONICAL Arrow.js mini-app for homeclaw skills. Copy this as the starting
     point for a new skill's assets/index.html, then change:
-      1. the owner/name in the two API paths below ('household/my-skill')
+      1. the owner/name in the API paths below ('household/my-skill')
       2. the SQL SELECT and the columns the template reads (item.name, item.done)
       3. the markup/styles to fit your data
 
-    It demonstrates every idiom a mini-app needs:
-      - import ONLY { reactive, html } from @arrow-js/core (no build step)
-      - mount by CALLING the template with a DOM node: html`...`(document.body)
-      - @click event binding (NOT onclick — onclick fires once at render and
-        then never again, which is the #1 way these apps silently break)
-      - reactive ${() => state.x} (re-renders) vs static ${value} (renders once)
-      - auth token read from localStorage
-      - a SELECT-only db/query fetch (the only DB access the browser gets;
-        all writes go through the agent via db_execute)
+    Two patterns throw "Invalid HTML position" at mount and render the app BLANK.
+    Both are browser-verified and flagged by the write-time lint — never use them:
+      A. an HTML comment ( <!-- ... --> ) INSIDE an html`...` template. Keep all
+         comments out in JS (like this one and the // notes below), never inside
+         the backticks.
+      B. a "partial" attribute that mixes static text with an interpolation, e.g.
+         class="card ${() => x}". The ${...} must be the WHOLE attribute value;
+         build the full string inside one arrow: class="${() => `card ${x}`}".
+
+    homeclaw auto-injects an error boundary when serving the page, so any runtime
+    error shows as a banner (and is readable via skill_render_status) instead of
+    a silent blank screen — but a clean app should never trigger it.
   -->
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -40,6 +43,7 @@
     li { padding: 0.4rem 0; border-bottom: 1px solid #eee; font-size: 0.9rem; }
     li.done { color: #aaa; text-decoration: line-through; }
     .status { font-size: 0.8rem; color: #999; }
+    .error { color: #b91c1c; }
   </style>
 </head>
 <body>
@@ -56,7 +60,11 @@
   const state = reactive({ items: [], filter: 'all', loading: true, error: null })
 
   // SELECT-only db/query is the browser's only DB access. Change the path's
-  // owner/name ('household/my-skill') and the SQL to match your skill.
+  // owner/name ('household/my-skill') and the SQL to match your skill. Tip: to
+  // discover the real table/column names, GET the schema first:
+  //   /api/skills/household/my-skill/db/schema
+  // Querying a column that does not exist is a common reason a mini-app shows
+  // nothing — build the template against the columns the schema actually lists.
   async function load() {
     try {
       const r = await fetch('/api/skills/household/my-skill/db/query', {
@@ -66,11 +74,13 @@
           sql: 'SELECT id, name, done FROM items ORDER BY created_at DESC',
         }),
       })
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`)
       const data = await r.json()
       state.items = data.rows ?? []
       state.loading = false
     } catch (e) {
+      // Surface the failure — never swallow it into an empty list, or a broken
+      // query looks identical to "no data yet" and you cannot tell them apart.
       state.error = String(e)
       state.loading = false
     }
@@ -85,14 +95,16 @@
 
   load()
 
+  // STATIC vs REACTIVE (this is the other thing that quietly breaks mini-apps):
+  //   ${'Items'}        -> a bare expression renders ONCE at mount.
+  //   ${() => state.x}  -> an arrow re-runs on every state change. Use an arrow
+  //                        for anything that changes; the items load after the
+  //                        first render, so a bare ${state.items} would show 0
+  //                        forever.
+  // For an attribute, the arrow must produce the WHOLE value (see note B above).
   html`
-    <!-- STATIC: an expression with no arrow is evaluated once at render.
-         Fine for a constant like this title; wrong for anything that changes. -->
     <h1>${'Items'}</h1>
 
-    <!-- REACTIVE: an arrow expression re-runs on every state change. Dropping the
-         arrow here (a bare expression reading state.items) would stay 0 forever,
-         because the items load after the first render. -->
     <div class="count">${() => `${visible().length} of ${state.items.length}`}</div>
 
     <div class="filters">
@@ -111,7 +123,7 @@
       state.loading
         ? html`<p class="status">Loading…</p>`
         : state.error
-          ? html`<p class="status">Error: ${() => state.error}</p>`
+          ? html`<p class="status error">Error: ${() => state.error}</p>`
           : visible().length === 0
             ? html`<p class="status">Nothing here yet.</p>`
             : html`<ul>

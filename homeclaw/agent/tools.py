@@ -2335,6 +2335,9 @@ def register_builtin_tools(
   // Arrow mini-app contract: import only {{ reactive, html }} from @arrow-js/core;
   // mount with html`...`(el); live values are ${{() => x}}; events are @click (NEVER
   // onclick). No render()/boundary()/hydrate()/@arrow-js/framework — those need a build.
+  // Two patterns throw "Invalid HTML position" and render BLANK: (1) any HTML comment
+  // inside an html`...` template, (2) a partial attribute like class="x ${{...}}" — the
+  // ${{...}} must be the WHOLE attribute value. Keep comments in JS, like these.
   import {{ reactive, html }} from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs'
 
   const token = localStorage.getItem('homeclaw_token') ?? ''
@@ -2605,6 +2608,85 @@ def register_builtin_tools(
             )
         )
         return result
+
+    @_reg(
+        name="skill_db_schema",
+        description=(
+            "List the tables and columns of a skill's SQLite database. Call this "
+            "BEFORE writing a mini-app or a db/query SELECT so the UI reads real "
+            "column names — querying a column that does not exist is a common reason "
+            "a mini-app renders nothing."
+        ),
+        policy=ToolPolicy(access="read", scope="personal"),
+    )
+    async def skill_db_schema(
+        *,
+        person: Annotated[str, Desc("Household member name")],
+        name: Annotated[str, Desc("Skill name")],
+        owner: Annotated[
+            str | None,
+            Desc("Who owns the skill: 'household' or a person's name. Required if ambiguous."),
+        ] = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        import sqlite3
+
+        from homeclaw.api.routes.skills import read_db_schema
+
+        loc, err = _resolve_editable_skill_location(person=person, name=name, owner=owner)
+        if err is not None:
+            return err
+        assert loc is not None
+        db_path = loc.skill_dir / "data" / f"{loc.skill_dir.name}.db"
+        if not db_path.is_file():
+            return {
+                "error": f"Skill '{name}' has no database yet ({db_path.name} not found). "
+                "It is created on the first data_write/db_execute."
+            }
+        try:
+            tables = read_db_schema(db_path)
+        except sqlite3.Error as exc:
+            return {"error": f"Could not read schema: {exc}"}
+        return {"tables": tables, "count": len(tables)}
+
+    @_reg(
+        name="skill_render_status",
+        description=(
+            "Read the most recent runtime errors a skill's mini-app reported from the "
+            "browser. Use this AFTER writing/editing a mini-app and having the user open "
+            "it: it shows what actually broke (e.g. a mount error) so you fix the real "
+            "problem instead of guessing. Empty means it rendered cleanly or has not "
+            "been opened yet."
+        ),
+        policy=ToolPolicy(access="read", scope="personal"),
+    )
+    async def skill_render_status(
+        *,
+        person: Annotated[str, Desc("Household member name")],
+        name: Annotated[str, Desc("Skill name")],
+        owner: Annotated[
+            str | None,
+            Desc("Who owns the skill: 'household' or a person's name. Required if ambiguous."),
+        ] = None,
+        **_: Any,
+    ) -> dict[str, Any]:
+        from homeclaw.api.routes.skills import get_render_log
+
+        loc, err = _resolve_editable_skill_location(person=person, name=name, owner=owner)
+        if err is not None:
+            return err
+        assert loc is not None
+        events = get_render_log(loc.scope, loc.skill_dir.name)
+        if not events:
+            return {
+                "status": "no_errors_reported",
+                "hint": (
+                    "No runtime errors logged. Either the mini-app rendered cleanly, or "
+                    "it has not been opened in a browser since the last change — ask the "
+                    "user to open it, then check again."
+                ),
+            }
+        return {"status": "errors_reported", "events": events, "count": len(events)}
 
     @_reg(
         name="read_skill",
