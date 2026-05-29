@@ -92,6 +92,22 @@ def _check_content_length(content: str, field: str = "content") -> dict[str, Any
     return None
 
 
+def _arrow_lint_warnings(file_rel: str, content: str) -> list[str]:
+    """Lint Arrow.js mini-app HTML written under a skill's assets/ directory.
+
+    Returns non-blocking warnings for known footguns (wrong event binding,
+    non-reactive interpolations, framework imports, missing mount). Only runs on
+    ``assets/*.html`` writes; returns an empty list for anything else.
+    """
+    norm = file_rel.replace("\\", "/").lstrip("./")
+    parts = norm.split("/")
+    if not norm.lower().endswith(".html") or "assets" not in parts:
+        return []
+    from homeclaw.plugins.skills.arrow_lint import lint_arrow_html
+
+    return lint_arrow_html(content)
+
+
 # Module-level set of activated skills — shared between read_skill and
 # auto-activation in the agent loop.  Persists for the process lifetime.
 activated_skills: set[str] = set()
@@ -2419,12 +2435,15 @@ def register_builtin_tools(
                 return {"error": f"Text to find not found in {file}"}
             new_text = text.replace(find, replace or "")
             path.write_text(new_text)
-            return {
+            result = {
                 "file": file,
                 "status": "edited",
                 "replacements": text.count(find),
                 "size": len(new_text),
             }
+            if lint := _arrow_lint_warnings(file, new_text):
+                result["arrow_warnings"] = lint
+            return result
 
         # Write mode
         if content is not None:
@@ -2455,7 +2474,10 @@ def register_builtin_tools(
                     }
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content)
-            return {"file": file, "status": "written", "size": len(content)}
+            result = {"file": file, "status": "written", "size": len(content)}
+            if lint := _arrow_lint_warnings(file, content):
+                result["arrow_warnings"] = lint
+            return result
 
         return {"error": "Provide content (write), or find+replace (edit), or nothing (read)"}
 
@@ -2543,6 +2565,7 @@ def register_builtin_tools(
         if err := _check_content_length(final_html, field="html_content"):
             return err
         asset_path.write_text(final_html)
+        arrow_warnings = _arrow_lint_warnings(f"assets/{asset_rel}", final_html)
 
         loaded = False
         warning: str | None = None
@@ -2570,6 +2593,8 @@ def register_builtin_tools(
         }
         if warning:
             result["warning"] = warning
+        if arrow_warnings:
+            result["arrow_warnings"] = arrow_warnings
         result.update(
             _verify_skill(
                 skill_dir=loc.skill_dir,

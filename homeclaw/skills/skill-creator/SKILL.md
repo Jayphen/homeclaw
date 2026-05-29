@@ -441,3 +441,9 @@ skill_edit_file(
   correctly by calling `web_browse(url="http://localhost:8080/api/skills/{owner}/{name}/assets/index.html")`.
   This opens the page in a real browser and returns its accessibility tree. If the UI has issues
   (blank page, JS errors in the output), fix them with `skill_edit_file` and re-verify.
+- **Write-time lint**: when you write an `assets/*.html` via `skill_edit_file` or
+  `skill_enable_ui_app`, the tool result may include an `arrow_warnings` list flagging the
+  silent-failure footguns above (`onclick=` instead of `@click`, bare `${state.x}` that won't
+  update, `@arrow-js/framework`/SSR imports, a missing `html`...`(el)` mount). These are
+  non-blocking, but treat them as must-fix — they are exactly why a mini-app renders blank or
+  dead. Re-edit until the warnings are gone.
