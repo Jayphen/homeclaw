@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reference mini-app</title>
+  <!--
+    CANONICAL Arrow.js mini-app for homeclaw skills. Copy this as the starting
+    point for a new skill's assets/index.html, then change:
+      1. the owner/name in the two API paths below ('household/my-skill')
+      2. the SQL SELECT and the columns the template reads (item.name, item.done)
+      3. the markup/styles to fit your data
+
+    It demonstrates every idiom a mini-app needs:
+      - import ONLY { reactive, html } from @arrow-js/core (no build step)
+      - mount by CALLING the template with a DOM node: html`...`(document.body)
+      - @click event binding (NOT onclick — onclick fires once at render and
+        then never again, which is the #1 way these apps silently break)
+      - reactive ${() => state.x} (re-renders) vs static ${value} (renders once)
+      - auth token read from localStorage
+      - a SELECT-only db/query fetch (the only DB access the browser gets;
+        all writes go through the agent via db_execute)
+  -->
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 1.5rem; background: #fafaf9; color: #1a1a18;
+    }
+    h1 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .count { font-size: 0.8rem; color: #888; margin-bottom: 1rem; }
+    .filters { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    button {
+      padding: 0.35rem 0.9rem; border: 1px solid #d0cfc8; border-radius: 6px;
+      background: #fff; cursor: pointer; font-size: 0.85rem; color: #333;
+    }
+    button:hover { background: #f0ede8; }
+    button.active { background: #c1440e; color: #fff; border-color: #c1440e; }
+    ul { list-style: none; }
+    li { padding: 0.4rem 0; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+    li.done { color: #aaa; text-decoration: line-through; }
+    .status { font-size: 0.8rem; color: #999; }
+  </style>
+</head>
+<body>
+<script type="module">
+  // Import ONLY reactive + html from @arrow-js/core. Never @arrow-js/framework,
+  // /ssr, or /hydrate — those need a build step a mini-app does not have.
+  import { reactive, html } from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs'
+
+  // Same-origin auth: the homeclaw shell stores the token in localStorage.
+  const token = localStorage.getItem('homeclaw_token') ?? ''
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+
+  // All UI state lives in one reactive object. Mutate fields directly.
+  const state = reactive({ items: [], filter: 'all', loading: true, error: null })
+
+  // SELECT-only db/query is the browser's only DB access. Change the path's
+  // owner/name ('household/my-skill') and the SQL to match your skill.
+  async function load() {
+    try {
+      const r = await fetch('/api/skills/household/my-skill/db/query', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          sql: 'SELECT id, name, done FROM items ORDER BY created_at DESC',
+        }),
+      })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const data = await r.json()
+      state.items = data.rows ?? []
+      state.loading = false
+    } catch (e) {
+      state.error = String(e)
+      state.loading = false
+    }
+  }
+
+  // Derived view state — a plain function, recomputed because it reads reactive
+  // fields inside a callable template expression below.
+  const visible = () =>
+    state.filter === 'active' ? state.items.filter((i) => !i.done)
+    : state.filter === 'done' ? state.items.filter((i) => i.done)
+    : state.items
+
+  load()
+
+  html`
+    <!-- STATIC: an expression with no arrow is evaluated once at render.
+         Fine for a constant like this title; wrong for anything that changes. -->
+    <h1>${'Items'}</h1>
+
+    <!-- REACTIVE: an arrow expression re-runs on every state change. Dropping the
+         arrow here (a bare expression reading state.items) would stay 0 forever,
+         because the items load after the first render. -->
+    <div class="count">${() => `${visible().length} of ${state.items.length}`}</div>
+
+    <div class="filters">
+      ${() =>
+        ['all', 'active', 'done'].map(
+          (f) => html`
+            <button
+              class="${() => (state.filter === f ? 'active' : '')}"
+              @click="${() => (state.filter = f)}"
+            >${f}</button>
+          `.key(f)
+        )}
+    </div>
+
+    ${() =>
+      state.loading
+        ? html`<p class="status">Loading…</p>`
+        : state.error
+          ? html`<p class="status">Error: ${() => state.error}</p>`
+          : visible().length === 0
+            ? html`<p class="status">Nothing here yet.</p>`
+            : html`<ul>
+                ${() =>
+                  visible().map(
+                    (item) =>
+                      html`<li class="${() => (item.done ? 'done' : '')}">
+                        ${() => item.name}
+                      </li>`.key(item.id)
+                  )}
+              </ul>`}
+  `(document.body)
+</script>
+</body>
+</html>
