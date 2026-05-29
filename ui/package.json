@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@ai-sdk/svelte": "^4.0.134",
+    "@arrow-js/sandbox": "^1.0.6",
     "ai": "^6.0.134",
     "date-fns": "^4.1.0",
     "dompurify": "^3.3.3",

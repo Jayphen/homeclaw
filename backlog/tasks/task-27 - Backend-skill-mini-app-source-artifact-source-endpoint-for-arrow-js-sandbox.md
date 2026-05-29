@@ -3,11 +3,11 @@ id: TASK-27
 title: >-
   Backend: skill mini-app source artifact + source endpoint for
   @arrow-js/sandbox
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-05-29 11:37'
-updated_date: '2026-05-29 12:00'
+updated_date: '2026-05-29 14:38'
 labels:
   - skills
   - mini-app
@@ -45,3 +45,9 @@ Foundation for TASK-28 (frontend render).
 <!-- SECTION:NOTES:BEGIN -->
 Added ui_app.kind ('iframe'|'sandbox') to SkillUiApp, inferred from entry extension (.ts/.js -> sandbox), with sandbox-entry normalization (basename must be main.ts/main.js; path kept, not assets-normalized). New GET /api/skills/{owner}/{name}/app-source returns {source:{main.ts|main.js, main.css?}, title} for sandbox skills (404 for iframe/missing). Tests: parser kind-inference (test_skill_loader.py), endpoint (test_skill_miniapp.py). Updated a test_skill_tools assertion (iframe apps now report kind). 709 pass; typecheck + lint clean. Docs deferred to TASK-29.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in PR #166. ui_app.kind (iframe|sandbox) + GET app-source endpoint serving the {main.ts/main.css} source map for sandbox skills. Additive; iframe apps unchanged. 709 tests pass.
+<!-- SECTION:FINAL_SUMMARY:END -->

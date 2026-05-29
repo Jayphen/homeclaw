@@ -1,11 +1,13 @@
 <script lang="ts">
   import { api, skillAppSrc } from "$lib/api";
+  import { fetchAppSource, mountMiniApp } from "$lib/sandbox";
 
   let { params = {} }: { params?: { owner?: string; name?: string } } = $props();
 
   interface SkillUiApp {
     entry: string;
     title: string | null;
+    kind?: "iframe" | "sandbox";
   }
 
   interface SkillDetail {
@@ -14,9 +16,15 @@
     ui_app: SkillUiApp | null;
   }
 
-  let detail: SkillDetail | null = $state(null);
+  let detail = $state<SkillDetail | null>(null);
   let loading: boolean = $state(true);
   let error: string | null = $state(null);
+
+  // Sandbox mini-app mount state.
+  let mountEl = $state<HTMLElement | undefined>();
+  let sandboxError = $state<string | null>(null);
+
+  const isSandbox = $derived(detail?.ui_app?.kind === "sandbox");
 
   async function fetchDetail(owner: string, name: string) {
     loading = true;
@@ -39,6 +47,38 @@
     }
   });
 
+  // Mount the sandboxed mini-app inline once the detail and mount node exist.
+  // Re-runs (and tears down) when the target skill changes or on unmount.
+  $effect(() => {
+    const d = detail;
+    const el = mountEl;
+    if (!d || d.ui_app?.kind !== "sandbox" || !el) return;
+
+    let cancelled = false;
+    let teardown: (() => void) | null = null;
+    sandboxError = null;
+
+    (async () => {
+      try {
+        const { source } = await fetchAppSource(d.owner, d.name);
+        if (cancelled) return;
+        teardown = await mountMiniApp(el, d.owner, d.name, {
+          source,
+          onError: (message) => {
+            sandboxError = message;
+          },
+        });
+      } catch (e: any) {
+        if (!cancelled) sandboxError = e?.message ?? String(e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      teardown?.();
+    };
+  });
+
   const title = $derived(detail?.ui_app?.title || detail?.name || params.name || "App");
 </script>
 
@@ -54,12 +94,14 @@
     {#if detail?.ui_app}
       <div class="app-bar-right">
         <a class="bar-link" href="#/skills/{detail.owner}/{detail.name}">Manage skill</a>
-        <a
-          class="bar-link"
-          href={skillAppSrc(detail.owner, detail.name, detail.ui_app.entry)}
-          target="_blank"
-          rel="noopener"
-        >Open in tab ↗</a>
+        {#if !isSandbox}
+          <a
+            class="bar-link"
+            href={skillAppSrc(detail.owner, detail.name, detail.ui_app.entry)}
+            target="_blank"
+            rel="noopener"
+          >Open in tab ↗</a>
+        {/if}
       </div>
     {/if}
   </header>
@@ -76,6 +118,11 @@
     <div class="state">
       <div class="error-card">Couldn't load this app: {error}</div>
     </div>
+  {:else if detail && detail.ui_app && isSandbox}
+    {#if sandboxError}
+      <div class="sandbox-error">⚠ Mini-app error: {sandboxError}</div>
+    {/if}
+    <div bind:this={mountEl} class="app-frame sandbox-mount"></div>
   {:else if detail && detail.ui_app}
     <iframe
       src={skillAppSrc(detail.owner, detail.name, detail.ui_app.entry)}
@@ -185,6 +232,30 @@
     border-radius: var(--radius-md);
     background: var(--surface);
     box-shadow: var(--shadow);
+  }
+
+  .sandbox-mount {
+    overflow: auto;
+    padding: 1rem;
+  }
+
+  /* The mini-app's host custom element should fill the mount. */
+  .sandbox-mount :global(arrow-sandbox) {
+    display: block;
+    width: 100%;
+  }
+
+  .sandbox-error {
+    background: #7f1d1d;
+    color: #fff;
+    font:
+      13px/1.5 ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      monospace;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--radius-sm);
+    white-space: pre-wrap;
   }
 
   .state {
