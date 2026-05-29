@@ -81,6 +81,30 @@ class TelegramChannel:
                 "Use /register <name> to link your Telegram account to a household member."
             )
 
+    async def _handle_new(self, update: Update, _context: Any) -> None:
+        """Handle /new — start a fresh conversation (clear the live context window)."""
+        if update.message is None:
+            return
+        if not self._is_allowed(update):
+            return
+        person = self._resolve_person(update)
+        if person is None:
+            await update.message.reply_text("I don't know who you are. Use /register <name> first.")
+            return
+        if self._is_group_chat(update):
+            chat_id = str(update.effective_chat.id) if update.effective_chat else "group"
+            channel: str | None = f"group-{chat_id}"
+        else:
+            channel = None
+        cleared = await self._loop.reset_conversation(person, channel)
+        if cleared:
+            await update.message.reply_text(
+                f"🆕 Fresh conversation started — cleared {cleared} message(s) from context. "
+                "Your earlier history is still saved."
+            )
+        else:
+            await update.message.reply_text("🆕 Already a fresh conversation — nothing to clear.")
+
     async def _handle_register(self, update: Update, _context: Any) -> None:
         """Handle /register <name> — link this Telegram user to a household member."""
         if update.message is None or update.effective_user is None:
@@ -403,6 +427,7 @@ class TelegramChannel:
         """Build and configure the Telegram Application."""
         app = Application.builder().token(self._token).post_init(self._post_init).build()
         app.add_handler(CommandHandler("start", self._handle_start))
+        app.add_handler(CommandHandler("new", self._handle_new))
         app.add_handler(CommandHandler("register", self._handle_register))
         app.add_handler(CommandHandler("register_member", self._handle_register_member))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))

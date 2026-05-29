@@ -134,7 +134,10 @@ instructions (skill.md) are separate from data — use skill_update to change in
 data_write/data_delete to manage flat files. When editing an existing skill file \
 (assets/index.html, scripts, etc.), always use skill_edit_file with find/replace to change \
 only the specific lines that need updating — never rewrite the whole file. Full rewrites of \
-large files will be truncated and fail.
+large files will be truncated and fail. If a chat has grown long or muddled, the user can \
+send /new to start a fresh conversation — this clears the chat context while keeping all \
+saved data, notes, and skills. Suggest /new instead of ever telling them to "start over" \
+some other way.
 
 When someone asks for an interactive skill, dashboard, tracker, widget, panel, or small web UI, \
 prefer building it as an embedded skill mini-app instead of pasting raw HTML in chat. Use the \
@@ -758,6 +761,21 @@ class AgentLoop:
             # Record activity for idle-based consolidation
             self._last_activity[history_key] = time.monotonic()
             return result
+
+    async def reset_conversation(self, person: str, channel: str | None = None) -> int:
+        """Start a fresh conversation for a person/channel (the ``/new`` command).
+
+        Mirrors :meth:`run`'s key derivation and takes the same per-session lock
+        so a reset cannot race a turn in flight. The append-only history file is
+        preserved on disk; only the live context window is cleared. Returns the
+        number of messages dropped from the live window.
+        """
+        person = person.lower()
+        history_key = channel or person
+        async with self._lock_pool.lock_for(history_key):
+            cleared = reset_history(self._workspaces, history_key)
+            self._last_activity[history_key] = time.monotonic()
+            return cleared
 
     async def _run_inner(
         self,
@@ -1430,3 +1448,20 @@ def _advance_consolidation_pointer(workspaces: Path, person: str, new_pointer: i
     for msg in all_messages:
         lines.append(msg.model_dump_json())
     atomic_write_text(path, "\n".join(lines) + "\n")
+
+
+def reset_history(workspaces: Path, key: str) -> int:
+    """Start a fresh conversation for *key* (a person name or channel id).
+
+    Advances the consolidation pointer past every message so the next turn
+    begins with an empty context window. The append-only history file is kept on
+    disk in full — only the live view the LLM sees is cleared. Returns the number
+    of messages that were dropped from the live window (0 if already empty).
+    """
+    path = _history_path(workspaces, key)
+    last_consolidated, all_messages = _read_history_file(path)
+    cleared = len(all_messages) - last_consolidated
+    if cleared <= 0:
+        return 0
+    _advance_consolidation_pointer(workspaces, key, len(all_messages))
+    return cleared

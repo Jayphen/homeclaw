@@ -122,3 +122,12 @@ web_browse(url="http://localhost:8080/api/skills/household/my-skill/assets/index
 ```
 
 This lets the agent confirm the UI renders correctly before reporting back to the user.
+
+`web_browse` is optional. Even without it, every served mini-app gets an **error boundary**
+injected automatically: a mount or runtime error shows as a banner in the page (instead of a
+blank screen) and is recorded server-side, where the agent can read it with the
+`skill_render_status` tool. Two Arrow patterns throw `Invalid HTML position` at mount and
+render the app blank — an HTML comment inside an Arrow `html` template, and a partial attribute
+like `class="x ${...}"` — and both are flagged at write time in the tool result's
+`arrow_warnings`. The agent can also discover a skill database's tables and columns with
+`skill_db_schema` (or `GET /api/skills/{owner}/{name}/db/schema`) before writing a query.

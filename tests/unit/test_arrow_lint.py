@@ -135,15 +135,74 @@ def test_does_not_flag_deferred_variable_mount() -> None:
 
 
 # ---------------------------------------------------------------------------
+# (e) HTML comments inside an html`` template — a mount-time fatal
+#     (browser-verified: any <!-- --> inside the template throws "Invalid HTML
+#      position" and the whole app renders blank)
+# ---------------------------------------------------------------------------
+
+
+def test_flags_html_comment_inside_template() -> None:
+    src = _app("html`<!-- a note -->\n<p>${() => state.count}</p>`(document.body)")
+    warnings = lint_arrow_html(src)
+    assert any("comment" in w.lower() and "invalid html position" in w.lower() for w in warnings)
+
+
+def test_flags_html_comment_between_elements_in_template() -> None:
+    src = _app(
+        "html`<div>${() => state.count}</div><!-- x -->"
+        "<div>${() => state.count}</div>`(document.body)"
+    )
+    assert any("comment" in w.lower() for w in lint_arrow_html(src))
+
+
+# ---------------------------------------------------------------------------
+# (f) partial attribute interpolation — a mount-time fatal
+# ---------------------------------------------------------------------------
+
+
+def test_flags_partial_attribute_interpolation() -> None:
+    src = _app('html`<span class="card ${() => state.count}">x</span>`(document.body)')
+    warnings = lint_arrow_html(src)
+    assert any("attribute" in w.lower() and "invalid html position" in w.lower() for w in warnings)
+
+
+def test_flags_trailing_partial_attribute_interpolation() -> None:
+    src = _app('html`<span class="${() => state.count} card">x</span>`(document.body)')
+    assert any("attribute" in w.lower() for w in lint_arrow_html(src))
+
+
+def test_does_not_flag_whole_value_attribute_interpolation() -> None:
+    src = _app("html`<span class=\"${() => state.count ? 'a' : 'b'}\">x</span>`(document.body)")
+    assert not any("attribute mixes static text" in w.lower() for w in lint_arrow_html(src))
+
+
+def test_does_not_flag_static_only_attribute() -> None:
+    src = _app('html`<span class="card big">${() => state.count}</span>`(document.body)')
+    assert not any("attribute mixes static text" in w.lower() for w in lint_arrow_html(src))
+
+
+# ---------------------------------------------------------------------------
 # Comments, non-arrow input, and the shipped reference app
 # ---------------------------------------------------------------------------
 
 
-def test_comments_do_not_cause_false_positives() -> None:
+def test_js_comments_do_not_cause_false_positives() -> None:
+    # JS // and /* */ comments that mention footgun keywords must not trip rules.
     src = _app(
         '// never use onclick="..." or @arrow-js/framework; don\'t call render()\n'
         "/* renderToString() is SSR-only */\n"
-        "html`<!-- ${state.count} in a comment -->\n<p>${() => state.count}</p>`(document.body)"
+        "html`<p>${() => state.count}</p>`(document.body)"
+    )
+    assert lint_arrow_html(src) == []
+
+
+def test_page_comments_outside_template_are_ignored() -> None:
+    # An HTML comment in page markup (not inside a template) — even one that
+    # mentions onclick or a backticked html`...` — must not be linted.
+    src = (
+        "<head><!-- copy this: html`...`(document.body); avoid onclick --></head>\n"
+        f"<script type='module'>\n{CORE_IMPORT}\nconst state = reactive({{count: 0}})\n"
+        "html`<p>${() => state.count}</p>`(document.body)\n</script>"
     )
     assert lint_arrow_html(src) == []
 

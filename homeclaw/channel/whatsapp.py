@@ -382,6 +382,17 @@ class WhatsAppChannel:
             channel = None
             source_channel = "whatsapp_dm"
 
+        if text == "/new":
+            cleared = await self._loop.reset_conversation(person, channel)
+            msg = (
+                f"🆕 Fresh conversation started — cleared {cleared} message(s) from context. "
+                "Your earlier history is still saved."
+                if cleared
+                else "🆕 Already a fresh conversation — nothing to clear."
+            )
+            await self._client.reply_message(msg, ev)
+            return
+
         logger.info("[%s%s] %s", person, f" in {channel}" if channel else "", user_text)
         await self._run_and_reply(ev, user_text, person, channel, source_channel)
 

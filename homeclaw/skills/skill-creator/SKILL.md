@@ -285,14 +285,25 @@ These five idioms are the whole API surface a mini-app needs. Follow them exactl
 5. **Events** use an `@`-prefixed attribute whose value is a function:
    `@click="${() => state.count++}"`. Likewise `@input`, `@submit`, etc.
 
-**Never** use any of these in a mini-app — they silently do nothing or require a
-build step that mini-apps don't have:
+**Never** use any of these in a mini-app — they throw at mount (blank page) or
+silently do nothing:
 
-- ❌ `onclick="${...}"` (or any `on*` attribute) — use `@click`. This is the #1 cause
-  of "the buttons don't work."
+- ❌ **An HTML comment `<!-- ... -->` INSIDE an `html`...`` template.** This throws
+  `Invalid HTML position` at mount and renders the ENTIRE app blank — browser-verified,
+  and it is the #1 reason a hand-written mini-app shows nothing. Keep every comment in
+  JS (`//` or `/* */`) *outside* the backticks. (Comments in `<head>`/`<style>` are fine.)
+- ❌ **A "partial" attribute that mixes static text with `${...}`**, e.g.
+  `class="card ${() => state.active}"`. Also throws `Invalid HTML position` at mount.
+  The `${...}` must be the WHOLE attribute value — build the full string in one arrow:
+  `class="${() => state.active ? 'card active' : 'card'}"`.
+- ❌ `onclick="${...}"` (or any `on*` attribute) — use `@click`. The #1 cause of
+  "the buttons don't work."
 - ❌ `render()`, `boundary()`, `renderToString()`, `serializePayload()`, `hydrate()`
 - ❌ importing from `@arrow-js/framework`, `@arrow-js/ssr`, or `@arrow-js/hydrate`
 - ❌ `${state.count}` for anything that changes — wrap it in `() =>`
+- ❌ swallowing a failed fetch into an empty result (`r.ok ? r.json() : { rows: [] }`).
+  A broken query then looks identical to "no data yet". Always surface the error to a
+  `state.error` field and render it (see the reference app).
 
 Minimal interactive app (copy this shape — note `@click`, the `() =>` wrappers, and
 the trailing `(document.body)` that mounts it):
@@ -357,27 +368,28 @@ skill_edit_file(name="skill-creator", file="references/examples.md")
   const token = localStorage.getItem('homeclaw_token') ?? ''
   const headers = { Authorization: `Bearer ${token}` }
 
-  // Load skill data — use SQLite for structured/growing data:
-  const state = reactive({ items: [], loading: true })
+  // Load skill data — use SQLite for structured/growing data. Surface failures
+  // into state.error; never swallow them into an empty list.
+  const state = reactive({ items: [], loading: true, error: null })
 
-  // SQLite query (preferred for growing data):
+  // Discover real column names first (so the SELECT below is not a guess):
+  //   GET /api/skills/household/my-skill/db/schema  ->  { tables: [{ name, columns }] }
+  // Or, as the agent, call the skill_db_schema tool before writing the SELECT.
   fetch('/api/skills/household/my-skill/db/query', {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sql: 'SELECT * FROM items ORDER BY created_at DESC' })
+    body: JSON.stringify({ sql: 'SELECT id, name FROM items ORDER BY created_at DESC' })
   })
-    .then(r => r.ok ? r.json() : { rows: [] })
+    .then(async r => { if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`); return r.json() })
     .then(d => { state.items = d.rows ?? []; state.loading = false })
-
-  // Or for small JSON config files:
-  // fetch('/api/skills/household/my-skill/files/data/config.json', { headers })
-  //   .then(r => r.ok ? r.json() : {})
-  //   .then(d => { ... })
+    .catch(e => { state.error = String(e); state.loading = false })
 
   html`
     ${() => state.loading
       ? html`<p>Loading…</p>`
-      : html`<ul>${() => state.items.map(item => html`<li>${item}</li>`)}</ul>`
+      : state.error
+        ? html`<p>Error: ${() => state.error}</p>`
+        : html`<ul>${() => state.items.map(item => html`<li>${() => item.name}</li>`.key(item.id))}</ul>`
     }
   `(document.body)
 </script>
@@ -435,15 +447,20 @@ skill_edit_file(
   skills or the member's name for private skills
 - JSON data files: `GET /api/skills/{owner}/{name}/files/data/filename`
 - SQLite queries: `POST /api/skills/{owner}/{name}/db/query` with `{sql, params}` body (SELECT only)
+- **Discover the schema before writing a SELECT**: call the `skill_db_schema` tool (or
+  `GET /api/skills/{owner}/{name}/db/schema`) to get the real tables/columns. Querying a
+  column that does not exist is a common reason a mini-app shows nothing.
 - Writes go through the agent (LLM calls `db_execute` / `data_write`); the UI is read-only
 - LAN-only installs: vendor Arrow.js into `assets/arrow.js` and use a relative import
-- **UI verification**: if `browser_enabled` is on in Settings, you can verify the app renders
-  correctly by calling `web_browse(url="http://localhost:8080/api/skills/{owner}/{name}/assets/index.html")`.
-  This opens the page in a real browser and returns its accessibility tree. If the UI has issues
-  (blank page, JS errors in the output), fix them with `skill_edit_file` and re-verify.
 - **Write-time lint**: when you write an `assets/*.html` via `skill_edit_file` or
-  `skill_enable_ui_app`, the tool result may include an `arrow_warnings` list flagging the
-  silent-failure footguns above (`onclick=` instead of `@click`, bare `${state.x}` that won't
-  update, `@arrow-js/framework`/SSR imports, a missing `html`...`(el)` mount). These are
-  non-blocking, but treat them as must-fix — they are exactly why a mini-app renders blank or
-  dead. Re-edit until the warnings are gone.
+  `skill_enable_ui_app`, the tool result may include an `arrow_warnings` list. Treat every
+  warning as must-fix. The two that render the app fully **blank** are an HTML comment inside
+  an `html`...`` template and a partial attribute (`class="x ${...}"`); the rest flag handlers
+  that won't fire or values that won't update. Re-edit until `arrow_warnings` is empty.
+- **Runtime error boundary (read this when an app renders blank or wrong)**: homeclaw injects
+  an error boundary into every served mini-app. A mount/runtime error shows as a red banner in
+  the page (instead of a blank screen) AND is captured server-side. After you write or edit an
+  app, ask the user to open it, then call `skill_render_status(name=..., person=...)` to read
+  the actual error (e.g. `Invalid HTML position`) and fix the real cause instead of guessing.
+- **UI verification (optional)**: if `browser_enabled` is on in Settings, you can also render
+  it yourself with `web_browse(url="http://localhost:8080/api/skills/{owner}/{name}/assets/index.html")`.

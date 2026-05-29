@@ -20,6 +20,7 @@ Features:
 - Typing indicators during processing
 - `/register <name>` to link a Telegram account to a household member
 - `/start` welcome message
+- `/new` to start a fresh conversation — clears the chat context while keeping all saved data, notes, and skills
 
 ### Setup
 
@@ -35,6 +36,7 @@ Features:
 - Text messages and photo handling
 - Group chat support
 - `/register <name>` for account linking
+- `/new` to start a fresh conversation
 
 ### Setup
 
@@ -51,6 +53,8 @@ Terminal chat for development. No external dependencies.
 ```bash
 homeclaw chat --person alice
 ```
+
+Type `/new` to start a fresh conversation, or `exit`/`quit` to leave.
 
 ## Channel dispatcher
 
