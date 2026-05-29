@@ -7,6 +7,8 @@
   import Knowledge from "./views/Knowledge.svelte";
   import Contacts from "./views/Contacts.svelte";
   import Skills from "./views/Skills.svelte";
+  import Apps from "./views/Apps.svelte";
+  import AppView from "./views/AppView.svelte";
   import Plugins from "./views/Plugins.svelte";
   import Routines from "./views/Routines.svelte";
   import Settings from "./views/Settings.svelte";
@@ -25,6 +27,8 @@
     "/contacts": Contacts,
     "/contacts/:id": Contacts,
     "/routines": Routines,
+    "/apps": Apps,
+    "/apps/:owner/:name": AppView,
     "/skills": Skills,
     "/skills/:owner/:name": Skills,
     "/skills/:owner/:name/*file": Skills,
@@ -164,6 +168,7 @@
         <a href="#/bookmarks">Bookmarks</a>
         <a href="#/contacts">Contacts</a>
         <a href="#/routines">Routines</a>
+        <a href="#/apps">Apps</a>
       </nav>
 
       <nav class="nav-group">

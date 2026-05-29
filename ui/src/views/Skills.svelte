@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, getToken } from "$lib/api";
+  import { api, skillAppSrc } from "$lib/api";
   import { renderMarkdown } from "$lib/markdown";
   import { formatDateTime } from "$lib/time";
   import MarkdownEditor from "$lib/MarkdownEditor.svelte";
@@ -362,14 +362,10 @@
     return ["md", "txt", "json", "yaml", "yml", "toml", "py", "sh", "js", "ts", "csv", "env"].includes(ext);
   }
 
-  // Build the iframe src for a skill's embedded UI app, appending the auth
-  // token as a query param so the browser navigation request is authenticated.
-  function appSrc(owner: string, name: string, entry: string): string {
-    const token = getToken();
-    const normalizedEntry = entry.replace(/^\/?assets\//, "").replace(/^\/+/, "");
-    const base = `/api/skills/${owner}/${name}/assets/${normalizedEntry || "index.html"}`;
-    return token ? `${base}?token=${encodeURIComponent(token)}` : base;
-  }
+  // Skill mini-app iframe src (auth token appended as query param) — see
+  // skillAppSrc in $lib/api. Mini-apps now have a dedicated /apps route; this
+  // detail-page embed is kept for the skill detail view.
+  const appSrc = skillAppSrc;
 </script>
 
 <div class="skills-page">
