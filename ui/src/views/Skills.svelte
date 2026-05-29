@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, skillAppSrc } from "$lib/api";
+  import { api } from "$lib/api";
   import { renderMarkdown } from "$lib/markdown";
   import { formatDateTime } from "$lib/time";
   import MarkdownEditor from "$lib/MarkdownEditor.svelte";
@@ -361,11 +361,6 @@
     const ext = name.split(".").pop()?.toLowerCase() ?? "";
     return ["md", "txt", "json", "yaml", "yml", "toml", "py", "sh", "js", "ts", "csv", "env"].includes(ext);
   }
-
-  // Skill mini-app iframe src (auth token appended as query param) — see
-  // skillAppSrc in $lib/api. Mini-apps now have a dedicated /apps route; this
-  // detail-page embed is kept for the skill detail view.
-  const appSrc = skillAppSrc;
 </script>
 
 <div class="skills-page">
@@ -518,19 +513,9 @@
       <section class="app-panel">
         <div class="app-panel-header">
           <h2>{detail.ui_app.title || detail.name}</h2>
-          <a
-            href={appSrc(detail.owner, detail.name, detail.ui_app.entry)}
-            target="_blank"
-            rel="noopener"
-            class="btn-open-tab"
-          >Open in tab ↗</a>
+          <a href="#/apps/{detail.owner}/{detail.name}" class="btn-open-tab">Open app →</a>
         </div>
-        <iframe
-          src={appSrc(detail.owner, detail.name, detail.ui_app.entry)}
-          sandbox="allow-scripts allow-same-origin allow-forms"
-          class="skill-app-frame"
-          title={detail.ui_app.title || detail.name}
-        ></iframe>
+        <p class="app-panel-hint">This skill has a mini-app. Open it from the Apps section.</p>
       </section>
     {/if}
 
@@ -1017,11 +1002,10 @@
     padding: 0.2rem 0.5rem; border-radius: calc(var(--radius) / 2);
   }
   .btn-open-tab:hover { background: var(--surface); color: var(--text); }
-  .skill-app-frame {
-    display: block;
-    width: 100%;
-    min-height: 400px;
-    border: none;
-    background: #fff;
+  .app-panel-hint {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
   }
 </style>

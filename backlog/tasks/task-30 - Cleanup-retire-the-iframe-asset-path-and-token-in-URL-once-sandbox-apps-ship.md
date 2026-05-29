@@ -1,9 +1,11 @@
 ---
 id: TASK-30
 title: 'Cleanup: retire the iframe asset path and token-in-URL once sandbox apps ship'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-05-29 11:37'
+updated_date: '2026-05-29 15:41'
 labels:
   - skills
   - security
@@ -29,7 +31,13 @@ Depends on TASK-28 (sandbox rendering must be live first).
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ?token= query-param auth and skillAppSrc removed; session token never in a URL
-- [ ] #2 iframe asset serving + render-boundary HTML injection removed; db endpoints retained
-- [ ] #3 no remaining URL-token usage (verified)
+- [x] #1 ?token= query-param auth and skillAppSrc removed; session token never in a URL
+- [x] #2 iframe asset serving + render-boundary HTML injection removed; db endpoints retained
+- [x] #3 no remaining URL-token usage (verified)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Removed token-in-URL and the iframe machinery: deps.py _parse_auth no longer accepts ?token= (header Bearer only); skillAppSrc deleted from api.ts; serve_skill_asset + the injected HTML error boundary (_RENDER_BOUNDARY_* / _inject_render_boundary) removed from skills.py; AppView iframe branch + 'Open in tab' removed (sandbox-only; legacy-kind shows a 'rebuild as sandbox' notice); Skills.svelte detail iframe panel replaced with an 'Open app' link to /apps. Retained the render-log feedback loop (post_render_log + skill_render_status) and rewired it — AppView now POSTs sandbox onError to /_render_log so skill_render_status still works. arrow_lint kept (still used by skill_edit_file for legacy assets/*.html). Tests: dropped boundary-injection + asset-injection tests; kept render-log/schema/app-source. 701 tests pass; typecheck + lint clean; ui build OK. Verified: no ?token=, no skillAppSrc, no serve_skill_asset, no iframe remain.
+<!-- SECTION:NOTES:END -->
