@@ -428,3 +428,61 @@ class TestAdvanceConsolidationPointer:
         assert len(all_messages) == 4
         assert all_messages[0].content == "first"
         assert all_messages[3].content == "fourth"
+
+
+# ---------------------------------------------------------------------------
+# Consolidation-vs-save concurrency invariant
+# ---------------------------------------------------------------------------
+
+
+class TestConsolidationSaveInterleaving:
+    """A turn saved while consolidation runs must survive the pointer advance.
+
+    Background consolidation reads the history, runs a slow LLM extraction, then
+    advances the pointer. If a user turn is saved during that window, the
+    advance must not clobber it. This holds because _advance_consolidation_pointer
+    re-reads the file fresh rather than reusing a stale snapshot — a property
+    worth pinning so it isn't "optimized" away. At runtime the per-key lock
+    serializes these two writes; here we assert the data invariant directly.
+    """
+
+    def test_turn_saved_after_consolidation_read_is_preserved(self, tmp_path: Path) -> None:
+        alice_dir = tmp_path / "alice"
+        alice_dir.mkdir()
+        path = alice_dir / "history.jsonl"
+
+        # Initial history: pointer 0, two turns (4 messages).
+        _write_jsonl(
+            path,
+            [
+                _metadata_line(0),
+                _msg_dict("user", "q1"),
+                _msg_dict("assistant", "a1"),
+                _msg_dict("user", "q2"),
+                _msg_dict("assistant", "a2"),
+            ],
+        )
+
+        # Consolidation snapshots the pointer/messages it intends to advance
+        # past (the first turn → chunk_end == 2).
+        last_consolidated, _ = _read_history_file(path)
+        chunk_end = 2
+
+        # ...meanwhile a new user turn lands on the request path and is saved.
+        existing = _load_history(tmp_path, "alice")
+        existing.append(Message(role="user", content="q3"))
+        existing.append(Message(role="assistant", content="a3"))
+        _save_history(tmp_path, "alice", existing)
+
+        # Now consolidation advances the pointer using its stale chunk_end.
+        _advance_consolidation_pointer(tmp_path, "alice", last_consolidated + chunk_end)
+
+        pointer, all_messages = _read_history_file(path)
+        contents = [m.content for m in all_messages]
+
+        assert pointer == 2  # pointer advanced past the consolidated turn
+        # The turn saved during the consolidation window is NOT lost.
+        assert "q3" in contents
+        assert "a3" in contents
+        # And no earlier message was dropped either.
+        assert contents[:4] == ["q1", "a1", "q2", "a2"]

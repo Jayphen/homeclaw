@@ -11,14 +11,15 @@ Read `homeclaw-planning-prompt.md` for the full architecture and product spec.
 
 ## Task tracking
 
-Use `br` (beads_rust) for ALL task tracking. Never create markdown TODO files or task
-lists. Every piece of work goes into beads.
+Use [Backlog.md](https://backlog.md) (`backlog`) for ALL task tracking. Never create markdown
+TODO files or ad-hoc task lists. Every piece of work goes into backlog as a task under `backlog/`.
 
 ```bash
-br ready          # Find unblocked work
-br show <id>      # View issue details
-br update <id> --claim  # Claim work
-br close <id> --reason "..."  # Complete work
+backlog task list --plain            # List tasks (To Do / In Progress / Done)
+backlog task <id> --plain            # View task details
+backlog task edit <id> -s "In Progress" -a @me   # Claim and start work
+backlog task edit <id> -s Done       # Complete work
+backlog task create "Title" -d "..." # File new work
 ```
 
 ## Language and tooling
@@ -168,9 +169,9 @@ The version in `pyproject.toml` is managed by release-please — do not bump it 
 ## Landing the plane
 
 When ending a session:
-1. File remaining work as beads issues
+1. File remaining work as backlog tasks (`backlog task create`)
 2. Run `make typecheck` and `make lint`
-3. Close completed issues with `br close`
+3. Mark completed tasks Done (`backlog task edit <id> -s Done`)
 4. Commit and push (use conventional commit prefixes)
 
 ## graphify

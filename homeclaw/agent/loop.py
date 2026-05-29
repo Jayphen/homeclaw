@@ -35,6 +35,7 @@ from homeclaw.agent.runtime_state import (
 )
 from homeclaw.agent.tool_decorator import ToolPolicy
 from homeclaw.agent.tools import ToolManifest, ToolRegistry
+from homeclaw.atomicio import atomic_write_text
 from homeclaw.locking import LockPool
 from homeclaw.memory.semantic import SemanticMemory
 
@@ -699,8 +700,15 @@ class AgentLoop:
             history_key,
         )
 
-        # Only advance the pointer after successfully extracting memories
-        _advance_consolidation_pointer(self._workspaces, history_key, last_consolidated + chunk_end)
+        # Only advance the pointer after successfully extracting memories.
+        # Take the per-key lock so the read-modify-write races neither the
+        # request path's _save_history nor another consolidation pass. The
+        # advance re-reads the file fresh, so any turn saved while the (slow)
+        # LLM extraction ran above is preserved rather than overwritten.
+        async with self._lock_pool.lock_for(history_key):
+            _advance_consolidation_pointer(
+                self._workspaces, history_key, last_consolidated + chunk_end
+            )
         _record("succeeded", "ok", chunk_size=len(chunk), saved_entries=saved)
 
     async def run(
@@ -1394,7 +1402,7 @@ def _save_history(workspaces: Path, person: str, messages: list[Message]) -> Non
     lines = [json.dumps({"_type": _METADATA_TYPE, "last_consolidated": last_consolidated})]
     lines.extend(m.model_dump_json() for m in consolidated)
     lines.extend(m.model_dump_json() for m in new_persistent)
-    path.write_text("\n".join(lines) + "\n")
+    atomic_write_text(path, "\n".join(lines) + "\n")
 
 
 def _advance_consolidation_pointer(workspaces: Path, person: str, new_pointer: int) -> None:
@@ -1408,4 +1416,4 @@ def _advance_consolidation_pointer(workspaces: Path, person: str, new_pointer: i
     lines = [json.dumps({"_type": _METADATA_TYPE, "last_consolidated": new_pointer})]
     for msg in all_messages:
         lines.append(msg.model_dump_json())
-    path.write_text("\n".join(lines) + "\n")
+    atomic_write_text(path, "\n".join(lines) + "\n")
