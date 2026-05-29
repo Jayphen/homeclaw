@@ -273,10 +273,50 @@ ui-app:
 **Arrow.js is the preferred framework** — zero build step, reactive,
 tiny (~5KB). Load it from CDN or vendor it into `assets/`.
 
-Before writing Arrow.js code, read the bundled references for correct API usage:
-- `references/api.md` — reactive state, html templates, components, watch semantics
+#### Mini-app contract (read before writing a single line)
+
+These five idioms are the whole API surface a mini-app needs. Follow them exactly:
+
+1. **Import only** `{ reactive, html }` **from** `@arrow-js/core` (the CDN URL below).
+2. **Mount** the template by *calling* it with a DOM node: ``html`...`(document.body)``.
+3. **State** is `reactive({...})`; mutate fields directly (`state.count++`).
+4. **Live values** are callables: `${() => state.count}`. A bare `${state.count}`
+   renders **once** and never updates.
+5. **Events** use an `@`-prefixed attribute whose value is a function:
+   `@click="${() => state.count++}"`. Likewise `@input`, `@submit`, etc.
+
+**Never** use any of these in a mini-app — they silently do nothing or require a
+build step that mini-apps don't have:
+
+- ❌ `onclick="${...}"` (or any `on*` attribute) — use `@click`. This is the #1 cause
+  of "the buttons don't work."
+- ❌ `render()`, `boundary()`, `renderToString()`, `serializePayload()`, `hydrate()`
+- ❌ importing from `@arrow-js/framework`, `@arrow-js/ssr`, or `@arrow-js/hydrate`
+- ❌ `${state.count}` for anything that changes — wrap it in `() =>`
+
+Minimal interactive app (copy this shape — note `@click`, the `() =>` wrappers, and
+the trailing `(document.body)` that mounts it):
+
+```html
+<script type="module">
+  import { reactive, html } from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs'
+
+  const state = reactive({ count: 0 })
+
+  html`
+    <p>Count: ${() => state.count}</p>
+    <button @click="${() => state.count++}">+1</button>
+    <button @click="${() => state.count = 0}">Reset</button>
+  `(document.body)
+</script>
+```
+
+The bundled references expand on this — read them for fetch/SQLite, keyed lists,
+and components, but the contract above is sufficient for most mini-apps:
+- `references/api.md` — reactive state, html templates, events (`@click`), components, watch
 - `references/examples.md` — counter, list rendering, event handlers, keyed lists
 - `references/getting-started.md` — no-build pattern, CDN import, mental model
+- `references/advanced-ssr.md` — framework/SSR/hydrate; **not for mini-apps**, ignore it here
 
 Read them with:
 ```

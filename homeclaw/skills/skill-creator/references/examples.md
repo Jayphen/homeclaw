@@ -1,5 +1,12 @@
 # Arrow Examples
 
+> **Provenance.** Forked from the official `@arrow-js/skill` package
+> (`github.com/standardagents/arrow-js`, MIT) and deliberately rewritten for
+> homeclaw's no-build CDN mini-app case: upstream's Vite-scaffold / SSR /
+> hydration / routing examples were replaced with `@click` handlers, `db/query`
+> fetches, and LAN vendoring. These examples are homeclaw-specific — do not
+> re-sync them wholesale from upstream.
+
 ## Counter
 
 ```ts

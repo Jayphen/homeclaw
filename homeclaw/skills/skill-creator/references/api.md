@@ -2,6 +2,13 @@
 
 Use this reference when you need the main runtime semantics quickly.
 
+> **Provenance.** This file is a fork of the official `@arrow-js/skill` package
+> (npm: `@arrow-js/skill`, repo: `github.com/standardagents/arrow-js`, MIT). The
+> sections below are kept in sync with upstream `api.md` — pull genuine
+> runtime-semantics fixes from there. The **Events** section below is a homeclaw
+> addition (upstream omits it). SSR/framework material was moved to
+> `advanced-ssr.md`: it does not apply to no-build mini-apps.
+
 ## `reactive()`
 
 - Turns objects and arrays into live reactive state.
@@ -28,10 +35,23 @@ Use this reference when you need the main runtime semantics quickly.
 - Use for side effects, not primary rendering.
 - Prefer template expressions for UI updates and `watch()` for imperative work.
 
-## Framework + SSR
+## Events
 
-- `render(root, view)` mounts a view to the DOM.
-- `boundary(view, options)` gives async and hydration recovery boundaries.
-- `renderToString(view)` returns `{ html, payload }`.
-- `serializePayload(payload)` writes the SSR payload into the page.
-- `hydrate(root, view, payload)` adopts matching SSR DOM in the browser.
+- Bind listeners with an `@`-prefixed attribute, **not** the DOM `on*` attribute.
+  `@click="${() => ...}"` works; `onclick="${...}"` silently does nothing.
+- The value is a function: `@click="${() => state.count++}"`.
+- Any DOM event works: `@input`, `@submit`, `@change`, `@keydown`, etc.
+- Read the event with a parameter: `@input="${(e) => state.text = e.target.value}"`.
+- Async handlers are fine: `@click="${async () => { await save() }}"`.
+
+```html
+<button @click="${() => state.count++}">Clicked ${() => state.count} times</button>
+<input @input="${(e) => state.name = e.target.value}" />
+```
+
+## Not for mini-apps: framework + SSR
+
+`render`, `boundary`, `renderToString`, `serializePayload`, and `hydrate` belong to
+`@arrow-js/framework` / `@arrow-js/ssr` / `@arrow-js/hydrate` and require a build step.
+They do **not** apply to no-build CDN mini-apps — see `advanced-ssr.md` if you are
+genuinely scaffolding a full SSR app.

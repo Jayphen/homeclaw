@@ -142,8 +142,11 @@ skill-creator guidance, and prefer the dedicated `skill_enable_ui_app` tool when
 SKILL.md and `assets/index.html` are written deterministically. \
 Add `ui-app:` to the skill frontmatter, \
 write the app to `assets/index.html`, and prefer Arrow.js for the UI. \
-For browser-loaded Arrow apps, use an ESM import such as \
-`https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs`. The app should read the auth token \
+For browser-loaded Arrow apps, import only `reactive, html` from \
+`https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs`, \
+mount with `html`...`(document.body)`, bind events with `@click` (NOT `onclick`), \
+and wrap changing values as `${{() => x}}`; read the skill-creator references before \
+writing the app. The app should read the auth token \
 from `localStorage.getItem('homeclaw_token')` and call the homeclaw skill API endpoints. \
 Data files: `GET /api/skills/{{owner}}/{{name}}/files/data/{{filename}}`. \
 SQLite queries: `POST /api/skills/{{owner}}/{{name}}/db/query` with `{{sql, params}}`. \
