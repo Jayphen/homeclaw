@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.31.0](https://github.com/Jayphen/homeclaw/compare/v0.30.0...v0.31.0) (2026-05-29)
+
+
+### Features
+
+* lint Arrow.js mini-app writes for silent-failure footguns ([#161](https://github.com/Jayphen/homeclaw/issues/161)) ([47484d1](https://github.com/Jayphen/homeclaw/commit/47484d1eb64f528977c5ba321e10ec1fcab4170f))
+* ship a correct, tracked Arrow.js reference mini-app ([#160](https://github.com/Jayphen/homeclaw/issues/160)) ([f0a04ad](https://github.com/Jayphen/homeclaw/commit/f0a04adf53ee0554945efa73ee6c9c2f7aae917b))
+
+
+### Bug Fixes
+
+* make agent history persistence atomic and locked ([#155](https://github.com/Jayphen/homeclaw/issues/155)) ([815de8a](https://github.com/Jayphen/homeclaw/commit/815de8afd25c694e95aa03aa74c2c0fe4846a36f))
+* make history persistence append-only so truncated turns survive ([#157](https://github.com/Jayphen/homeclaw/issues/157)) ([ef6a0ac](https://github.com/Jayphen/homeclaw/commit/ef6a0ac8e4e50432de60ebf13512a3c7fd63c1c2))
+
+
+### Documentation
+
+* make Arrow.js mini-app event/contract guidance unmissable ([#159](https://github.com/Jayphen/homeclaw/issues/159)) ([82b8f45](https://github.com/Jayphen/homeclaw/commit/82b8f45eaec217ccec0d5090c398ff78d5bb9550))
+
 ## [0.30.0](https://github.com/Jayphen/homeclaw/compare/v0.29.1...v0.30.0) (2026-04-25)
 
 
