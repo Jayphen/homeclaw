@@ -1,11 +1,11 @@
 # Arrow Examples
 
-> **Provenance.** Forked from the official `@arrow-js/skill` package
-> (`github.com/standardagents/arrow-js`, MIT) and deliberately rewritten for
-> homeclaw's no-build CDN mini-app case: upstream's Vite-scaffold / SSR /
-> hydration / routing examples were replaced with `@click` handlers, `db/query`
-> fetches, and LAN vendoring. These examples are homeclaw-specific — do not
-> re-sync them wholesale from upstream.
+> **homeclaw mini-apps run in a sandbox** (`@arrow-js/sandbox`). Import from the
+> bare `@arrow-js/core`, `export default` your template (no `html`...`(el)` mount),
+> and read data via the `homeclaw` host bridge — never `fetch`/`localStorage`.
+> See the skill-creator SKILL.md for the full contract. The Arrow patterns below
+> (state, events, keyed lists, components) are correct; ignore any older
+> CDN/mount framing.
 
 ## Counter
 
@@ -35,35 +35,29 @@ const state = reactive({ count: 1 })
 html`<p>Current count: ${Counter(state)}</p>`
 ```
 
-## Fetching data and rendering a list
+## Fetching data and rendering a list (via the host bridge)
 
-```html
-<script type="module">
-  import { reactive, html } from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs'
+```ts
+// app/main.ts
+import { reactive, html } from '@arrow-js/core'
+import { query } from 'homeclaw'
 
-  const token = localStorage.getItem('homeclaw_token') ?? ''
-  const headers = { Authorization: `Bearer ${token}` }
+const state = reactive({ items: [], loading: true, error: null })
 
-  const state = reactive({ items: [], loading: true, error: null })
+// Read-only SELECT, run host-side. Surface failures into state.error — never
+// swallow them into an empty list.
+query('SELECT id, name FROM items ORDER BY created_at DESC')
+  .then((rows) => { state.items = rows; state.loading = false })
+  .catch((e) => { state.error = String(e?.message ?? e); state.loading = false })
 
-  fetch('/api/skills/household/my-skill/db/query', {
-    method: 'POST',
-    headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sql: 'SELECT * FROM items ORDER BY created_at DESC' })
-  })
-    .then(r => r.ok ? r.json() : Promise.reject(r.status))
-    .then(d => { state.items = d.rows ?? []; state.loading = false })
-    .catch(e => { state.error = String(e); state.loading = false })
-
-  html`
-    ${() => state.loading
-      ? html`<p>Loading…</p>`
-      : state.error
-        ? html`<p>Error: ${() => state.error}</p>`
-        : html`<ul>${() => state.items.map(item => html`<li>${item.name}</li>`)}</ul>`
-    }
-  `(document.body)
-</script>
+export default html`
+  ${() => state.loading
+    ? html`<p>Loading…</p>`
+    : state.error
+      ? html`<p>Error: ${() => state.error}</p>`
+      : html`<ul>${() => state.items.map(item => html`<li>${() => item.name}</li>`.key(item.id))}</ul>`
+  }
+`
 ```
 
 ## Event handlers

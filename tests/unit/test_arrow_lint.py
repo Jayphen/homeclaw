@@ -216,11 +216,21 @@ def test_empty_source() -> None:
     assert lint_arrow_html("") == []
 
 
-def test_shipped_reference_app_is_clean() -> None:
-    """The canonical reference mini-app (TASK-16) must pass its own lint (TASK-18)."""
-    ref = Path("homeclaw/skills/skill-creator/assets/reference-mini-app.html")
+def test_shipped_reference_app_follows_sandbox_contract() -> None:
+    """The canonical reference mini-app is now sandbox source (TASK-29).
+
+    arrow_lint targets the legacy single-HTML model (its missing-mount rule would
+    even false-positive on a sandbox `export default`), so instead of linting we
+    assert the source-payload contract the reference must teach.
+    """
+    ref = Path("homeclaw/skills/skill-creator/assets/reference-mini-app.ts")
     assert ref.is_file(), f"reference app missing at {ref}"
-    assert lint_arrow_html(ref.read_text()) == []
+    src = ref.read_text()
+    assert "from '@arrow-js/core'" in src
+    assert "from 'homeclaw'" in src  # host bridge, not fetch
+    assert "export default" in src
+    assert "fetch('" not in src  # no real network call (comments may mention fetch)
+    assert "localStorage" not in src  # the VM has no token
 
 
 def test_reports_multiple_distinct_issues_together() -> None:

@@ -1,0 +1,31 @@
+/* app/main.css — styles the sandbox root for the reference mini-app. */
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  padding: 1rem;
+  color: #1c1c17;
+}
+h1 {
+  font-size: 1.25rem;
+  margin: 0 0 0.75rem;
+}
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.job {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #eee;
+}
+.job.done {
+  text-decoration: line-through;
+  color: #888;
+}
+.status {
+  color: #666;
+}
+.error {
+  color: #b3261e;
+  white-space: pre-wrap;
+}

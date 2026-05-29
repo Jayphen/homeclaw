@@ -241,226 +241,123 @@ in the Skills settings.
 Morning briefing, weekly review — orchestrates multiple tools.
 Instructions describe the workflow steps and what to include.
 
-### Mini-app skill (Arrow.js embedded UI)
+### Mini-app skill (embedded UI via Arrow sandbox)
 
-Skills can embed a small interactive web app in the homeclaw web UI.
-Declare it with `ui-app:` in the frontmatter — the app appears as a live
-panel on the skill's detail page, with a link to open in a new tab.
+Skills can embed a small interactive web app in the homeclaw UI. It runs
+**inline, in a sandboxed WASM VM** (`@arrow-js/sandbox`) — no iframe. The
+mini-app's code is untrusted and isolated: it **cannot** read the session token,
+**cannot** `fetch`, and **cannot** touch the host page. It reaches skill data
+**only** through a host bridge. The app shows up in the **Apps** section and on
+the skill's detail page.
 
-If the skill already exists, do NOT call `skill_create` again. Instead:
-1. Call `read_skill` to inspect the existing skill and its files
-2. Prefer `skill_enable_ui_app` to deterministically update `SKILL.md` and create `assets/index.html`
-3. If you must edit manually, use `skill_edit_file` to update `SKILL.md` and add a top-level `ui-app:` block
-4. Write the app to `assets/index.html` with `skill_edit_file`
-5. Keep the app inside the skill's `assets/` directory so the web UI can render it
+Declare it with `ui-app:` in the frontmatter, pointing at an Arrow source entry:
 
-Do NOT return raw HTML to the user and tell them to save or run it manually.
-For embedded apps, the goal is a live skill panel in homeclaw, not a pasted HTML blob.
-Never use `{name}__data_write` for `SKILL.md` or `assets/index.html` — `data_write`
-only manages files inside `data/`.
-
-**SKILL.md frontmatter:**
 ```yaml
 ---
 name: my-skill
 description: Track items and show them in an interactive list.
 ui-app:
-  entry: assets/index.html   # default — can omit if using this path
-  title: My App              # optional display title
+  entry: app/main.ts     # Arrow source — a .ts/.js entry selects the sandbox model
+  title: My App          # optional display title
 ---
 ```
 
-**Arrow.js is the preferred framework** — zero build step, reactive,
-tiny (~5KB). Load it from CDN or vendor it into `assets/`.
+If the skill already exists, do NOT call `skill_create` again. Prefer
+`skill_enable_ui_app` — it deterministically adds the `ui-app:` block and writes
+`app/main.ts` (+ `app/main.css`). Omit `main_ts` for a working default scaffold,
+or pass your own. Do NOT hand the user raw source to save/run — the goal is a
+live panel in homeclaw.
 
-#### Mini-app contract (read before writing a single line)
+#### The artifact: a source payload
 
-These five idioms are the whole API surface a mini-app needs. Follow them exactly:
+A mini-app is one entry file, **`app/main.ts`** (or `main.js`), plus optional
+**`app/main.css`**. The sandbox compiles and runs `main.ts`; it must
+**`export default`** an Arrow template.
 
-1. **Import only** `{ reactive, html }` **from** `@arrow-js/core` (the CDN URL below).
-2. **Mount** the template by *calling* it with a DOM node: ``html`...`(document.body)``.
-3. **State** is `reactive({...})`; mutate fields directly (`state.count++`).
-4. **Live values** are callables: `${() => state.count}`. A bare `${state.count}`
-   renders **once** and never updates.
-5. **Events** use an `@`-prefixed attribute whose value is a function:
-   `@click="${() => state.count++}"`. Likewise `@input`, `@submit`, etc.
+#### The contract (read before writing a single line)
 
-**Never** use any of these in a mini-app — they throw at mount (blank page) or
-silently do nothing:
+1. `import { reactive, html } from '@arrow-js/core'`.
+2. Read skill data via the **host bridge**: `import { query, schema } from 'homeclaw'`.
+   - `query(sql, params?)` — read-only SELECT against this skill's SQLite db; returns the rows.
+   - `schema()` — returns tables/columns; call it (or the `skill_db_schema` tool) before writing a SELECT.
+   - **Never `fetch()` and never a token.** The VM has no network and no credentials; the host runs the authenticated call for you.
+3. State is `reactive({...})`; mutate fields directly (`state.loading = false`).
+4. **Live values are callables**: `${() => state.x}`. A bare `${state.x}` renders once and never updates.
+5. Events use an `@`-prefixed attribute: `@click="${() => ...}"` (NEVER `onclick`).
+6. **`export default`** an `html`...`` template (or component result). Do NOT call ``html`...`(el)`` — the sandbox mounts the default export.
+7. Send a message to the host with `output(payload)` when needed (`output` is a global inside the sandbox; payload must be JSON-serializable).
+8. Put styles in `app/main.css`.
 
-- ❌ **An HTML comment `<!-- ... -->` INSIDE an `html`...`` template.** This throws
-  `Invalid HTML position` at mount and renders the ENTIRE app blank — browser-verified,
-  and it is the #1 reason a hand-written mini-app shows nothing. Keep every comment in
-  JS (`//` or `/* */`) *outside* the backticks. (Comments in `<head>`/`<style>` are fine.)
-- ❌ **A "partial" attribute that mixes static text with `${...}`**, e.g.
-  `class="card ${() => state.active}"`. Also throws `Invalid HTML position` at mount.
-  The `${...}` must be the WHOLE attribute value — build the full string in one arrow:
-  `class="${() => state.active ? 'card active' : 'card'}"`.
-- ❌ `onclick="${...}"` (or any `on*` attribute) — use `@click`. The #1 cause of
-  "the buttons don't work."
-- ❌ `render()`, `boundary()`, `renderToString()`, `serializePayload()`, `hydrate()`
-- ❌ importing from `@arrow-js/framework`, `@arrow-js/ssr`, or `@arrow-js/hydrate`
-- ❌ `${state.count}` for anything that changes — wrap it in `() =>`
-- ❌ swallowing a failed fetch into an empty result (`r.ok ? r.json() : { rows: [] }`).
-  A broken query then looks identical to "no data yet". Always surface the error to a
-  `state.error` field and render it (see the reference app).
+**Never** import `@arrow-js/framework` / `/ssr` / `/hydrate`, and never call
+`render()` / `boundary()` / `hydrate()` — those are not part of the sandbox.
 
-Minimal interactive app (copy this shape — note `@click`, the `() =>` wrappers, and
-the trailing `(document.body)` that mounts it):
+Minimal app:
 
-```html
-<script type="module">
-  import { reactive, html } from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs'
+```ts
+// app/main.ts
+import { reactive, html } from '@arrow-js/core'
 
-  const state = reactive({ count: 0 })
+const state = reactive({ count: 0 })
 
-  html`
-    <p>Count: ${() => state.count}</p>
-    <button @click="${() => state.count++}">+1</button>
-    <button @click="${() => state.count = 0}">Reset</button>
-  `(document.body)
-</script>
+export default html`
+  <p>Count: ${() => state.count}</p>
+  <button @click="${() => state.count++}">+1</button>
+`
+```
+
+Data-driven app (via the host bridge):
+
+```ts
+// app/main.ts
+import { reactive, html } from '@arrow-js/core'
+import { query } from 'homeclaw'
+
+const state = reactive({ rows: [], loading: true, error: null })
+
+// Surface failures into state.error — never swallow them into an empty list, or
+// a broken query looks identical to "no data yet".
+query('SELECT id, title FROM jobs ORDER BY id')
+  .then((rows) => { state.rows = rows; state.loading = false })
+  .catch((err) => { state.error = String(err?.message ?? err); state.loading = false })
+
+export default html`
+  ${() => state.loading ? html`<p>Loading…</p>` : null}
+  ${() => state.error ? html`<p class="error">${() => state.error}</p>` : null}
+  ${() => !state.loading && !state.error
+    ? html`<ul>${() => state.rows.map((r) => html`<li>${() => r.title}</li>`.key(r.id))}</ul>`
+    : null}
+`
 ```
 
 **Canonical starting point — copy this, don't write from scratch.** A complete,
-correct, browser-verified mini-app ships at `assets/reference-mini-app.html` in
-this skill. It demonstrates every idiom above (`@click`, reactive vs static,
-`html`...`(el)` mount, auth token, SELECT-only `db/query` fetch, keyed lists,
-loading/error/empty states). Read it, then adapt it:
+source-based reference ships at `assets/reference-mini-app.ts` (+ `.css`) in this
+skill: keyed list, loading/error/empty states, a host-bridge `query`, and error
+surfacing. Read it, then adapt it:
 
 ```
-skill_edit_file(name="skill-creator", file="assets/reference-mini-app.html")
+skill_edit_file(name="skill-creator", file="assets/reference-mini-app.ts")
 ```
 
-Copy its contents into the new skill's `assets/index.html` and change only: the
-`household/my-skill` owner/name in the API paths, the SQL `SELECT` + the columns
-the template reads, and the markup/styles. Keep the event/reactivity wiring as-is.
+Copy it into your skill's `app/main.ts` and change only the SQL `SELECT` + the
+columns the template reads + the markup. Keep the event/reactivity wiring as-is.
 
-The bundled references expand on this — read them for more patterns, but the
-reference app + the contract above are sufficient for most mini-apps:
+The bundled references expand on Arrow itself — read them for more patterns:
+
 - `references/api.md` — reactive state, html templates, events (`@click`), components, watch
-- `references/examples.md` — counter, list rendering, event handlers, keyed lists
-- `references/getting-started.md` — no-build pattern, CDN import, mental model
+- `references/examples.md` — counter, list rendering, keyed lists
+- `references/getting-started.md` — the mental model
 - `references/advanced-ssr.md` — framework/SSR/hydrate; **not for mini-apps**, ignore it here
 
-Read them with:
-```
-skill_edit_file(name="skill-creator", file="references/api.md")
-skill_edit_file(name="skill-creator", file="references/examples.md")
-```
+**How to create / convert:**
 
-```html
-<!-- assets/index.html -->
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { font-family: sans-serif; padding: 1rem; margin: 0; }
-  </style>
-</head>
-<body>
-<script type="module">
-  import { reactive, html } from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs'
-
-  // Read the auth token from localStorage (same origin as homeclaw)
-  const token = localStorage.getItem('homeclaw_token') ?? ''
-  const headers = { Authorization: `Bearer ${token}` }
-
-  // Load skill data — use SQLite for structured/growing data. Surface failures
-  // into state.error; never swallow them into an empty list.
-  const state = reactive({ items: [], loading: true, error: null })
-
-  // Discover real column names first (so the SELECT below is not a guess):
-  //   GET /api/skills/household/my-skill/db/schema  ->  { tables: [{ name, columns }] }
-  // Or, as the agent, call the skill_db_schema tool before writing the SELECT.
-  fetch('/api/skills/household/my-skill/db/query', {
-    method: 'POST',
-    headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sql: 'SELECT id, name FROM items ORDER BY created_at DESC' })
-  })
-    .then(async r => { if (!r.ok) throw new Error(`HTTP ${r.status}: ${await r.text()}`); return r.json() })
-    .then(d => { state.items = d.rows ?? []; state.loading = false })
-    .catch(e => { state.error = String(e); state.loading = false })
-
-  html`
-    ${() => state.loading
-      ? html`<p>Loading…</p>`
-      : state.error
-        ? html`<p>Error: ${() => state.error}</p>`
-        : html`<ul>${() => state.items.map(item => html`<li>${() => item.name}</li>`.key(item.id))}</ul>`
-    }
-  `(document.body)
-</script>
-</body>
-</html>
-```
-
-**How to create a mini-app skill:**
-```
-skill_create(
-  name="my-app",
-  description="Interactive tracker with embedded UI.",
-  scope="household",
-  instructions="...",
-  initial_files=[
-    {
-      "filename": "assets/index.html",
-      "content": "<!-- Arrow.js app here -->"
-    },
-    {
-      "filename": "data/items.json",
-      "content": "{\"items\": []}"
-    }
-  ]
-)
-```
-
-Then update `assets/index.html` via `skill_edit_file` with the full app.
-
-**Converting an existing skill into a mini-app:**
-```
-read_skill(name="budget", person="alice")
-skill_edit_file(
-  name="budget",
-  file="SKILL.md",
-  find="description: ...",
-  replace="description: ...\nui-app:\n  entry: assets/index.html\n  title: Budget Dashboard"
-)
-skill_edit_file(
-  name="budget",
-  file="assets/index.html",
-  content="<!-- Arrow.js app here -->"
-)
-```
+- **New skill:** `skill_create(...)`, then `skill_enable_ui_app(name=..., person=...)` to write the scaffold.
+- **Existing skill:** `read_skill(...)`, then `skill_enable_ui_app(...)` — it adds the `ui-app:` block and writes `app/main.ts` + `app/main.css`. Pass `main_ts=` / `main_css=` to supply your own source.
+- Supply a large app via `skill_enable_ui_app(main_ts=...)`; for later edits use `skill_edit_file` find/replace — never re-send the whole file.
 
 **Notes:**
-- The app runs on the same origin as homeclaw, so `fetch('/api/...')` works
-- Use `localStorage.getItem('homeclaw_token')` for the Bearer token
-- **When editing an existing `assets/index.html`, always use find/replace — never pass
-  `content=` with the full file.** Large HTML files exceed LLM output limits and the write
-  will be truncated and silently fail. Use `find=` / `replace=` to change only the lines
-  that need updating.
-- **Always include the owner in API paths** — `/api/skills/budget/...` is wrong,
-  `/api/skills/household/budget/...` is correct. The owner is `household` for shared
-  skills or the member's name for private skills
-- JSON data files: `GET /api/skills/{owner}/{name}/files/data/filename`
-- SQLite queries: `POST /api/skills/{owner}/{name}/db/query` with `{sql, params}` body (SELECT only)
-- **Discover the schema before writing a SELECT**: call the `skill_db_schema` tool (or
-  `GET /api/skills/{owner}/{name}/db/schema`) to get the real tables/columns. Querying a
-  column that does not exist is a common reason a mini-app shows nothing.
-- Writes go through the agent (LLM calls `db_execute` / `data_write`); the UI is read-only
-- LAN-only installs: vendor Arrow.js into `assets/arrow.js` and use a relative import
-- **Write-time lint**: when you write an `assets/*.html` via `skill_edit_file` or
-  `skill_enable_ui_app`, the tool result may include an `arrow_warnings` list. Treat every
-  warning as must-fix. The two that render the app fully **blank** are an HTML comment inside
-  an `html`...`` template and a partial attribute (`class="x ${...}"`); the rest flag handlers
-  that won't fire or values that won't update. Re-edit until `arrow_warnings` is empty.
-- **Runtime error boundary (read this when an app renders blank or wrong)**: homeclaw injects
-  an error boundary into every served mini-app. A mount/runtime error shows as a red banner in
-  the page (instead of a blank screen) AND is captured server-side. After you write or edit an
-  app, ask the user to open it, then call `skill_render_status(name=..., person=...)` to read
-  the actual error (e.g. `Invalid HTML position`) and fix the real cause instead of guessing.
-- **UI verification (optional)**: if `browser_enabled` is on in Settings, you can also render
-  it yourself with `web_browse(url="http://localhost:8080/api/skills/{owner}/{name}/assets/index.html")`.
+
+- The mini-app has **no** network and **no** token. All data flows through the `homeclaw` bridge (`query` / `schema`). Do not write `fetch('/api/...')` or read `localStorage` — they don't exist in the VM.
+- **Discover the schema before writing a SELECT**: call the `skill_db_schema` tool (or `schema()` in the app). Querying a column that doesn't exist is a common reason a mini-app shows nothing.
+- The bridge is **read-only** (SELECT). Writes go through the agent (the LLM calls `db_execute` / `data_write`).
+- In your SQL, just reference the tables — the host scopes the call to this skill's database for you.
+- **Errors surface automatically**: a compile/mount/runtime error appears as a banner in the panel (and via `skill_render_status`). You still must surface *query* failures into `state.error` and render them.

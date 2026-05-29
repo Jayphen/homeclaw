@@ -3,9 +3,11 @@ id: TASK-29
 title: >-
   Authoring: rewrite skill-creator for sandbox payloads + reference app; retire
   HTML-era lint/boundary
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-05-29 11:37'
+updated_date: '2026-05-29 15:31'
 labels:
   - skills
   - mini-app
@@ -31,7 +33,13 @@ Changes:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 skill-creator SKILL.md teaches the sandbox source-payload model (Arrow's tool schema + prompt)
-- [ ] #2 A working source-based reference mini-app ships and uses the host db bridge
-- [ ] #3 arrow_lint + injected error boundary reviewed: retired or re-scoped for the sandbox model; docs updated
+- [x] #1 skill-creator SKILL.md teaches the sandbox source-payload model (Arrow's tool schema + prompt)
+- [x] #2 A working source-based reference mini-app ships and uses the host db bridge
+- [x] #3 arrow_lint + injected error boundary reviewed: retired or re-scoped for the sandbox model; docs updated
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+skill_enable_ui_app now writes a sandbox app: app/main.ts (+ app/main.css) + ui-app:{entry: app/main.ts, kind: sandbox}, with a working default scaffold using the 'homeclaw' bridge (no fetch/token). New params main_ts/main_css (dropped html_content/entry). Reference app replaced: assets/reference-mini-app.html -> reference-mini-app.ts (+ .css), host-bridge query, keyed list, loading/error/empty. SKILL.md mini-app section + references/getting-started.md + examples.md rewritten for the source-payload + bridge model (bare @arrow-js/core import, export default, no CDN/mount/token). loop.py system-prompt guidance updated. arrow_lint REVIEWED: kept for legacy iframe (assets/*.html) only — it no-ops on sandbox source and its missing-mount rule would false-positive on export default; removed from the sandbox tool path. Error-boundary removal deferred to TASK-30 (it's part of retiring the iframe asset path). Docs site page updated. 707 tests pass, typecheck + lint clean, ui build OK.
+<!-- SECTION:NOTES:END -->
