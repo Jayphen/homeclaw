@@ -1,11 +1,11 @@
 ---
 id: TASK-23
 title: Add Apps launcher page and per-app routes for skill mini-apps
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-05-29 10:13'
-updated_date: '2026-05-29 10:19'
+updated_date: '2026-05-29 10:42'
 labels:
   - ui
   - skills
@@ -51,3 +51,9 @@ Changes:
 
 Verification: vite build passes; new files emit no compiler/a11y warnings. Live happy-path render not exercised — no household config or installed mini-app skill present locally, and seeding workspace state was out of scope for this slice.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in PR #164 (squash-merged to main as a3ce7f5). Apps launcher (/apps) + full-bleed per-app routes (/apps/{owner}/{name}); skillAppSrc extracted to $lib/api; Apps to primary nav. Sandbox/token unchanged this slice — hardening continues in TASK-24/25/26. vite build clean.
+<!-- SECTION:FINAL_SUMMARY:END -->

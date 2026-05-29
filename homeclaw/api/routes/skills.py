@@ -552,6 +552,49 @@ async def skill_db_schema(owner: str, name: str) -> dict[str, Any]:
     return {"tables": tables, "count": len(tables)}
 
 
+@router.get("/{owner}/{name}/app-source", dependencies=[AuthDep])
+async def skill_app_source(owner: str, name: str) -> dict[str, Any]:
+    """Return the source map for a sandboxed mini-app.
+
+    For ``ui_app.kind == "sandbox"`` skills, returns
+    ``{"source": {"main.ts"|"main.js": ..., "main.css"?: ...}, "title": ...}``.
+    The web UI feeds ``source`` directly to ``@arrow-js/sandbox``; the mini-app
+    runs in a WASM VM and reaches data only through the host bridge, so this
+    endpoint serves untrusted *source*, never a credential. See backlog TASK-28.
+    """
+    from homeclaw.plugins.skills.loader import skill_md_to_definition
+
+    workspaces = get_config().workspaces.resolve()
+    skill_dir = _safe_relative(workspaces / owner / "skills", name)
+    if not skill_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Skill not found")
+
+    skill_md = skill_dir / "SKILL.md"
+    if not skill_md.is_file():
+        raise HTTPException(status_code=404, detail="Skill has no SKILL.md")
+
+    try:
+        defn = skill_md_to_definition(skill_md.read_text())
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid SKILL.md: {exc}") from None
+
+    ui_app = defn.ui_app
+    if ui_app is None or ui_app.kind != "sandbox":
+        raise HTTPException(status_code=404, detail="Skill has no sandbox mini-app")
+
+    entry_path = _safe_relative(skill_dir, ui_app.entry)
+    if not entry_path.is_file():
+        raise HTTPException(status_code=404, detail=f"Entry source not found: {ui_app.entry}")
+
+    # Arrow requires the entry key to be exactly main.ts / main.js.
+    source: dict[str, str] = {entry_path.name: entry_path.read_text()}
+    css_path = entry_path.parent / "main.css"
+    if css_path.is_file():
+        source["main.css"] = css_path.read_text()
+
+    return {"source": source, "title": ui_app.title}
+
+
 @router.get("/{owner}/{name}/files/{file_path:path}", dependencies=[AuthDep])
 async def read_skill_file(owner: str, name: str, file_path: str) -> dict[str, Any]:
     """Read the content of a file inside a skill directory.

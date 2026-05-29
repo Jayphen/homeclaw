@@ -7,7 +7,7 @@ import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel
@@ -34,10 +34,23 @@ _RESERVED_DATA_WRITE_PATTERNS = (
 
 
 class SkillUiApp(BaseModel):
-    """Embedded web app declaration for a skill."""
+    """Embedded web app declaration for a skill.
+
+    ``kind`` selects the embedding model:
+
+    - ``"iframe"`` (legacy): ``entry`` is an HTML file under the skill's
+      ``assets/`` dir, served and embedded in a sandboxed iframe.
+    - ``"sandbox"``: ``entry`` is an Arrow source entry (``main.ts``/``main.js``)
+      under the skill dir, run inline in a QuickJS+WASM sandbox via
+      ``@arrow-js/sandbox``. The host mediates all data — see backlog TASK-27..30.
+
+    ``kind`` is inferred from the entry extension when not declared explicitly
+    (``.ts``/``.js`` → sandbox, otherwise iframe).
+    """
 
     entry: str = "index.html"
     title: str | None = None
+    kind: Literal["iframe", "sandbox"] = "iframe"
 
 
 class SkillFrontmatter(BaseModel):
@@ -154,23 +167,57 @@ def _normalize_ui_app_entry(value: Any) -> str:
     return entry
 
 
+def _infer_ui_app_kind(entry: Any) -> str:
+    """Infer the embedding model from the entry filename (sandbox if .ts/.js)."""
+    if isinstance(entry, str) and entry.strip().endswith((".ts", ".js")):
+        return "sandbox"
+    return "iframe"
+
+
+def _normalize_sandbox_entry(value: Any) -> str:
+    """Normalize a sandbox ui-app entry path relative to the skill directory.
+
+    Unlike iframe entries, sandbox sources live anywhere under the skill dir
+    (not ``assets/``). Arrow requires the entry basename to be ``main.ts`` or
+    ``main.js``; the path may carry a prefix (e.g. ``app/main.ts``).
+    """
+    if not isinstance(value, str) or not value.strip():
+        return "main.ts"
+    entry = value.strip().lstrip("/")
+    base = entry.rsplit("/", 1)[-1]
+    if base not in ("main.ts", "main.js"):
+        raise ValueError(
+            f"Invalid sandbox ui_app.entry: basename must be main.ts or main.js, got {value!r}"
+        )
+    return entry
+
+
 def _parse_ui_app(value: Any) -> SkillUiApp | None:
     """Parse a ui-app declaration from YAML frontmatter."""
     if value is None:
         return None
-    if isinstance(value, SkillUiApp):
-        return SkillUiApp(
-            entry=_normalize_ui_app_entry(value.entry),
-            title=value.title,
-        )
     if value is True:
         return SkillUiApp()
-    if isinstance(value, dict):
-        return SkillUiApp(
-            entry=_normalize_ui_app_entry(value.get("entry", "assets/index.html")),
-            title=value.get("title"),
-        )
-    raise ValueError("Invalid ui-app frontmatter: expected true or a mapping with entry/title")
+
+    if isinstance(value, SkillUiApp):
+        raw_entry: Any = value.entry
+        title = value.title
+        raw_kind: Any = value.kind
+    elif isinstance(value, dict):
+        raw_entry = value.get("entry")
+        title = value.get("title")
+        raw_kind = value.get("kind")
+    else:
+        raise ValueError("Invalid ui-app frontmatter: expected true or a mapping with entry/title")
+
+    kind = raw_kind or _infer_ui_app_kind(raw_entry)
+    if kind not in ("iframe", "sandbox"):
+        raise ValueError(f"Invalid ui_app.kind: {kind!r} (expected 'iframe' or 'sandbox')")
+
+    if kind == "sandbox":
+        return SkillUiApp(entry=_normalize_sandbox_entry(raw_entry), title=title, kind="sandbox")
+    entry = raw_entry if raw_entry is not None else "assets/index.html"
+    return SkillUiApp(entry=_normalize_ui_app_entry(entry), title=title, kind="iframe")
 
 
 def parse_skill_md(content: str) -> tuple[SkillFrontmatter, str]:

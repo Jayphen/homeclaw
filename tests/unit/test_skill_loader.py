@@ -552,3 +552,53 @@ def test_build_skill_catalog_mixed_scopes(tmp_path: Path) -> None:
     names = {c.name for c in catalog}
     assert "weather" in names
     assert "budget" in names
+
+
+# ---------------------------------------------------------------------------
+# ui-app parsing — iframe (legacy) vs sandbox (@arrow-js/sandbox)
+# ---------------------------------------------------------------------------
+
+
+def _skill_with_ui_app(ui_app_block: str) -> str:
+    return f"---\nname: app-skill\ndescription: has a mini-app\n{ui_app_block}\n---\nBody.\n"
+
+
+def test_ui_app_true_defaults_to_iframe() -> None:
+    fm, _ = parse_skill_md(_skill_with_ui_app("ui-app: true"))
+    assert fm.ui_app is not None
+    assert fm.ui_app.kind == "iframe"
+    assert fm.ui_app.entry == "index.html"
+
+
+def test_ui_app_html_entry_is_iframe() -> None:
+    fm, _ = parse_skill_md(_skill_with_ui_app("ui-app:\n  entry: assets/index.html"))
+    assert fm.ui_app is not None
+    assert fm.ui_app.kind == "iframe"
+    # assets/ prefix stripped for iframe entries
+    assert fm.ui_app.entry == "index.html"
+
+
+def test_ui_app_ts_entry_inferred_as_sandbox() -> None:
+    fm, _ = parse_skill_md(_skill_with_ui_app("ui-app:\n  entry: app/main.ts"))
+    assert fm.ui_app is not None
+    assert fm.ui_app.kind == "sandbox"
+    # sandbox entries keep their path (not assets-normalized)
+    assert fm.ui_app.entry == "app/main.ts"
+
+
+def test_ui_app_js_entry_inferred_as_sandbox() -> None:
+    fm, _ = parse_skill_md(_skill_with_ui_app("ui-app:\n  entry: main.js"))
+    assert fm.ui_app is not None
+    assert fm.ui_app.kind == "sandbox"
+    assert fm.ui_app.entry == "main.js"
+
+
+def test_ui_app_explicit_sandbox_kind() -> None:
+    fm, _ = parse_skill_md(_skill_with_ui_app("ui-app:\n  kind: sandbox\n  entry: app/main.ts"))
+    assert fm.ui_app is not None
+    assert fm.ui_app.kind == "sandbox"
+
+
+def test_ui_app_sandbox_entry_must_be_main() -> None:
+    with pytest.raises(ValueError, match="main.ts or main.js"):
+        parse_skill_md(_skill_with_ui_app("ui-app:\n  entry: app/widget.ts"))

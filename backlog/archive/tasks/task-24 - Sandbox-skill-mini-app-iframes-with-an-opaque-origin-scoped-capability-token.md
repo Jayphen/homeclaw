@@ -1,9 +1,11 @@
 ---
 id: TASK-24
 title: Sandbox skill mini-app iframes with an opaque origin + scoped capability token
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-05-29 10:14'
+updated_date: '2026-05-29 11:37'
 labels:
   - ui
   - skills
@@ -38,3 +40,9 @@ Depends on TASK-23 (route must exist first). postMessage delivery of the token i
 - [ ] #3 db/query and db/schema enforce the capability token's scope server-side
 - [ ] #4 Opaque-origin (Origin: null) requests to skill asset + db endpoints handled via CORS
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+SUPERSEDED by the @arrow-js/sandbox adoption arc (TASK-27..30). The iframe + scoped-capability-token approach is obsolete: Arrow's WASM sandbox gives stronger isolation rendered inline, with no iframe and no tokens (host mediates all data via hostBridge). Verified by spike on branch spike/arrow-sandbox.
+<!-- SECTION:NOTES:END -->

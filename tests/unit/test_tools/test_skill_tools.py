@@ -711,7 +711,11 @@ Use the budget skill.
     )
 
     assert result["status"] == "ui_app_enabled"
-    assert result["ui_app"] == {"entry": "index.html", "title": "Budget Dashboard"}
+    assert result["ui_app"] == {
+        "entry": "index.html",
+        "title": "Budget Dashboard",
+        "kind": "iframe",
+    }
     assert result["asset_file"] == "assets/index.html"
 
     skill_dir = workspaces / "household" / "skills" / "budget"

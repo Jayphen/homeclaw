@@ -4,12 +4,12 @@ title: Remove token-in-URL for web UI (drop ?token= from app iframes and deps.py
 status: To Do
 assignee: []
 created_date: '2026-05-29 10:14'
+updated_date: '2026-05-29 11:37'
 labels:
   - ui
   - skills
   - security
-dependencies:
-  - TASK-25
+dependencies: []
 priority: medium
 ordinal: 26000
 ---
@@ -35,3 +35,9 @@ Depends on TASK-25.
 - [ ] #2 deps.py query-param token branch removed and no endpoint relies on it (verified)
 - [ ] #3 Any other URL-token usages identified and migrated or explicitly documented
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+SUPERSEDED by the @arrow-js/sandbox adoption arc (TASK-27..30). The iframe + scoped-capability-token approach is obsolete: Arrow's WASM sandbox gives stronger isolation rendered inline, with no iframe and no tokens (host mediates all data via hostBridge). Verified by spike on branch spike/arrow-sandbox.
+<!-- SECTION:NOTES:END -->
