@@ -311,8 +311,22 @@ the trailing `(document.body)` that mounts it):
 </script>
 ```
 
-The bundled references expand on this — read them for fetch/SQLite, keyed lists,
-and components, but the contract above is sufficient for most mini-apps:
+**Canonical starting point — copy this, don't write from scratch.** A complete,
+correct, browser-verified mini-app ships at `assets/reference-mini-app.html` in
+this skill. It demonstrates every idiom above (`@click`, reactive vs static,
+`html`...`(el)` mount, auth token, SELECT-only `db/query` fetch, keyed lists,
+loading/error/empty states). Read it, then adapt it:
+
+```
+skill_edit_file(name="skill-creator", file="assets/reference-mini-app.html")
+```
+
+Copy its contents into the new skill's `assets/index.html` and change only: the
+`household/my-skill` owner/name in the API paths, the SQL `SELECT` + the columns
+the template reads, and the markup/styles. Keep the event/reactivity wiring as-is.
+
+The bundled references expand on this — read them for more patterns, but the
+reference app + the contract above are sufficient for most mini-apps:
 - `references/api.md` — reactive state, html templates, events (`@click`), components, watch
 - `references/examples.md` — counter, list rendering, event handlers, keyed lists
 - `references/getting-started.md` — no-build pattern, CDN import, mental model
