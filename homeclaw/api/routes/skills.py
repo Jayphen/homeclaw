@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import mimetypes
 import re
 import shutil
 from datetime import UTC, datetime
@@ -10,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 from homeclaw.api.deps import AdminDep, AuthDep, get_config, list_member_workspaces
@@ -745,69 +743,6 @@ async def delete_skill_file(owner: str, name: str, file_path: str) -> dict[str, 
 # Skill asset serving — for embedded mini-apps (Arrow.js etc.)
 # ---------------------------------------------------------------------------
 
-# Client-side error boundary auto-injected into every served HTML mini-app. A
-# subtly-wrong Arrow app throws at mount and renders a *blank* page with the
-# error buried in the console — so the agent (and user) get no signal. This
-# script (a) renders any uncaught error or rejection as a visible banner so the
-# app is never silently blank, and (b) POSTs it once to the skill's render-log
-# so the agent can read what actually went wrong via ``skill_render_status``.
-# It is a classic <script> injected into <head>, so it installs its handlers
-# before the deferred ES-module mini-app runs and throws.
-_RENDER_BOUNDARY_MARKER = "__homeclaw_render_boundary__"
-_RENDER_BOUNDARY_JS = (
-    "<script>/* " + _RENDER_BOUNDARY_MARKER + " */\n"
-    "(function(){\n"
-    "  function skill(){var m=location.pathname.match("
-    "/\\/api\\/skills\\/([^/]+)\\/([^/]+)\\//);return m?{owner:m[1],name:m[2]}:null;}\n"
-    "  function token(){try{var t=localStorage.getItem('homeclaw_token');"
-    "if(t)return t;}catch(e){}"
-    "return new URLSearchParams(location.search).get('token')||'';}\n"
-    "  var reported=false;\n"
-    "  function banner(msg){try{var id='__homeclaw_error_banner__';"
-    "var el=document.getElementById(id);"
-    "if(!el){el=document.createElement('div');el.id=id;"
-    "el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;"
-    "background:#7f1d1d;color:#fff;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;"
-    "padding:10px 14px;white-space:pre-wrap;box-shadow:0 2px 10px rgba(0,0,0,.35)';"
-    "(document.body||document.documentElement).appendChild(el);}"
-    "el.textContent='\\u26a0 Mini-app error: '+msg;}catch(e){}}\n"
-    "  function report(msg,stack){banner(msg);if(reported)return;reported=true;"
-    "var s=skill();if(!s)return;try{fetch('/api/skills/'+s.owner+'/'+s.name+'/_render_log',"
-    "{method:'POST',headers:{'Content-Type':'application/json',"
-    "'Authorization':'Bearer '+token()},"
-    "body:JSON.stringify({message:String(msg),stack:String(stack||''),url:location.href})"
-    "}).catch(function(){});}catch(e){}}\n"
-    "  window.addEventListener('error',function(e){"
-    "report((e&&e.message)||(e&&e.error&&e.error.message)||'Uncaught error',"
-    "e&&e.error&&e.error.stack);});\n"
-    "  window.addEventListener('unhandledrejection',function(e){var r=(e&&e.reason)||{};"
-    "report(r.message||String(r),r.stack);});\n"
-    "  window.__homeclawReportError=report;\n"
-    "})();</script>\n"
-)
-
-_HEAD_OPEN_RE = re.compile(r"<head\b[^>]*>", re.IGNORECASE)
-_BODY_OPEN_RE = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
-
-
-def _inject_render_boundary(html: str) -> str:
-    """Insert the error-boundary <script> so it runs before the mini-app module.
-
-    Idempotent: a page that already carries the marker is returned unchanged.
-    Inserts just after ``<head>`` (or before ``<body>``, or at the top) so the
-    classic boundary script executes ahead of the deferred ES module.
-    """
-    if _RENDER_BOUNDARY_MARKER in html:
-        return html
-    m = _HEAD_OPEN_RE.search(html)
-    if m:
-        return html[: m.end()] + "\n" + _RENDER_BOUNDARY_JS + html[m.end() :]
-    m = _BODY_OPEN_RE.search(html)
-    if m:
-        return html[: m.start()] + _RENDER_BOUNDARY_JS + html[m.start() :]
-    return _RENDER_BOUNDARY_JS + html
-
-
 # Last-seen runtime render errors per (owner, name), reported by the boundary.
 # In-memory and ephemeral: it exists so the agent can read what broke right
 # after a user opens a freshly-written mini-app, not as a durable log.
@@ -824,43 +759,6 @@ class RenderLogEntry(BaseModel):
     message: str
     stack: str | None = None
     url: str | None = None
-
-
-@router.get(
-    "/{owner}/{name}/assets/{file_path:path}",
-    dependencies=[AuthDep],
-    response_model=None,
-)
-async def serve_skill_asset(owner: str, name: str, file_path: str) -> FileResponse | HTMLResponse:
-    """Serve a file from the skill's assets/ directory as a browser document.
-
-    This endpoint is used to load embedded mini-apps (e.g. Arrow.js apps)
-    declared via the ``ui-app`` SKILL.md frontmatter key. The browser
-    navigates to this URL inside an iframe, so auth is accepted via the
-    ``?token=`` query parameter in addition to the ``Authorization`` header.
-
-    HTML documents get the error boundary injected so a mini-app that throws at
-    mount shows the error instead of a blank page. Other files are served
-    verbatim with correct MIME types. Path traversal is rejected.
-    """
-    workspaces = get_config().workspaces.resolve()
-    skill_dir = _safe_relative(workspaces / owner / "skills", name)
-
-    if not skill_dir.is_dir():
-        raise HTTPException(status_code=404, detail="Skill not found")
-
-    assets_dir = skill_dir / "assets"
-    if not assets_dir.is_dir():
-        raise HTTPException(status_code=404, detail="Skill has no assets directory")
-
-    path = _safe_relative(assets_dir, file_path)
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail=f"Asset not found: {file_path}")
-
-    media_type, _ = mimetypes.guess_type(str(path))
-    if (media_type or "").startswith("text/html"):
-        return HTMLResponse(_inject_render_boundary(path.read_text()))
-    return FileResponse(path, media_type=media_type or "application/octet-stream")
 
 
 @router.post("/{owner}/{name}/_render_log", dependencies=[AuthDep])

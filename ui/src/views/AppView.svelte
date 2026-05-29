@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, skillAppSrc } from "$lib/api";
+  import { api } from "$lib/api";
   import { fetchAppSource, mountMiniApp } from "$lib/sandbox";
 
   let { params = {} }: { params?: { owner?: string; name?: string } } = $props();
@@ -66,6 +66,7 @@
           source,
           onError: (message) => {
             sandboxError = message;
+            reportRenderError(d.owner, d.name, message);
           },
         });
       } catch (e: any) {
@@ -78,6 +79,16 @@
       teardown?.();
     };
   });
+
+  // Report a sandbox error to the skill's render log so the agent can read it
+  // via skill_render_status (the host is authenticated; the sandbox is not).
+  function reportRenderError(owner: string, name: string, message: string): void {
+    void api(`/api/skills/${owner}/${name}/_render_log`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, url: `#/apps/${owner}/${name}` }),
+    }).catch(() => {});
+  }
 
   const title = $derived(detail?.ui_app?.title || detail?.name || params.name || "App");
 </script>
@@ -94,14 +105,6 @@
     {#if detail?.ui_app}
       <div class="app-bar-right">
         <a class="bar-link" href="#/skills/{detail.owner}/{detail.name}">Manage skill</a>
-        {#if !isSandbox}
-          <a
-            class="bar-link"
-            href={skillAppSrc(detail.owner, detail.name, detail.ui_app.entry)}
-            target="_blank"
-            rel="noopener"
-          >Open in tab ↗</a>
-        {/if}
       </div>
     {/if}
   </header>
@@ -124,12 +127,15 @@
     {/if}
     <div bind:this={mountEl} class="app-frame sandbox-mount"></div>
   {:else if detail && detail.ui_app}
-    <iframe
-      src={skillAppSrc(detail.owner, detail.name, detail.ui_app.entry)}
-      sandbox="allow-scripts allow-same-origin allow-forms"
-      class="app-frame"
-      title={title}
-    ></iframe>
+    <div class="state">
+      <div class="empty">
+        <p>This mini-app uses the legacy embedded format, which is no longer supported.</p>
+        <p class="empty-hint">
+          Ask homeclaw to rebuild it as a sandbox app, or
+          <a href="#/skills/{detail.owner}/{detail.name}">manage the skill</a>.
+        </p>
+      </div>
+    </div>
   {:else}
     <div class="state">
       <div class="empty">

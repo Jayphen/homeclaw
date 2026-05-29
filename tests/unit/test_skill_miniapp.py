@@ -19,9 +19,7 @@ from homeclaw.agent.loop import (
 from homeclaw.api.app import app
 from homeclaw.api.deps import set_agent_loop, set_config
 from homeclaw.api.routes.skills import (
-    _RENDER_BOUNDARY_MARKER,
     _RENDER_LOG,
-    _inject_render_boundary,
     read_db_schema,
 )
 from homeclaw.config import HomeclawConfig
@@ -66,32 +64,6 @@ class TestResetHistory:
 
     def test_no_history_file(self, tmp_path: Path) -> None:
         assert reset_history(tmp_path, "nobody") == 0
-
-
-# ---------------------------------------------------------------------------
-# Error-boundary injection
-# ---------------------------------------------------------------------------
-
-
-class TestInjectRenderBoundary:
-    def test_injects_marker_into_head(self) -> None:
-        out = _inject_render_boundary("<html><head><title>x</title></head><body></body></html>")
-        assert _RENDER_BOUNDARY_MARKER in out
-        # Boundary must precede the body (so it runs before a deferred module).
-        assert out.index(_RENDER_BOUNDARY_MARKER) < out.index("<body>")
-
-    def test_is_idempotent(self) -> None:
-        once = _inject_render_boundary("<head></head>")
-        assert _inject_render_boundary(once) == once
-
-    def test_injects_before_body_when_no_head(self) -> None:
-        out = _inject_render_boundary("<body><p>hi</p></body>")
-        assert _RENDER_BOUNDARY_MARKER in out
-        assert out.index(_RENDER_BOUNDARY_MARKER) < out.index("<body>")
-
-    def test_prepends_when_no_head_or_body(self) -> None:
-        out = _inject_render_boundary("<div>bare</div>")
-        assert out.startswith("<script>") or _RENDER_BOUNDARY_MARKER in out.split("<div>")[0]
 
 
 # ---------------------------------------------------------------------------
@@ -158,20 +130,6 @@ def client(skill_ws: Path) -> Iterator[TestClient]:
     yield TestClient(app)
     _RENDER_LOG.clear()
     set_agent_loop(None)
-
-
-class TestAssetInjection:
-    def test_html_asset_gets_boundary(self, client: TestClient) -> None:
-        resp = client.get("/api/skills/household/tracker/assets/index.html")
-        assert resp.status_code == 200
-        assert _RENDER_BOUNDARY_MARKER in resp.text
-        assert "text/html" in resp.headers["content-type"]
-
-    def test_non_html_asset_is_untouched(self, client: TestClient) -> None:
-        resp = client.get("/api/skills/household/tracker/assets/data.json")
-        assert resp.status_code == 200
-        assert _RENDER_BOUNDARY_MARKER not in resp.text
-        assert resp.json() == {"ok": True}
 
 
 class TestRenderLog:

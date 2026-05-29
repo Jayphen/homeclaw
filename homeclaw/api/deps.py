@@ -305,23 +305,16 @@ def _parse_token(token: str) -> tuple[str | None, bool]:
 def _parse_auth(request: Request) -> tuple[str | None, bool]:
     """Parse auth from the request and return (member_name, is_admin).
 
-    Checks (in order):
-    - ``Authorization: Bearer <token>`` header
-    - ``?token=<token>`` query parameter (for browser-navigated resources
-      such as skill asset iframes that cannot set custom headers)
+    Auth comes from the ``Authorization: Bearer <token>`` header. The session
+    token is never accepted as a URL query parameter — skill mini-apps run in a
+    sandbox and reach the API only through the host, so no browser-navigated
+    resource needs a token in its URL.
 
     Returns (None, False) if auth is invalid.
     """
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
-        result = _parse_token(auth.removeprefix("Bearer "))
-        if result[0] is not None:
-            return result
-
-    # Fall back to ?token= query parameter
-    query_token = request.query_params.get("token", "")
-    if query_token:
-        return _parse_token(query_token)
+        return _parse_token(auth.removeprefix("Bearer "))
 
     return None, False
 
