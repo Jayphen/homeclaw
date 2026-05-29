@@ -2316,6 +2316,9 @@ def register_builtin_tools(
 </head>
 <body>
 <script type="module">
+  // Arrow mini-app contract: import only {{ reactive, html }} from @arrow-js/core;
+  // mount with html`...`(el); live values are ${{() => x}}; events are @click (NEVER
+  // onclick). No render()/boundary()/hydrate()/@arrow-js/framework — those need a build.
   import {{ reactive, html }} from 'https://cdn.jsdelivr.net/npm/@arrow-js/core/dist/index.mjs'
 
   const token = localStorage.getItem('homeclaw_token') ?? ''

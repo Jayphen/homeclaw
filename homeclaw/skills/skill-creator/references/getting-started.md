@@ -47,9 +47,6 @@ import { reactive, html } from './arrow.js'
 - Callable expressions (`${() => ...}`) are re-evaluated on state change
 - Plain expressions (`${value}`) are evaluated once at render time
 
-## Package split (for scaffolded SSR apps, not mini-apps)
-
-- `@arrow-js/core`: `reactive`, `html`, `component`, `watch`
-- `@arrow-js/framework`: `render`, `boundary`, async component runtime
-- `@arrow-js/ssr`: `renderToString`, `serializePayload`
-- `@arrow-js/hydrate`: `hydrate`, `readPayload`
+Mini-apps only ever use `@arrow-js/core` (`reactive`, `html`, `component`, `watch`).
+The other Arrow packages (`framework`, `ssr`, `hydrate`) require a build step and do
+not apply here — see `advanced-ssr.md`.
