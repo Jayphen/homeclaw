@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from homeclaw.agent.additional_context import strip_additional_context
-from homeclaw.agent.loop import AgentLoop
+from homeclaw.agent.loop import AgentLoop, _history_path, _read_history_file
 from homeclaw.agent.providers.base import LLMResponse, ToolCall
 from homeclaw.agent.routing import CallType
 from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
@@ -364,3 +364,37 @@ async def test_group_chat_allows_cross_person_reads(
 
     # In group chat, cross-person reads should be allowed
     callback.assert_called_once_with("memory_read", {"person": "bob"})
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_truncated_turns_are_not_dropped_from_persisted_history(
+    mock_provider: AsyncMock, dev_workspaces: Path
+) -> None:
+    """A multi-turn conversation persists every turn even when each is truncated.
+
+    The unspecced mock provider's context_window coerces to a tiny budget, so
+    _truncate_history keeps only the last couple of messages each turn — exactly
+    the regime where the old window-rewrite save dropped earlier unconsolidated
+    turns. Persistence is now append-only, so all turns survive on disk for
+    consolidation. Regression for the truncation data-loss bug (TASK-2).
+    """
+    loop = _make_loop(mock_provider, dev_workspaces)
+
+    prompts = [f"remember fact number {i}" for i in range(5)]
+    for prompt in prompts:
+        await loop.run(prompt, person="alice")
+
+    _, messages = _read_history_file(_history_path(dev_workspaces, "alice"))
+
+    user_texts = [
+        strip_additional_context(m.content)
+        for m in messages
+        if m.role == "user" and isinstance(m.content, str)
+    ]
+    # All 5 new turns are persisted in order at the tail — none truncated away.
+    assert user_texts[-5:] == prompts
+    # Pre-existing dev-workspace history was retained too, not overwritten.
+    assert len(user_texts) > 5
+    # Each new turn's assistant reply is persisted as well.
+    assert sum(1 for m in messages if m.content == "I've noted that.") == 5
