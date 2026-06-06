@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.33.1](https://github.com/Jayphen/homeclaw/compare/v0.33.0...v0.33.1) (2026-06-06)
+
+
+### Bug Fixes
+
+* trigger release please ([5a94125](https://github.com/Jayphen/homeclaw/commit/5a94125e42e935409b78c4b7908837dec3bcf95b))
+
 ## [0.33.0](https://github.com/Jayphen/homeclaw/compare/v0.32.0...v0.33.0) (2026-05-29)
 
 
