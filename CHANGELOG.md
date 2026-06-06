@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.33.2](https://github.com/Jayphen/homeclaw/compare/v0.33.1...v0.33.2) (2026-06-06)
+
+
+### Bug Fixes
+
+* reduce live chat history budget ([#173](https://github.com/Jayphen/homeclaw/issues/173)) ([33c6d36](https://github.com/Jayphen/homeclaw/commit/33c6d361811380740105a2711db85555514db38a))
+
 ## [0.33.1](https://github.com/Jayphen/homeclaw/compare/v0.33.0...v0.33.1) (2026-06-06)
 
 
