@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { privateChat, householdChat, loadHistory, type ChatTab } from "$lib/chat";
+  import { privateChat, householdChat, loadHistory, resetChat, type ChatTab } from "$lib/chat";
   import { renderMarkdown } from "$lib/markdown";
   import { onMount, tick } from "svelte";
 
@@ -107,6 +107,11 @@
     const text = inputText.trim();
     if (!text || chat.status === "submitted" || chat.status === "streaming") return;
     inputText = "";
+    if (text.toLowerCase() === "/new") {
+      expandedDebug = new Set();
+      await resetChat(activeTab);
+      return;
+    }
     await chat.sendMessage({ text });
   }
 
