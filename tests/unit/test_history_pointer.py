@@ -232,10 +232,10 @@ class TestLoadHistory:
             lines.append(_msg_dict("assistant", f"resp {i}"))
         _write_jsonl(path, lines)
 
-        # Default max_messages is 200
+        # Default max_messages is the compact live prompt window.
         result = _load_history(tmp_path, "alice")
 
-        assert len(result) == 200
+        assert len(result) == 80
 
     def test_group_channel_history_path(self, tmp_path: Path) -> None:
         """Group channel history goes under household/channels/."""

@@ -32,6 +32,7 @@ _MAX_HISTORY_PAIRS = 50
 
 # Allowed channel values — reject anything else to prevent directory traversal.
 _ALLOWED_CHANNELS: frozenset[str] = frozenset({"web-household"})
+_RESET_COMMAND = "/new"
 
 
 def _extract_text(message: dict[str, Any]) -> str:
@@ -52,6 +53,19 @@ def _history_file(workspaces: Path, key: str) -> Path:
     if key.startswith("group-") or key.startswith("web-"):
         return workspaces / "household" / "channels" / key / "history.jsonl"
     return workspaces / key / "history.jsonl"
+
+
+def _validated_channel(value: Any) -> str | None:
+    """Return a valid web chat channel value or raise for unknown channels."""
+    channel = value if isinstance(value, str) else None
+    if channel and channel not in _ALLOWED_CHANNELS:
+        raise HTTPException(400, "Invalid channel")
+    return channel
+
+
+def _is_reset_command(content: str) -> bool:
+    """Return True when a web chat message is the /new reset command."""
+    return content.strip().lower() == _RESET_COMMAND
 
 
 def _load_visible_history(
@@ -127,11 +141,24 @@ async def chat_history(request: Request) -> list[dict[str, str]]:
     member = await get_current_member(request)
     person = member or "user"
     config = get_config()
-    channel: str | None = request.query_params.get("channel")
-    if channel and channel not in _ALLOWED_CHANNELS:
-        raise HTTPException(400, "Invalid channel")
+    channel = _validated_channel(request.query_params.get("channel"))
     history_key = channel or person
     return _load_visible_history(config.workspaces.resolve(), history_key)
+
+
+@router.post("/reset")
+async def chat_reset(request: Request) -> dict[str, Any]:
+    """Reset the current web chat context without involving the LLM."""
+    member = await get_current_member(request)
+    loop = get_agent_loop()
+    if loop is None:
+        raise HTTPException(503, "Agent not ready — configure a provider first")
+
+    body = await request.json()
+    channel = _validated_channel(body.get("channel"))
+    person = member or "user"
+    cleared = await loop.reset_conversation(person, channel=channel)
+    return {"status": "ok", "cleared": cleared}
 
 
 @router.post("")
@@ -160,9 +187,24 @@ async def chat(request: Request) -> StreamingResponse:
         raise HTTPException(400, "Empty message")
 
     person = member or "user"
-    channel: str | None = body.get("channel")
-    if channel and channel not in _ALLOWED_CHANNELS:
-        raise HTTPException(400, "Invalid channel")
+    channel = _validated_channel(body.get("channel"))
+
+    if _is_reset_command(content):
+        cleared = await loop.reset_conversation(person, channel=channel)
+
+        async def reset_response():
+            if cleared:
+                yield (
+                    "Chat cleared. We're starting fresh. "
+                    "Your saved data, notes, and skills are still there."
+                )
+            else:
+                yield "Already a fresh conversation — nothing to clear."
+
+        return StreamingResponse(
+            reset_response(),
+            media_type="text/plain; charset=utf-8",
+        )
 
     async def generate():
         interim_q: asyncio.Queue[str] = asyncio.Queue()

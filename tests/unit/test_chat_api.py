@@ -114,6 +114,62 @@ class TestChatEndpoint:
         assert resp.status_code == 200
         assert "something went wrong" in resp.text.lower()
 
+    def test_new_command_resets_without_calling_llm(self, client: TestClient):
+        mock_loop = AsyncMock()
+        mock_loop.reset_conversation.return_value = 12
+        set_agent_loop(mock_loop)
+
+        resp = client.post(
+            "/api/chat",
+            json={"messages": [{"role": "user", "content": "/new"}]},
+        )
+
+        assert resp.status_code == 200
+        assert "Chat cleared" in resp.text
+        mock_loop.reset_conversation.assert_awaited_once_with("user", channel=None)
+        mock_loop.run.assert_not_called()
+
+    def test_new_command_resets_household_channel(self, client: TestClient):
+        mock_loop = AsyncMock()
+        mock_loop.reset_conversation.return_value = 3
+        set_agent_loop(mock_loop)
+
+        resp = client.post(
+            "/api/chat",
+            json={
+                "channel": "web-household",
+                "messages": [{"role": "user", "content": "/new"}],
+            },
+        )
+
+        assert resp.status_code == 200
+        mock_loop.reset_conversation.assert_awaited_once_with(
+            "user",
+            channel="web-household",
+        )
+        mock_loop.run.assert_not_called()
+
+    def test_reset_endpoint_resets_without_llm(self, client: TestClient):
+        mock_loop = AsyncMock()
+        mock_loop.reset_conversation.return_value = 5
+        set_agent_loop(mock_loop)
+
+        resp = client.post("/api/chat/reset", json={})
+
+        assert resp.status_code == 200
+        assert resp.json() == {"status": "ok", "cleared": 5}
+        mock_loop.reset_conversation.assert_awaited_once_with("user", channel=None)
+        mock_loop.run.assert_not_called()
+
+    def test_reset_endpoint_rejects_invalid_channel(self, client: TestClient):
+        mock_loop = AsyncMock()
+        set_agent_loop(mock_loop)
+
+        resp = client.post("/api/chat/reset", json={"channel": "../alice"})
+
+        assert resp.status_code == 400
+        mock_loop.reset_conversation.assert_not_called()
+
 
 def test_latest_consolidation_debug_filters_to_history_key(
     monkeypatch: pytest.MonkeyPatch,

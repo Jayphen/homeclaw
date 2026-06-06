@@ -76,5 +76,23 @@ export function loadHistory(tab: ChatTab = "private"): Promise<void> {
   return promise;
 }
 
+/** Reset a chat tab's live context and clear the visible message list. */
+export async function resetChat(tab: ChatTab = "private"): Promise<number> {
+  const instance = tab === "household" ? householdChat : privateChat;
+  const resp = await api("/api/chat/reset", {
+    method: "POST",
+    body: JSON.stringify({
+      ...(tab === "household" ? { channel: "web-household" } : {}),
+    }),
+  });
+  if (!resp.ok) {
+    throw new Error("Failed to reset chat");
+  }
+  const data: { cleared?: number } = await resp.json();
+  instance.messages = [];
+  historyLoaded[tab] = true;
+  return data.cleared ?? 0;
+}
+
 // Keep the old exports for backwards compat with any other consumers
 export const chat = privateChat;
