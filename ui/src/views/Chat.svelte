@@ -31,8 +31,10 @@
       model?: string | null;
       recorded_at?: string;
     };
+    compaction_threshold?: number;
     context_window?: number;
     history_budget?: number;
+    history_capacity?: number;
     message_count?: number;
     model?: string;
     prompt_sections?: string[];
@@ -187,7 +189,13 @@
                       / {formatTokens(parsed.debug.context_window)} ctx
                     {/if}
                     {#if parsed.debug.history_budget !== undefined}
-                      / {formatTokens(parsed.debug.history_budget)} history budget
+                      / {formatTokens(parsed.debug.history_budget)} live budget
+                    {/if}
+                    {#if parsed.debug.history_capacity !== undefined}
+                      / {formatTokens(parsed.debug.history_capacity)} capacity
+                    {/if}
+                    {#if parsed.debug.compaction_threshold !== undefined}
+                      / compact at {formatTokens(parsed.debug.compaction_threshold)}
                     {/if}
                   </span>
                 </div>

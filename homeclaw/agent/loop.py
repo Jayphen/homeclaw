@@ -167,6 +167,12 @@ MAX_TOOL_ROUNDS = 40
 _RESERVED_FRACTION = 0.35
 _DEFAULT_CONTEXT_WINDOW = 128_000
 
+# Live prompts should stay compact even when a model has a huge context window.
+# Append-only history remains on disk for consolidation; this only limits what
+# each request sends to the model.
+_LIVE_HISTORY_TOKEN_FRACTION = 0.06
+_LIVE_HISTORY_MAX_MESSAGES = 80
+
 # Extra instructions prepended to the user message for scheduled routines so
 # the model actively uses web tools instead of hedging with stale training data.
 _ROUTINE_PREAMBLE = (
@@ -397,9 +403,11 @@ def _truncate_history(
     system_tokens: int,
     context_window: int,
 ) -> list[Message]:
-    """Drop oldest messages so history fits within the model's context window."""
+    """Drop oldest messages so history fits within the live prompt target."""
     window = context_window
-    budget = int(window * (1 - _RESERVED_FRACTION)) - system_tokens
+    capacity_budget = int(window * (1 - _RESERVED_FRACTION)) - system_tokens
+    live_budget = int(window * _LIVE_HISTORY_TOKEN_FRACTION)
+    budget = min(capacity_budget, live_budget)
 
     if budget <= 0:
         return history[-2:]  # keep at least current exchange
@@ -417,10 +425,11 @@ def _truncate_history(
     kept.reverse()
     if len(kept) < len(history):
         logger.info(
-            "Truncated history from %d to %d messages (%d estimated tokens)",
+            "Truncated history from %d to %d messages (%d estimated tokens, budget %d)",
             len(history),
             len(kept),
             used,
+            budget,
         )
     return _sanitize_history(kept)
 
@@ -495,7 +504,7 @@ InterimCallback = Callable[[str], Any]
 
 # Consolidation triggers when unconsolidated history exceeds this fraction
 # of the context window budget (after reserving space for system + output).
-_CONSOLIDATION_THRESHOLD = 0.25
+_CONSOLIDATION_THRESHOLD = 0.10
 
 # Minimum idle time (seconds) before consolidation runs for a session.
 _CONSOLIDATION_IDLE_SECS = 60
@@ -918,6 +927,14 @@ class AgentLoop:
         # Truncate history to fit within the model's context window.
         context_window = getattr(self._provider, "context_window", _DEFAULT_CONTEXT_WINDOW)
         system_tokens = estimate_tokens(system)
+        history_capacity = int(context_window * (1 - _RESERVED_FRACTION)) - system_tokens
+        live_history_budget = min(
+            history_capacity,
+            int(context_window * _LIVE_HISTORY_TOKEN_FRACTION),
+        )
+        compaction_threshold = int(
+            int(context_window * (1 - _RESERVED_FRACTION)) * _CONSOLIDATION_THRESHOLD
+        )
         history = _truncate_history(history, system_tokens, context_window)
 
         tools = self._registry.get_definitions()
@@ -928,7 +945,9 @@ class AgentLoop:
             "call_type": call_type.value,
             "context_window": context_window,
             "message_count": len(history),
-            "history_budget": int(context_window * (1 - _RESERVED_FRACTION)) - system_tokens,
+            "history_budget": live_history_budget,
+            "history_capacity": history_capacity,
+            "compaction_threshold": compaction_threshold,
             "token_estimates": {
                 "system": system_tokens,
                 "history": history_tokens,
@@ -1458,7 +1477,11 @@ def _read_history_file(path: Path) -> tuple[int, list[Message]]:
     return last_consolidated, messages
 
 
-def _load_history(workspaces: Path, person: str, max_messages: int = 200) -> list[Message]:
+def _load_history(
+    workspaces: Path,
+    person: str,
+    max_messages: int = _LIVE_HISTORY_MAX_MESSAGES,
+) -> list[Message]:
     """Load unconsolidated history — messages after the consolidation pointer."""
     path = _history_path(workspaces, person)
     last_consolidated, all_messages = _read_history_file(path)

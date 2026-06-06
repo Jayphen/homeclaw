@@ -47,6 +47,9 @@ async def test_run_metadata_includes_prompt_diagnostics(tmp_path: Any) -> None:
     assert metadata["context_window"] == 128_000
     assert metadata["message_count"] >= 1
     assert metadata["history_budget"] > 0
+    assert metadata["history_budget"] == 7680
+    assert metadata["history_capacity"] > metadata["history_budget"]
+    assert metadata["compaction_threshold"] == 8320
     assert metadata["prompt_sections"] == ["base_system_prompt", "context"]
     assert metadata["token_estimates"]["system"] > 0
     assert metadata["token_estimates"]["history"] > 0
