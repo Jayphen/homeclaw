@@ -5,13 +5,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from homeclaw.agent.loop import (
+    AgentLoop,
     _advance_consolidation_pointer,
     _append_turn,
     _load_history,
     _read_history_file,
 )
-from homeclaw.agent.providers.base import Message
+from homeclaw.agent.providers.base import LLMResponse, Message
+from homeclaw.agent.tools import ToolRegistry
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -32,6 +36,28 @@ def _msg_dict(role: str, content: str) -> dict:
 def _metadata_line(last_consolidated: int) -> dict:
     """Create a metadata line dict."""
     return {"_type": "metadata", "last_consolidated": last_consolidated}
+
+
+class _SummaryOnlyProvider:
+    context_window = 1_000
+    model = "test-summary-model"
+
+    def __init__(self) -> None:
+        self.calls: list[int] = []
+
+    async def complete(
+        self,
+        messages: list[Message],
+        tools: list[object],
+        system: str,
+        max_tokens: int | None = None,
+    ) -> LLMResponse:
+        self.calls.append(1)
+        return LLMResponse(
+            content=json.dumps({"memory_entries": [], "summary": "Low-signal chat."}),
+            tool_calls=[],
+            stop_reason="end_turn",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -531,3 +557,65 @@ class TestConsolidationSaveInterleaving:
         assert "a3" in contents
         # And no earlier message was dropped either.
         assert contents[:4] == ["q1", "a1", "q2", "a2"]
+
+
+# ---------------------------------------------------------------------------
+# AgentLoop._consolidate_session
+# ---------------------------------------------------------------------------
+
+
+class TestAgentLoopConsolidationProgress:
+    """Regression tests for consolidation pointer progress."""
+
+    @pytest.mark.asyncio
+    async def test_summary_only_result_advances_pointer(self, tmp_path: Path) -> None:
+        """A valid summary with no memory entries must not pin old chat forever."""
+        path = tmp_path / "alice" / "history.jsonl"
+        _write_jsonl(
+            path,
+            [
+                _metadata_line(0),
+                _msg_dict("user", "small talk " * 40),
+                _msg_dict("assistant", "friendly reply " * 40),
+                _msg_dict("user", "current question " * 40),
+                _msg_dict("assistant", "current answer " * 40),
+            ],
+        )
+
+        provider = _SummaryOnlyProvider()
+        loop = AgentLoop(
+            provider=provider,
+            registry=ToolRegistry(),
+            workspaces=tmp_path,
+        )
+
+        await loop._consolidate_session("alice")
+
+        last_consolidated, messages = _read_history_file(path)
+        assert last_consolidated == 2
+        assert len(messages) == 4
+        assert len(provider.calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_consolidation_catches_up_multiple_chunks(self, tmp_path: Path) -> None:
+        """One idle pass should process more than one chunk when history is huge."""
+        path = tmp_path / "alice" / "history.jsonl"
+        lines: list[dict] = [_metadata_line(0)]
+        for i in range(50):
+            role = "user" if i % 2 == 0 else "assistant"
+            lines.append(_msg_dict(role, f"message {i} " * 40))
+        _write_jsonl(path, lines)
+
+        provider = _SummaryOnlyProvider()
+        loop = AgentLoop(
+            provider=provider,
+            registry=ToolRegistry(),
+            workspaces=tmp_path,
+        )
+
+        await loop._consolidate_session("alice")
+
+        last_consolidated, messages = _read_history_file(path)
+        assert last_consolidated > 20
+        assert len(messages) == 50
+        assert len(provider.calls) > 1

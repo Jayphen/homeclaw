@@ -31,6 +31,10 @@ class PromptSnapshot(BaseModel):
     model: str
     tool_count: int
     system_token_estimate: int
+    history_token_estimate: int = 0
+    tool_token_estimate: int = 0
+    total_token_estimate: int = 0
+    message_count: int = 0
     sections: list[PromptSection]
     captured_at: datetime
 

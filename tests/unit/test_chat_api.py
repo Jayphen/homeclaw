@@ -10,8 +10,14 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi.testclient import TestClient
 
+from homeclaw.agent.runtime_state import (
+    ConsolidationEvent,
+    InMemoryRuntimeObservability,
+    now_utc,
+)
 from homeclaw.api.app import app
 from homeclaw.api.deps import set_agent_loop, set_config
+from homeclaw.api.routes.chat import _latest_consolidation_debug
 from homeclaw.config import HomeclawConfig
 
 
@@ -107,6 +113,48 @@ class TestChatEndpoint:
         )
         assert resp.status_code == 200
         assert "something went wrong" in resp.text.lower()
+
+
+def test_latest_consolidation_debug_filters_to_history_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = InMemoryRuntimeObservability()
+    runtime.record_consolidation(
+        ConsolidationEvent(
+            history_key="other",
+            person="alice",
+            status="succeeded",
+            reason="ok",
+            history_tokens=100,
+            recorded_at=now_utc(),
+        )
+    )
+    runtime.record_consolidation(
+        ConsolidationEvent(
+            history_key="web-household",
+            person="alice",
+            status="succeeded",
+            reason="summary_only",
+            unconsolidated_messages=12,
+            history_tokens=2400,
+            chunk_size=20,
+            saved_entries=0,
+            model="test-model",
+            recorded_at=now_utc(),
+        )
+    )
+    monkeypatch.setattr(
+        "homeclaw.api.routes.chat.get_runtime_observability",
+        lambda: runtime,
+    )
+
+    debug = _latest_consolidation_debug("web-household")
+
+    assert debug is not None
+    assert debug["reason"] == "summary_only"
+    assert debug["history_tokens"] == 2400
+    assert debug["unconsolidated_messages"] == 12
+    assert debug["model"] == "test-model"
 
 
 class TestChatHistory:

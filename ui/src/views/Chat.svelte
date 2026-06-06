@@ -20,7 +20,29 @@
   let expandedDebug: Set<string> = $state(new Set());
 
   interface DebugMeta {
+    call_type?: string;
+    consolidation?: {
+      status?: string;
+      reason?: string;
+      history_tokens?: number;
+      unconsolidated_messages?: number;
+      chunk_size?: number;
+      saved_entries?: number;
+      model?: string | null;
+      recorded_at?: string;
+    };
+    context_window?: number;
+    history_budget?: number;
+    message_count?: number;
     model?: string;
+    prompt_sections?: string[];
+    stop_reason?: string | null;
+    token_estimates?: {
+      system?: number;
+      history?: number;
+      tools?: number;
+      total?: number;
+    };
     tools?: string[];
     tool_rounds?: number;
     duration_ms?: number;
@@ -49,6 +71,20 @@
     const next = new Set(expandedDebug);
     if (next.has(id)) next.delete(id); else next.add(id);
     expandedDebug = next;
+  }
+
+  function formatDuration(ms?: number): string {
+    return `${((ms ?? 0) / 1000).toFixed(1)}s`;
+  }
+
+  function formatTokens(value?: number): string {
+    if (value === undefined || value === null) return "?";
+    if (value >= 1000) return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`;
+    return value.toString();
+  }
+
+  function modelLabel(model?: string): string {
+    return model?.split("/").pop() ?? "?";
   }
 
   function scrollToBottom() {
@@ -128,22 +164,75 @@
             class="debug-badge"
             onclick={() => toggleDebug(message.id)}
           >
-            {parsed.debug.model?.split('/').pop() ?? '?'}
+            {modelLabel(parsed.debug.model)}
+            {#if parsed.debug.token_estimates?.total}
+              &middot; {formatTokens(parsed.debug.token_estimates.total)} tok
+            {/if}
             {#if parsed.debug.tools?.length}
               &middot; {parsed.debug.tools.length} tool{parsed.debug.tools.length === 1 ? '' : 's'}
             {/if}
-            &middot; {((parsed.debug.duration_ms ?? 0) / 1000).toFixed(1)}s
+            &middot; {formatDuration(parsed.debug.duration_ms)}
           </button>
           {#if expandedDebug.has(message.id)}
             <div class="debug-panel">
-              <div><strong>Model</strong> {parsed.debug.model ?? 'unknown'}</div>
-              {#if parsed.debug.tool_rounds}
-                <div><strong>Tool rounds</strong> {parsed.debug.tool_rounds}</div>
+              <div class="debug-row"><strong>Model</strong> <span>{parsed.debug.model ?? 'unknown'}</span></div>
+              <div class="debug-row"><strong>Call</strong> <span>{parsed.debug.call_type ?? 'conversation'} / {parsed.debug.stop_reason ?? 'end_turn'}</span></div>
+              <div class="debug-row"><strong>Duration</strong> <span>{formatDuration(parsed.debug.duration_ms)}</span></div>
+              {#if parsed.debug.message_count !== undefined || parsed.debug.context_window !== undefined}
+                <div class="debug-row">
+                  <strong>Window</strong>
+                  <span>
+                    {parsed.debug.message_count ?? '?'} messages
+                    {#if parsed.debug.context_window}
+                      / {formatTokens(parsed.debug.context_window)} ctx
+                    {/if}
+                    {#if parsed.debug.history_budget !== undefined}
+                      / {formatTokens(parsed.debug.history_budget)} history budget
+                    {/if}
+                  </span>
+                </div>
+              {/if}
+              {#if parsed.debug.token_estimates}
+                <div class="debug-tokens" aria-label="Estimated prompt tokens">
+                  <div><span>Total</span><strong>{formatTokens(parsed.debug.token_estimates.total)}</strong></div>
+                  <div><span>System</span><strong>{formatTokens(parsed.debug.token_estimates.system)}</strong></div>
+                  <div><span>History</span><strong>{formatTokens(parsed.debug.token_estimates.history)}</strong></div>
+                  <div><span>Tools</span><strong>{formatTokens(parsed.debug.token_estimates.tools)}</strong></div>
+                </div>
+              {/if}
+              {#if parsed.debug.tool_rounds !== undefined}
+                <div class="debug-row"><strong>Tool rounds</strong> <span>{parsed.debug.tool_rounds}</span></div>
               {/if}
               {#if parsed.debug.tools?.length}
-                <div><strong>Tools</strong> {parsed.debug.tools.join(', ')}</div>
+                <div class="debug-row"><strong>Tools</strong> <span>{parsed.debug.tools.join(', ')}</span></div>
               {/if}
-              <div><strong>Duration</strong> {((parsed.debug.duration_ms ?? 0) / 1000).toFixed(1)}s</div>
+              {#if parsed.debug.prompt_sections?.length}
+                <div class="debug-row">
+                  <strong>Prompt</strong>
+                  <span>{parsed.debug.prompt_sections.join(', ')}</span>
+                </div>
+              {/if}
+              {#if parsed.debug.consolidation}
+                <div class="debug-row">
+                  <strong>Compact</strong>
+                  <span>
+                    {parsed.debug.consolidation.status ?? 'unknown'}
+                    / {parsed.debug.consolidation.reason ?? 'no reason'}
+                    {#if parsed.debug.consolidation.history_tokens !== undefined}
+                      / {formatTokens(parsed.debug.consolidation.history_tokens)} hist tok
+                    {/if}
+                    {#if parsed.debug.consolidation.unconsolidated_messages !== undefined}
+                      / {parsed.debug.consolidation.unconsolidated_messages} msgs
+                    {/if}
+                    {#if parsed.debug.consolidation.chunk_size}
+                      / chunk {parsed.debug.consolidation.chunk_size}
+                    {/if}
+                    {#if parsed.debug.consolidation.saved_entries}
+                      / {parsed.debug.consolidation.saved_entries} saved
+                    {/if}
+                  </span>
+                </div>
+              {/if}
             </div>
           {/if}
         {/if}
@@ -415,9 +504,49 @@
     gap: 0.2rem;
   }
 
+  .debug-row {
+    display: grid;
+    grid-template-columns: 6rem minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+  }
+
   .debug-panel strong {
     color: var(--text);
-    margin-right: 0.4rem;
+  }
+
+  .debug-row span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .debug-tokens {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.35rem;
+    margin: 0.25rem 0;
+  }
+
+  .debug-tokens div {
+    min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.35rem 0.45rem;
+  }
+
+  .debug-tokens span {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .debug-tokens strong {
+    display: block;
+    margin-top: 0.1rem;
+    font-size: 0.82rem;
   }
 
   .thinking {
@@ -500,6 +629,18 @@
     .chat {
       height: calc(100vh - 7rem);
       max-height: calc(100vh - 7rem);
+    }
+
+    .debug-panel {
+      max-width: 100%;
+    }
+
+    .debug-row {
+      grid-template-columns: 4.5rem minmax(0, 1fr);
+    }
+
+    .debug-tokens {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 </style>

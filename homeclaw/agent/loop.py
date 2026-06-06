@@ -305,6 +305,21 @@ def _estimate_message_tokens(msg: Message) -> int:
     return total
 
 
+def _estimate_tool_tokens(tools: list[Any]) -> int:
+    """Estimate prompt tokens contributed by tool schemas."""
+    try:
+        text = json.dumps(
+            [
+                tool.model_dump(mode="json") if hasattr(tool, "model_dump") else tool
+                for tool in tools
+            ],
+            default=str,
+        )
+    except TypeError:
+        text = str(tools)
+    return estimate_tokens(text)
+
+
 def _sanitize_history(history: list[Message]) -> list[Message]:
     """Ensure history has valid structure for the LLM API.
 
@@ -480,13 +495,17 @@ InterimCallback = Callable[[str], Any]
 
 # Consolidation triggers when unconsolidated history exceeds this fraction
 # of the context window budget (after reserving space for system + output).
-_CONSOLIDATION_THRESHOLD = 0.6
+_CONSOLIDATION_THRESHOLD = 0.25
 
 # Minimum idle time (seconds) before consolidation runs for a session.
 _CONSOLIDATION_IDLE_SECS = 60
 
 # Maximum messages to consolidate in one chunk.
 _CONSOLIDATION_CHUNK_SIZE = 20
+
+# Catch up several chunks in one idle pass so production histories do not stay
+# bloated for days after crossing the compaction threshold.
+_CONSOLIDATION_MAX_CHUNKS_PER_RUN = 5
 
 
 class AgentLoop:
@@ -620,12 +639,16 @@ class AgentLoop:
         from homeclaw.agent.consolidation import consolidate_chunk, save_consolidated_memories
 
         path = _history_path(self._workspaces, history_key)
-        last_consolidated, all_messages = _read_history_file(path)
-        unconsolidated = all_messages[last_consolidated:]
         person = history_key.split("-")[0] if "-" in history_key else history_key
 
         def _record(
-            status: str, reason: str, *, chunk_size: int = 0, saved_entries: int = 0
+            status: str,
+            reason: str,
+            *,
+            unconsolidated_messages: int,
+            history_tokens: int,
+            chunk_size: int = 0,
+            saved_entries: int = 0,
         ) -> None:
             if self._runtime_observability is None:
                 return
@@ -635,7 +658,7 @@ class AgentLoop:
                     person=person,
                     status=status,  # type: ignore[arg-type]
                     reason=reason,
-                    unconsolidated_messages=len(unconsolidated),
+                    unconsolidated_messages=unconsolidated_messages,
                     history_tokens=history_tokens,
                     chunk_size=chunk_size,
                     saved_entries=saved_entries,
@@ -646,22 +669,8 @@ class AgentLoop:
                 )
             )
 
-        # Check if consolidation is needed
-        history_tokens = sum(_estimate_message_tokens(m) for m in unconsolidated)
         context_window = getattr(self._provider, "context_window", _DEFAULT_CONTEXT_WINDOW)
         budget = int(context_window * (1 - _RESERVED_FRACTION))
-
-        if history_tokens < budget * _CONSOLIDATION_THRESHOLD:
-            _record("skipped", "history_below_threshold")
-            return  # Not enough to warrant consolidation
-
-        # Consolidate the oldest chunk
-        chunk_end = min(_CONSOLIDATION_CHUNK_SIZE, len(unconsolidated) - 2)
-        if chunk_end < 2:
-            _record("skipped", "not_enough_messages")
-            return  # Need at least a couple messages to consolidate
-
-        chunk = unconsolidated[:chunk_end]
 
         # Use a shallow copy of the provider so we can set the cheap model
         # without mutating the shared instance (which may be mid-request).
@@ -674,44 +683,113 @@ class AgentLoop:
             if hasattr(consolidation_provider, "model"):
                 consolidation_provider.model = cheap_model  # type: ignore[attr-defined]
 
-        result = await consolidate_chunk(chunk, person, consolidation_provider)
+        chunks_processed = 0
+        total_saved = 0
 
-        if "error" in result:
-            logger.warning(
-                "Consolidation failed for '%s': %s — will retry next cycle",
-                history_key,
-                result["error"],
-            )
-            _record("failed", f"provider_error:{result['error']}", chunk_size=len(chunk))
-            return  # Don't advance pointer — retry next cycle
+        while chunks_processed < _CONSOLIDATION_MAX_CHUNKS_PER_RUN:
+            last_consolidated, all_messages = _read_history_file(path)
+            unconsolidated = all_messages[last_consolidated:]
+            history_tokens = sum(_estimate_message_tokens(m) for m in unconsolidated)
 
-        # Save extracted memories
-        entries = result.get("memory_entries", [])
-        if not entries:
+            if history_tokens < budget * _CONSOLIDATION_THRESHOLD:
+                _record(
+                    "skipped" if chunks_processed == 0 else "succeeded",
+                    "history_below_threshold" if chunks_processed == 0 else "target_reached",
+                    unconsolidated_messages=len(unconsolidated),
+                    history_tokens=history_tokens,
+                    saved_entries=total_saved,
+                )
+                return  # Not enough to warrant more consolidation
+
+            # Consolidate the oldest chunk, preserving the newest two messages
+            # as active conversational context.
+            chunk_end = min(_CONSOLIDATION_CHUNK_SIZE, len(unconsolidated) - 2)
+            if chunk_end < 2:
+                _record(
+                    "skipped",
+                    "not_enough_messages",
+                    unconsolidated_messages=len(unconsolidated),
+                    history_tokens=history_tokens,
+                )
+                return  # Need at least a couple messages to consolidate
+
+            chunk = unconsolidated[:chunk_end]
+            result = await consolidate_chunk(chunk, person, consolidation_provider)
+
+            if "error" in result:
+                logger.warning(
+                    "Consolidation failed for '%s': %s — will retry next cycle",
+                    history_key,
+                    result["error"],
+                )
+                _record(
+                    "failed",
+                    f"provider_error:{result['error']}",
+                    unconsolidated_messages=len(unconsolidated),
+                    history_tokens=history_tokens,
+                    chunk_size=len(chunk),
+                    saved_entries=total_saved,
+                )
+                return  # Don't advance pointer — retry next cycle
+
+            # A valid summary with no durable facts is still a successful
+            # consolidation. Otherwise low-signal early chat can pin the pointer
+            # forever and keep every later turn in the live prompt.
+            entries_raw = result.get("memory_entries", [])
+            entries = entries_raw if isinstance(entries_raw, list) else []
+            summary = result.get("summary")
+            has_summary = isinstance(summary, str) and bool(summary.strip())
+            if not entries and not has_summary:
+                logger.info(
+                    "Consolidation returned no entries or summary for '%s' — will retry",
+                    history_key,
+                )
+                _record(
+                    "failed",
+                    "empty_consolidation_result",
+                    unconsolidated_messages=len(unconsolidated),
+                    history_tokens=history_tokens,
+                    chunk_size=len(chunk),
+                    saved_entries=total_saved,
+                )
+                return
+
+            saved = await save_consolidated_memories(entries, person, self._workspaces)
+            total_saved += saved
+            chunks_processed += 1
             logger.info(
-                "Consolidation returned no memory entries for '%s' — will retry", history_key
+                "Consolidated %d messages → %d memory entries for '%s'",
+                len(chunk),
+                saved,
+                history_key,
             )
-            _record("failed", "no_memory_entries", chunk_size=len(chunk))
-            return  # Don't advance pointer — LLM likely returned bad JSON
 
-        saved = await save_consolidated_memories(entries, person, self._workspaces)
-        logger.info(
-            "Consolidated %d messages → %d memory entries for '%s'",
-            len(chunk),
-            saved,
-            history_key,
+            # Advance after a valid extraction/summary. The advance re-reads the
+            # file fresh, so turns saved while the LLM extraction ran are
+            # preserved rather than overwritten.
+            async with self._lock_pool.lock_for(history_key):
+                _advance_consolidation_pointer(
+                    self._workspaces, history_key, last_consolidated + chunk_end
+                )
+            _record(
+                "succeeded",
+                "ok" if saved else "summary_only",
+                unconsolidated_messages=len(unconsolidated),
+                history_tokens=history_tokens,
+                chunk_size=len(chunk),
+                saved_entries=saved,
+            )
+
+        last_consolidated, all_messages = _read_history_file(path)
+        unconsolidated = all_messages[last_consolidated:]
+        history_tokens = sum(_estimate_message_tokens(m) for m in unconsolidated)
+        _record(
+            "succeeded",
+            "max_chunks_per_run",
+            unconsolidated_messages=len(unconsolidated),
+            history_tokens=history_tokens,
+            saved_entries=total_saved,
         )
-
-        # Only advance the pointer after successfully extracting memories.
-        # Take the per-key lock so the read-modify-write races neither the
-        # request path's _append_turn nor another consolidation pass. The
-        # advance re-reads the file fresh, so any turn saved while the (slow)
-        # LLM extraction ran above is preserved rather than overwritten.
-        async with self._lock_pool.lock_for(history_key):
-            _advance_consolidation_pointer(
-                self._workspaces, history_key, last_consolidated + chunk_end
-            )
-        _record("succeeded", "ok", chunk_size=len(chunk), saved_entries=saved)
 
     async def run(
         self,
@@ -843,6 +921,22 @@ class AgentLoop:
         history = _truncate_history(history, system_tokens, context_window)
 
         tools = self._registry.get_definitions()
+        history_tokens = sum(_estimate_message_tokens(message) for message in history)
+        tool_tokens = _estimate_tool_tokens(tools)
+        total_tokens = system_tokens + history_tokens + tool_tokens
+        prompt_debug = {
+            "call_type": call_type.value,
+            "context_window": context_window,
+            "message_count": len(history),
+            "history_budget": int(context_window * (1 - _RESERVED_FRACTION)) - system_tokens,
+            "token_estimates": {
+                "system": system_tokens,
+                "history": history_tokens,
+                "tools": tool_tokens,
+                "total": total_tokens,
+            },
+            "prompt_sections": [section.name for section in prompt_sections],
+        }
         response: LLMResponse | None = None
 
         # Detect if this request includes images — used to route to the
@@ -875,6 +969,10 @@ class AgentLoop:
                     model=model,
                     tool_count=len(tools),
                     system_token_estimate=system_tokens,
+                    history_token_estimate=history_tokens,
+                    tool_token_estimate=tool_tokens,
+                    total_token_estimate=total_tokens,
+                    message_count=len(history),
                     sections=prompt_sections,
                     captured_at=now_utc(),
                 )
@@ -1007,8 +1105,9 @@ class AgentLoop:
                     model=self._current_model,
                     tools=tool_names_used,
                     tool_rounds=tool_rounds,
-                    prompt_sections=[section.name for section in prompt_sections],
+                    stop_reason=response.stop_reason,
                     duration_ms=int((time.monotonic() - t0) * 1000),
+                    **prompt_debug,
                 )
             return (
                 "Sorry, I ran out of output space before finishing. "
@@ -1027,8 +1126,9 @@ class AgentLoop:
                     model=self._current_model,
                     tools=tool_names_used,
                     tool_rounds=tool_rounds,
-                    prompt_sections=[section.name for section in prompt_sections],
+                    stop_reason=response.stop_reason,
                     duration_ms=int((time.monotonic() - t0) * 1000),
+                    **prompt_debug,
                 )
             return (
                 response.content + "\n\n"
@@ -1056,8 +1156,9 @@ class AgentLoop:
                 model=self._current_model,
                 tools=tool_names_used,
                 tool_rounds=tool_rounds,
-                prompt_sections=[section.name for section in prompt_sections],
+                stop_reason=response.stop_reason if response else None,
                 duration_ms=int((time.monotonic() - t0) * 1000),
+                **prompt_debug,
             )
 
         return response.content if response else ""
