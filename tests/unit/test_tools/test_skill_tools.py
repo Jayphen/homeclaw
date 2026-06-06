@@ -914,9 +914,8 @@ Use the embedded dashboard.
 
 
 def test_skill_creator_builtin_instructions_cover_existing_skill_mini_apps() -> None:
-    skill_md = Path(
-        "/Users/beepboop/dev/homeclaw/homeclaw/skills/skill-creator/SKILL.md"
-    ).read_text()
+    repo_root = Path(__file__).parents[3]
+    skill_md = (repo_root / "homeclaw" / "skills" / "skill-creator" / "SKILL.md").read_text()
     assert "If the skill already exists, do NOT call `skill_create` again." in skill_md
     assert "skill_enable_ui_app" in skill_md
     # Sandbox source-payload model (TASK-29), not the legacy single-HTML iframe.
