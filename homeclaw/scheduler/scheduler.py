@@ -125,6 +125,7 @@ class Scheduler:
                 f"[Scheduled routine] {description}",
                 person,
                 call_type=CallType.ROUTINE,
+                persist_history=False,
             )
             if result and result.strip() and scheduler._dispatcher:
                 await scheduler._dispatcher.send(
@@ -172,6 +173,7 @@ class Scheduler:
                     f"[Scheduled routine] {description}",
                     HOUSEHOLD_WORKSPACE,
                     call_type=CallType.ROUTINE,
+                    persist_history=False,
                 )
                 scheduler._save_last_run(job_id, result)
                 logger.info("Routine completed: %s (response length: %d)", description, len(result))

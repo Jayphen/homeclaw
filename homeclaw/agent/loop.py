@@ -809,6 +809,7 @@ class AgentLoop:
         interim_callback: InterimCallback | None = None,
         metadata: dict[str, Any] | None = None,
         source_channel: str | None = None,
+        persist_history: bool = True,
     ) -> str:
         """Run the agent loop for a message.
 
@@ -827,6 +828,10 @@ class AgentLoop:
                 rounds, duration_ms) after execution completes.
             source_channel: User-facing channel label for per-turn context
                 (e.g. telegram_dm, whatsapp_group, web).
+            persist_history: When false, run with an empty conversation window
+                and do not append the turn to history. Scheduled routines use
+                this so previous routine outputs never become future prompt
+                context.
         """
         person = person.lower()
         history_key = channel or person
@@ -840,9 +845,11 @@ class AgentLoop:
                 interim_callback=interim_callback,
                 metadata=metadata,
                 source_channel=source_channel,
+                persist_history=persist_history,
             )
-            # Record activity for idle-based consolidation
-            self._last_activity[history_key] = time.monotonic()
+            if persist_history:
+                # Record activity for idle-based consolidation.
+                self._last_activity[history_key] = time.monotonic()
             return result
 
     async def reset_conversation(self, person: str, channel: str | None = None) -> int:
@@ -870,6 +877,7 @@ class AgentLoop:
         interim_callback: InterimCallback | None = None,
         metadata: dict[str, Any] | None = None,
         source_channel: str | None = None,
+        persist_history: bool = True,
     ) -> str:
         t0 = time.monotonic()
         tool_names_used: list[str] = []
@@ -902,7 +910,7 @@ class AgentLoop:
         )
         system, prompt_sections = _build_system_prompt(context, self._note_detail_level)
 
-        history = _load_history(self._workspaces, history_key)
+        history = _load_history(self._workspaces, history_key) if persist_history else []
 
         # Prepend routine preamble so the LLM knows to use web tools
         if call_type == CallType.ROUTINE and isinstance(user_message, str):
@@ -1118,7 +1126,8 @@ class AgentLoop:
 
         if response and response.stop_reason == "max_tokens":
             logger.warning("LLM output truncated at max_tokens — suppressing raw content")
-            _append_turn(self._workspaces, history_key, new_messages)
+            if persist_history:
+                _append_turn(self._workspaces, history_key, new_messages)
             if metadata is not None:
                 metadata.update(
                     model=self._current_model,
@@ -1139,7 +1148,8 @@ class AgentLoop:
                 "Agent loop exhausted %d tool rounds without completing", MAX_TOOL_ROUNDS
             )
             # Surface the exhaustion to the user instead of returning partial content.
-            _append_turn(self._workspaces, history_key, new_messages)
+            if persist_history:
+                _append_turn(self._workspaces, history_key, new_messages)
             if metadata is not None:
                 metadata.update(
                     model=self._current_model,
@@ -1158,7 +1168,8 @@ class AgentLoop:
                 "Try a simpler request or ask me to continue."
             )
 
-        _append_turn(self._workspaces, history_key, new_messages)
+        if persist_history:
+            _append_turn(self._workspaces, history_key, new_messages)
 
         # Log group chat exchanges so memsearch can index them — lets
         # members reference group conversations from private DMs.
