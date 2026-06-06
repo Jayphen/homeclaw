@@ -924,6 +924,19 @@ class AgentLoop:
         history_tokens = sum(_estimate_message_tokens(message) for message in history)
         tool_tokens = _estimate_tool_tokens(tools)
         total_tokens = system_tokens + history_tokens + tool_tokens
+        prompt_debug = {
+            "call_type": call_type.value,
+            "context_window": context_window,
+            "message_count": len(history),
+            "history_budget": int(context_window * (1 - _RESERVED_FRACTION)) - system_tokens,
+            "token_estimates": {
+                "system": system_tokens,
+                "history": history_tokens,
+                "tools": tool_tokens,
+                "total": total_tokens,
+            },
+            "prompt_sections": [section.name for section in prompt_sections],
+        }
         response: LLMResponse | None = None
 
         # Detect if this request includes images — used to route to the
@@ -1092,8 +1105,9 @@ class AgentLoop:
                     model=self._current_model,
                     tools=tool_names_used,
                     tool_rounds=tool_rounds,
-                    prompt_sections=[section.name for section in prompt_sections],
+                    stop_reason=response.stop_reason,
                     duration_ms=int((time.monotonic() - t0) * 1000),
+                    **prompt_debug,
                 )
             return (
                 "Sorry, I ran out of output space before finishing. "
@@ -1112,8 +1126,9 @@ class AgentLoop:
                     model=self._current_model,
                     tools=tool_names_used,
                     tool_rounds=tool_rounds,
-                    prompt_sections=[section.name for section in prompt_sections],
+                    stop_reason=response.stop_reason,
                     duration_ms=int((time.monotonic() - t0) * 1000),
+                    **prompt_debug,
                 )
             return (
                 response.content + "\n\n"
@@ -1141,8 +1156,9 @@ class AgentLoop:
                 model=self._current_model,
                 tools=tool_names_used,
                 tool_rounds=tool_rounds,
-                prompt_sections=[section.name for section in prompt_sections],
+                stop_reason=response.stop_reason if response else None,
                 duration_ms=int((time.monotonic() - t0) * 1000),
+                **prompt_debug,
             )
 
         return response.content if response else ""

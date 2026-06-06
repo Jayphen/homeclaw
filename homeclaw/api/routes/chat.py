@@ -16,7 +16,12 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from homeclaw.agent.additional_context import strip_additional_context
-from homeclaw.api.deps import get_agent_loop, get_config, get_current_member
+from homeclaw.api.deps import (
+    get_agent_loop,
+    get_config,
+    get_current_member,
+    get_runtime_observability,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +93,28 @@ def _load_visible_history(
 
     # Return last N pairs (2 messages per pair)
     return messages[-(_MAX_HISTORY_PAIRS * 2) :]
+
+
+def _latest_consolidation_debug(history_key: str) -> dict[str, Any] | None:
+    """Return compact consolidation debug data for the active chat only."""
+    runtime_observability = get_runtime_observability()
+    if runtime_observability is None:
+        return None
+    snapshot = runtime_observability.snapshot()
+    for event in snapshot.recent_consolidations:
+        if event.history_key != history_key:
+            continue
+        return {
+            "status": event.status,
+            "reason": event.reason,
+            "history_tokens": event.history_tokens,
+            "unconsolidated_messages": event.unconsolidated_messages,
+            "chunk_size": event.chunk_size,
+            "saved_entries": event.saved_entries,
+            "model": event.model,
+            "recorded_at": event.recorded_at.isoformat(),
+        }
+    return None
 
 
 @router.get("/history")
@@ -185,6 +212,9 @@ async def chat(request: Request) -> StreamingResponse:
 
             # Append debug metadata as a hidden HTML comment
             if meta:
+                consolidation = _latest_consolidation_debug(channel or person)
+                if consolidation:
+                    meta["consolidation"] = consolidation
                 yield f"\n<!--debug:{json.dumps(meta)}-->"
 
         except Exception as exc:
