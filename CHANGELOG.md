@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.33.3](https://github.com/Jayphen/homeclaw/compare/v0.33.2...v0.33.3) (2026-06-09)
+
+
+### Performance Improvements
+
+* remove always-injected household profile, routines, and decisions from context ([#175](https://github.com/Jayphen/homeclaw/issues/175)) ([e81f28d](https://github.com/Jayphen/homeclaw/commit/e81f28df07cd9877bbfdc3c4a1b9c071e7c9ee4f))
+
 ## [0.33.2](https://github.com/Jayphen/homeclaw/compare/v0.33.1...v0.33.2) (2026-06-06)
 
 
