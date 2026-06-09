@@ -10,10 +10,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from homeclaw.agent.loop import (
-    _history_path,
-    _load_history,
-    _read_history_file,
+from homeclaw.agent.history import (
+    history_path,
+    load_history,
+    read_history_file,
     reset_history,
 )
 from homeclaw.api.app import app
@@ -40,24 +40,24 @@ def _write_history(path: Path, last_consolidated: int, n_messages: int) -> None:
 
 class TestResetHistory:
     def test_clears_live_window_and_preserves_file(self, tmp_path: Path) -> None:
-        path = _history_path(tmp_path, "alice")
+        path = history_path(tmp_path, "alice")
         _write_history(path, last_consolidated=0, n_messages=4)
 
         cleared = reset_history(tmp_path, "alice")
 
         assert cleared == 4
-        last, msgs = _read_history_file(path)
+        last, msgs = read_history_file(path)
         assert last == 4  # pointer advanced to the end
         assert len(msgs) == 4  # raw messages still on disk (append-only audit)
-        assert _load_history(tmp_path, "alice") == []  # live context empty
+        assert load_history(tmp_path, "alice") == []  # live context empty
 
     def test_counts_only_unconsolidated(self, tmp_path: Path) -> None:
-        path = _history_path(tmp_path, "bob")
+        path = history_path(tmp_path, "bob")
         _write_history(path, last_consolidated=2, n_messages=5)
         assert reset_history(tmp_path, "bob") == 3  # 5 - 2 already-consolidated
 
     def test_idempotent_when_already_fresh(self, tmp_path: Path) -> None:
-        path = _history_path(tmp_path, "cara")
+        path = history_path(tmp_path, "cara")
         _write_history(path, last_consolidated=0, n_messages=2)
         assert reset_history(tmp_path, "cara") == 2
         assert reset_history(tmp_path, "cara") == 0
