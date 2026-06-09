@@ -264,7 +264,7 @@ async def test_install_skill_plugin(tmp_path: Path) -> None:
 
     assert entry.name == "testskill"
     assert entry.plugin_type == PluginType.SKILL
-    assert (tmp_path / "household" / "skills" / "testskill" / "skill.md").is_file()
+    assert (tmp_path / "household" / "skills" / "testskill" / "SKILL.md").is_file()
 
 
 @pytest.mark.asyncio
