@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from homeclaw.agent.loop import (
-    AgentLoop,
-    _advance_consolidation_pointer,
-    _append_turn,
-    _load_history,
-    _read_history_file,
+from homeclaw.agent.history import (
+    advance_consolidation_pointer,
+    append_turn,
+    load_history,
+    read_history_file,
 )
+from homeclaw.agent.loop import AgentLoop
 from homeclaw.agent.providers.base import LLMResponse, Message
 from homeclaw.agent.tools import ToolRegistry
 
@@ -61,12 +61,12 @@ class _SummaryOnlyProvider:
 
 
 # ---------------------------------------------------------------------------
-# _read_history_file
+# read_history_file
 # ---------------------------------------------------------------------------
 
 
 class TestReadHistoryFile:
-    """Tests for _read_history_file."""
+    """Tests for read_history_file."""
 
     def test_with_metadata_line(self, tmp_path: Path) -> None:
         """File with metadata line → returns correct pointer."""
@@ -82,7 +82,7 @@ class TestReadHistoryFile:
             ],
         )
 
-        last_consolidated, messages = _read_history_file(path)
+        last_consolidated, messages = read_history_file(path)
 
         assert last_consolidated == 2
         assert len(messages) == 4
@@ -100,7 +100,7 @@ class TestReadHistoryFile:
             ],
         )
 
-        last_consolidated, messages = _read_history_file(path)
+        last_consolidated, messages = read_history_file(path)
 
         assert last_consolidated == 0
         assert len(messages) == 2
@@ -110,7 +110,7 @@ class TestReadHistoryFile:
         path = tmp_path / "history.jsonl"
         path.write_text("")
 
-        last_consolidated, messages = _read_history_file(path)
+        last_consolidated, messages = read_history_file(path)
 
         assert last_consolidated == 0
         assert messages == []
@@ -119,7 +119,7 @@ class TestReadHistoryFile:
         """File doesn't exist → (0, [])."""
         path = tmp_path / "nonexistent.jsonl"
 
-        last_consolidated, messages = _read_history_file(path)
+        last_consolidated, messages = read_history_file(path)
 
         assert last_consolidated == 0
         assert messages == []
@@ -137,7 +137,7 @@ class TestReadHistoryFile:
             ],
         )
 
-        _, messages = _read_history_file(path)
+        _, messages = read_history_file(path)
 
         assert len(messages) == 3
         assert messages[0].role == "user"
@@ -157,19 +157,19 @@ class TestReadHistoryFile:
             + "\n"
         )
 
-        last_consolidated, messages = _read_history_file(path)
+        last_consolidated, messages = read_history_file(path)
 
         assert last_consolidated == 0
         assert len(messages) == 2
 
 
 # ---------------------------------------------------------------------------
-# _load_history
+# load_history
 # ---------------------------------------------------------------------------
 
 
 class TestLoadHistory:
-    """Tests for _load_history."""
+    """Tests for load_history."""
 
     def test_returns_messages_after_pointer(self, tmp_path: Path) -> None:
         """Only messages after the consolidation pointer are returned."""
@@ -188,7 +188,7 @@ class TestLoadHistory:
             ],
         )
 
-        result = _load_history(tmp_path, "alice")
+        result = load_history(tmp_path, "alice")
 
         # Should only get messages after pointer (index 2 onwards)
         assert len(result) == 2
@@ -211,13 +211,13 @@ class TestLoadHistory:
             ],
         )
 
-        result = _load_history(tmp_path, "alice")
+        result = load_history(tmp_path, "alice")
 
         assert len(result) == 4
 
     def test_no_history_file(self, tmp_path: Path) -> None:
         """No history file → empty list."""
-        result = _load_history(tmp_path, "alice")
+        result = load_history(tmp_path, "alice")
         assert result == []
 
     def test_respects_max_messages(self, tmp_path: Path) -> None:
@@ -233,7 +233,7 @@ class TestLoadHistory:
         _write_jsonl(path, lines)
 
         # Default max_messages is the compact live prompt window.
-        result = _load_history(tmp_path, "alice")
+        result = load_history(tmp_path, "alice")
 
         assert len(result) == 80
 
@@ -251,19 +251,19 @@ class TestLoadHistory:
             ],
         )
 
-        result = _load_history(tmp_path, "group-test")
+        result = load_history(tmp_path, "group-test")
 
         assert len(result) == 2
         assert result[0].content == "group message"
 
 
 # ---------------------------------------------------------------------------
-# _append_turn
+# append_turn
 # ---------------------------------------------------------------------------
 
 
 class TestAppendTurn:
-    """Tests for _append_turn (append-only history persistence)."""
+    """Tests for append_turn (append-only history persistence)."""
 
     def test_preserves_pointer_and_all_prior_messages(self, tmp_path: Path) -> None:
         """Appending a turn keeps the pointer and every message already on disk."""
@@ -289,9 +289,9 @@ class TestAppendTurn:
             Message(role="assistant", content="new answer"),
         ]
 
-        _append_turn(tmp_path, "alice", new_messages)
+        append_turn(tmp_path, "alice", new_messages)
 
-        last_consolidated, all_messages = _read_history_file(path)
+        last_consolidated, all_messages = read_history_file(path)
         assert last_consolidated == 2
         # All 4 prior messages preserved + 2 new = 6, in order.
         contents = [m.content for m in all_messages]
@@ -304,18 +304,18 @@ class TestAppendTurn:
             Message(role="assistant", content="first response"),
         ]
 
-        _append_turn(tmp_path, "bob", messages)
+        append_turn(tmp_path, "bob", messages)
 
         path = tmp_path / "bob" / "history.jsonl"
         assert path.is_file()
 
-        last_consolidated, all_messages = _read_history_file(path)
+        last_consolidated, all_messages = read_history_file(path)
         assert last_consolidated == 0
         assert len(all_messages) == 2
 
     def test_empty_turn_is_a_noop(self, tmp_path: Path) -> None:
         """Appending no persistable messages must not create or clobber a file."""
-        _append_turn(tmp_path, "ghost", [])
+        append_turn(tmp_path, "ghost", [])
         assert not (tmp_path / "ghost" / "history.jsonl").exists()
 
     def test_preserves_tool_chain(self, tmp_path: Path) -> None:
@@ -333,10 +333,10 @@ class TestAppendTurn:
             Message(role="assistant", content="done!"),
         ]
 
-        _append_turn(tmp_path, "alice", messages)
+        append_turn(tmp_path, "alice", messages)
 
         path = tmp_path / "alice" / "history.jsonl"
-        _, saved_messages = _read_history_file(path)
+        _, saved_messages = read_history_file(path)
 
         assert len(saved_messages) == 4
         assert saved_messages[0].role == "user"
@@ -349,7 +349,7 @@ class TestAppendTurn:
     def test_unconsolidated_history_beyond_the_window_is_never_lost(self, tmp_path: Path) -> None:
         """The bug this fixes: a long unconsolidated history must survive a save.
 
-        Previously the in-memory window (capped by _load_history and trimmed by
+        Previously the in-memory window (capped by load_history and trimmed by
         _truncate_history) was rewritten over the whole post-pointer file, so any
         unconsolidated message outside that window was deleted before it could be
         consolidated. Append-only persistence retains them all.
@@ -359,7 +359,7 @@ class TestAppendTurn:
         path = alice_dir / "history.jsonl"
 
         # 300 unconsolidated messages on disk (pointer 0) — larger than the
-        # _load_history cap of 200, the regime where the old code lost data.
+        # load_history cap of 200, the regime where the old code lost data.
         lines: list[dict] = [_metadata_line(0)]
         for i in range(300):
             lines.append(_msg_dict("user" if i % 2 == 0 else "assistant", f"m{i}"))
@@ -367,7 +367,7 @@ class TestAppendTurn:
 
         # The loop would only load/keep a small window — but a save appends only
         # the new turn, so the on-disk count can only grow.
-        _append_turn(
+        append_turn(
             tmp_path,
             "alice",
             [
@@ -376,7 +376,7 @@ class TestAppendTurn:
             ],
         )
 
-        pointer, all_messages = _read_history_file(path)
+        pointer, all_messages = read_history_file(path)
         assert pointer == 0
         assert len(all_messages) == 302
         # Oldest unconsolidated message still present (not truncated away)...
@@ -386,12 +386,12 @@ class TestAppendTurn:
 
 
 # ---------------------------------------------------------------------------
-# _advance_consolidation_pointer
+# advance_consolidation_pointer
 # ---------------------------------------------------------------------------
 
 
 class TestAdvanceConsolidationPointer:
-    """Tests for _advance_consolidation_pointer."""
+    """Tests for advance_consolidation_pointer."""
 
     def test_advances_pointer(self, tmp_path: Path) -> None:
         """Pointer advances to the new value, messages preserved."""
@@ -410,9 +410,9 @@ class TestAdvanceConsolidationPointer:
             ],
         )
 
-        _advance_consolidation_pointer(tmp_path, "alice", 2)
+        advance_consolidation_pointer(tmp_path, "alice", 2)
 
-        last_consolidated, all_messages = _read_history_file(path)
+        last_consolidated, all_messages = read_history_file(path)
         assert last_consolidated == 2
         # All messages should still be present
         assert len(all_messages) == 4
@@ -435,9 +435,9 @@ class TestAdvanceConsolidationPointer:
         )
 
         # Try to go backwards — should be a no-op
-        _advance_consolidation_pointer(tmp_path, "alice", 1)
+        advance_consolidation_pointer(tmp_path, "alice", 1)
 
-        last_consolidated, _ = _read_history_file(path)
+        last_consolidated, _ = read_history_file(path)
         assert last_consolidated == 3  # unchanged
 
     def test_advance_to_same_value(self, tmp_path: Path) -> None:
@@ -455,20 +455,20 @@ class TestAdvanceConsolidationPointer:
             ],
         )
 
-        _advance_consolidation_pointer(tmp_path, "alice", 2)
+        advance_consolidation_pointer(tmp_path, "alice", 2)
 
-        last_consolidated, _ = _read_history_file(path)
+        last_consolidated, _ = read_history_file(path)
         assert last_consolidated == 2
 
     def test_advance_with_nonexistent_file(self, tmp_path: Path) -> None:
         """Advancing on a missing file creates it with the new pointer."""
-        _advance_consolidation_pointer(tmp_path, "newuser", 5)
+        advance_consolidation_pointer(tmp_path, "newuser", 5)
 
         path = tmp_path / "newuser" / "history.jsonl"
         # When there are no messages and pointer is 0 from read,
         # and new_pointer > 0, it should write the new pointer
         if path.exists():
-            last_consolidated, messages = _read_history_file(path)
+            last_consolidated, messages = read_history_file(path)
             assert last_consolidated == 5
             assert messages == []
 
@@ -489,9 +489,9 @@ class TestAdvanceConsolidationPointer:
             ],
         )
 
-        _advance_consolidation_pointer(tmp_path, "alice", 2)
+        advance_consolidation_pointer(tmp_path, "alice", 2)
 
-        _, all_messages = _read_history_file(path)
+        _, all_messages = read_history_file(path)
         assert len(all_messages) == 4
         assert all_messages[0].content == "first"
         assert all_messages[3].content == "fourth"
@@ -507,7 +507,7 @@ class TestConsolidationSaveInterleaving:
 
     Background consolidation reads the history, runs a slow LLM extraction, then
     advances the pointer. If a user turn is saved during that window, the
-    advance must not clobber it. This holds because _advance_consolidation_pointer
+    advance must not clobber it. This holds because advance_consolidation_pointer
     re-reads the file fresh rather than reusing a stale snapshot — a property
     worth pinning so it isn't "optimized" away. At runtime the per-key lock
     serializes these two writes; here we assert the data invariant directly.
@@ -532,11 +532,11 @@ class TestConsolidationSaveInterleaving:
 
         # Consolidation snapshots the pointer/messages it intends to advance
         # past (the first turn → chunk_end == 2).
-        last_consolidated, _ = _read_history_file(path)
+        last_consolidated, _ = read_history_file(path)
         chunk_end = 2
 
         # ...meanwhile a new user turn lands on the request path and is appended.
-        _append_turn(
+        append_turn(
             tmp_path,
             "alice",
             [
@@ -546,9 +546,9 @@ class TestConsolidationSaveInterleaving:
         )
 
         # Now consolidation advances the pointer using its stale chunk_end.
-        _advance_consolidation_pointer(tmp_path, "alice", last_consolidated + chunk_end)
+        advance_consolidation_pointer(tmp_path, "alice", last_consolidated + chunk_end)
 
-        pointer, all_messages = _read_history_file(path)
+        pointer, all_messages = read_history_file(path)
         contents = [m.content for m in all_messages]
 
         assert pointer == 2  # pointer advanced past the consolidated turn
@@ -589,9 +589,9 @@ class TestAgentLoopConsolidationProgress:
             workspaces=tmp_path,
         )
 
-        await loop._consolidate_session("alice")
+        await loop._consolidator._consolidate_session("alice")
 
-        last_consolidated, messages = _read_history_file(path)
+        last_consolidated, messages = read_history_file(path)
         assert last_consolidated == 2
         assert len(messages) == 4
         assert len(provider.calls) == 1
@@ -613,9 +613,9 @@ class TestAgentLoopConsolidationProgress:
             workspaces=tmp_path,
         )
 
-        await loop._consolidate_session("alice")
+        await loop._consolidator._consolidate_session("alice")
 
-        last_consolidated, messages = _read_history_file(path)
+        last_consolidated, messages = read_history_file(path)
         assert last_consolidated > 20
         assert len(messages) == 50
         assert len(provider.calls) > 1

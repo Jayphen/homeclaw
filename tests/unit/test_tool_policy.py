@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from homeclaw.agent.loop import describe_tool_policies
 from homeclaw.agent.runtime_state import InMemoryRuntimeObservability
 from homeclaw.agent.tool_decorator import ToolPolicy
+from homeclaw.agent.tool_policy import describe_tool_policies
 from homeclaw.agent.tools import ToolRegistry
 
 

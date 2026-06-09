@@ -1,10 +1,10 @@
 """Tests for system prompt guidance in homeclaw/agent/loop.py."""
 
-from homeclaw.agent.loop import _build_system_prompt
+from homeclaw.agent.prompts import build_system_prompt
 
 
 def test_system_prompt_steers_interactive_skill_requests_toward_embedded_ui_apps() -> None:
-    system, sections = _build_system_prompt("", "normal")
+    system, sections = build_system_prompt("", "normal")
 
     assert sections[0].name == "base_system_prompt"
     assert "prefer building it as an embedded skill mini-app" in system

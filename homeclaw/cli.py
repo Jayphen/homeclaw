@@ -267,7 +267,7 @@ def main() -> None:
 def _dry_run(workspaces: Path, args: argparse.Namespace) -> None:
     """Print the full system prompt and registered tools, then exit."""
     from homeclaw.agent.context import build_context
-    from homeclaw.agent.loop import SYSTEM_PROMPT
+    from homeclaw.agent.prompts import SYSTEM_PROMPT
     from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
 
     context = asyncio.run(

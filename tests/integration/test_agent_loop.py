@@ -11,7 +11,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from homeclaw.agent.additional_context import strip_additional_context
-from homeclaw.agent.loop import AgentLoop, _history_path, _read_history_file
+from homeclaw.agent.history import history_path, read_history_file
+from homeclaw.agent.loop import AgentLoop
 from homeclaw.agent.providers.base import LLMResponse, ToolCall
 from homeclaw.agent.routing import CallType
 from homeclaw.agent.tools import ToolRegistry, register_builtin_tools
@@ -385,7 +386,7 @@ async def test_truncated_turns_are_not_dropped_from_persisted_history(
     for prompt in prompts:
         await loop.run(prompt, person="alice")
 
-    _, messages = _read_history_file(_history_path(dev_workspaces, "alice"))
+    _, messages = read_history_file(history_path(dev_workspaces, "alice"))
 
     user_texts = [
         strip_additional_context(m.content)

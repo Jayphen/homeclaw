@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from homeclaw.agent.loop import _FEED_WORTHY_TOOLS, _log_tool_event
+from homeclaw.agent.activity_log import FEED_WORTHY_TOOLS, log_tool_event
 from homeclaw.agent.providers.base import LLMResponse
 
 # ---------------------------------------------------------------------------
@@ -36,7 +36,7 @@ def _read_events(workspaces: Path) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# _log_tool_event
+# log_tool_event
 # ---------------------------------------------------------------------------
 
 
@@ -46,7 +46,7 @@ class TestLogToolEvent:
     @pytest.mark.asyncio
     async def test_writes_event_with_llm_summary(self, tmp_path: Path) -> None:
         provider = _mock_provider("Saved a food memory for Alice")
-        await _log_tool_event(
+        await log_tool_event(
             tmp_path,
             "memory_save",
             {"topic": "food", "person": "alice", "content": "likes pasta"},
@@ -62,7 +62,7 @@ class TestLogToolEvent:
 
     @pytest.mark.asyncio
     async def test_fallback_when_provider_is_none(self, tmp_path: Path) -> None:
-        await _log_tool_event(
+        await log_tool_event(
             tmp_path,
             "memory_save",
             {"topic": "food", "person": "alice"},
@@ -77,7 +77,7 @@ class TestLogToolEvent:
     async def test_fallback_on_llm_error(self, tmp_path: Path) -> None:
         provider = AsyncMock()
         provider.complete.side_effect = RuntimeError("API down")
-        await _log_tool_event(
+        await log_tool_event(
             tmp_path,
             "bookmark_save",
             {"title": "Cool site", "url": "https://example.com"},
@@ -92,7 +92,7 @@ class TestLogToolEvent:
     async def test_fallback_on_short_llm_response(self, tmp_path: Path) -> None:
         """LLM returns too-short text → fallback used."""
         provider = _mock_provider("OK")
-        await _log_tool_event(
+        await log_tool_event(
             tmp_path,
             "note_save",
             {"person": "carol", "date": "today"},
@@ -107,7 +107,7 @@ class TestLogToolEvent:
     @pytest.mark.asyncio
     async def test_skips_non_feed_worthy_tools(self, tmp_path: Path) -> None:
         provider = _mock_provider("Listed contacts")
-        await _log_tool_event(
+        await log_tool_event(
             tmp_path,
             "contact_list",
             {},
@@ -122,7 +122,7 @@ class TestLogToolEvent:
     async def test_args_truncated(self, tmp_path: Path) -> None:
         provider = _mock_provider("Saved a memory for Alice")
         long_content = "x" * 500
-        await _log_tool_event(
+        await log_tool_event(
             tmp_path,
             "memory_save",
             {"topic": "food", "content": long_content, "person": "alice"},
@@ -136,14 +136,14 @@ class TestLogToolEvent:
     @pytest.mark.asyncio
     async def test_multiple_events_append(self, tmp_path: Path) -> None:
         provider = _mock_provider("Did something")
-        await _log_tool_event(
+        await log_tool_event(
             tmp_path,
             "memory_save",
             {"topic": "a"},
             "alice",
             provider,
         )
-        await _log_tool_event(
+        await log_tool_event(
             tmp_path,
             "note_save",
             {"person": "bob", "date": "today"},
@@ -170,7 +170,7 @@ class TestLogToolEvent:
             "channel_preference_get",
             "skill_list",
         }
-        assert _FEED_WORTHY_TOOLS.isdisjoint(read_tools)
+        assert FEED_WORTHY_TOOLS.isdisjoint(read_tools)
 
 
 # ---------------------------------------------------------------------------
