@@ -40,26 +40,6 @@ class TestBobContext:
         assert "Runs on weekends" not in ctx
 
 
-class TestHouseholdProfile:
-    """Tests for household profile injection."""
-
-    async def test_includes_household_profile(self, dev_workspaces: Path) -> None:
-        ctx = await build_context("hello", "alice", dev_workspaces)
-        assert "Household profile:" in ctx
-        assert "[about]" in ctx
-        assert "Family of four" in ctx
-        assert "Mochi and Biscuit" in ctx
-
-    async def test_household_profile_in_shared_context(self, dev_workspaces: Path) -> None:
-        ctx = await build_context("hello", "alice", dev_workspaces, shared_only=True)
-        assert "Household profile:" in ctx
-        assert "Family of four" in ctx
-
-    async def test_no_profile_without_household_memory(self, tmp_path: Path) -> None:
-        ctx = await build_context("hello", "alice", tmp_path)
-        assert "Household profile:" not in ctx
-
-
 class TestRecentNotes:
     """Tests for recent notes injection."""
 
@@ -105,58 +85,6 @@ class TestPersonMemoryTopics:
     async def test_no_memory_topics_for_unknown_person(self, dev_workspaces: Path) -> None:
         ctx = await build_context("hello", "nobody", dev_workspaces)
         assert "Your memory topics:" not in ctx
-
-
-class TestRoutines:
-    """Tests for scheduled routines injection."""
-
-    async def test_includes_routines(self, dev_workspaces: Path) -> None:
-        ctx = await build_context("hello", "alice", dev_workspaces)
-        assert "Household routines:" in ctx
-        assert "morning_briefing" in ctx
-        assert "weekly_grocery_check" in ctx
-
-    async def test_routines_in_shared_context(self, dev_workspaces: Path) -> None:
-        ctx = await build_context("hello", "alice", dev_workspaces, shared_only=True)
-        assert "Household routines:" in ctx
-
-    async def test_no_routines_without_file(self, tmp_path: Path) -> None:
-        ctx = await build_context("hello", "alice", tmp_path)
-        assert "Household routines:" not in ctx
-
-
-class TestDecisions:
-    """Tests for decision injection."""
-
-    async def test_includes_household_decisions(self, dev_workspaces: Path) -> None:
-        decisions_path = dev_workspaces / "household" / "decisions.md"
-        decisions_path.parent.mkdir(parents=True, exist_ok=True)
-        decisions_path.write_text(
-            "# Decisions\n\n- [2026-03-19 10:00] Piano lessons on Tuesdays — alice\n"
-        )
-        ctx = await build_context("hello", "alice", dev_workspaces)
-        assert "Settled decisions" in ctx
-        assert "Piano lessons on Tuesdays" in ctx
-
-    async def test_includes_personal_decisions(self, dev_workspaces: Path) -> None:
-        decisions_path = dev_workspaces / "alice" / "decisions.md"
-        decisions_path.parent.mkdir(parents=True, exist_ok=True)
-        decisions_path.write_text(
-            "# Decisions\n\n- [2026-03-19 10:00] Switch to morning yoga — alice\n"
-        )
-        ctx = await build_context("hello", "alice", dev_workspaces)
-        assert "morning yoga" in ctx
-
-    async def test_no_personal_decisions_in_shared_context(self, dev_workspaces: Path) -> None:
-        decisions_path = dev_workspaces / "alice" / "decisions.md"
-        decisions_path.parent.mkdir(parents=True, exist_ok=True)
-        decisions_path.write_text("# Decisions\n\n- [2026-03-19 10:00] Personal decision — alice\n")
-        ctx = await build_context("hello", "alice", dev_workspaces, shared_only=True)
-        assert "Personal decision" not in ctx
-
-    async def test_no_decisions_section_without_file(self, tmp_path: Path) -> None:
-        ctx = await build_context("hello", "alice", tmp_path)
-        assert "Settled decisions" not in ctx
 
 
 class TestEdgeCases:

@@ -7,13 +7,11 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from homeclaw.contacts.store import list_contacts
-from homeclaw.memory.markdown import memory_list_topics, memory_read_topic
+from homeclaw.memory.markdown import memory_list_topics
 from homeclaw.memory.semantic import SemanticMemory
 from homeclaw.reminders.store import load_reminders
-from homeclaw.scheduler.routines import parse_routines_md
 
 HOUSEHOLD_WORKSPACE = "household"
-_PROFILE_MAX_LINES = 8
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +26,6 @@ class ContextConfig(BaseSettings):
     max_ha_entities: int = 20
     max_recent_notes_days: int = 3
     max_note_lines: int = 10
-    max_decisions: int = 15
 
 
 def _build_system_info(model: str | None) -> str:
@@ -69,13 +66,6 @@ async def build_context(
 
     # System info — lets the agent answer questions about itself
     parts.append(_build_system_info(model))
-
-    # Household profile — inject a compact summary from household memory topics
-    # so the LLM knows who this family is in every conversation.
-    profile_lines = _build_household_profile(workspaces)
-    if profile_lines:
-        parts.append("Household profile:")
-        parts.extend(profile_lines)
 
     # Active reminders due today (never dropped)
     contacts = list_contacts(workspaces)
@@ -149,18 +139,6 @@ async def build_context(
     if skill_catalog:
         parts.extend(skill_catalog)
 
-    # --- Priority 2e: scheduled routines ---
-    routines = _build_routines_summary(workspaces)
-    if routines:
-        parts.append("Household routines:")
-        parts.extend(routines)
-
-    # --- Priority 2f: recent decisions ---
-    decisions = _build_decisions_summary(workspaces, person, cfg, shared_only)
-    if decisions:
-        parts.append("Settled decisions (do not re-litigate):")
-        parts.extend(decisions)
-
     # --- Priority 3: semantic memory chunks (dropped second) ---
     if semantic_memory and semantic_memory.enabled:
         recalled = await semantic_memory.recall(
@@ -178,32 +156,6 @@ async def build_context(
     token_count = estimate_tokens(result)
     logger.debug("Context built: %d estimated tokens", token_count)
     return result
-
-
-def _build_household_profile(workspaces: Path) -> list[str]:
-    """Build a compact household profile from household memory topics.
-
-    Reads the first few lines of each household memory file to give the
-    LLM grounding about who this family is without blowing the token budget.
-    """
-    topics = memory_list_topics(workspaces, HOUSEHOLD_WORKSPACE)
-    if not topics:
-        return []
-    lines: list[str] = []
-    for topic in topics:
-        content = memory_read_topic(workspaces, HOUSEHOLD_WORKSPACE, topic)
-        if not content:
-            continue
-        # Take the first _PROFILE_MAX_LINES non-empty lines (skip the # heading)
-        topic_lines = [
-            ln.strip()
-            for ln in content.splitlines()
-            if ln.strip() and not ln.strip().startswith("#")
-        ][:_PROFILE_MAX_LINES]
-        if topic_lines:
-            lines.append(f"  [{topic}]")
-            lines.extend(f"    {ln}" for ln in topic_lines)
-    return lines
 
 
 def _build_recent_notes(
@@ -273,45 +225,6 @@ def _build_skill_catalog(
             extras.append("http")
         extra_str = f" ({', '.join(extras)})" if extras else ""
         lines.append(f"  - {entry.name}: {entry.description}{scope_tag}{extra_str}")
-    return lines
-
-
-def _build_routines_summary(workspaces: Path) -> list[str]:
-    """Build a compact list of scheduled household routines."""
-    routines = parse_routines_md(workspaces)
-    if not routines:
-        return []
-    return [f"  - {r.name}: {r.description}" for r in routines]
-
-
-def _build_decisions_summary(
-    workspaces: Path,
-    person: str,
-    cfg: ContextConfig,
-    shared_only: bool,
-) -> list[str]:
-    """Collect recent decisions — household always, personal in DMs only."""
-    lines: list[str] = []
-
-    # Household decisions (always included)
-    hh_path = workspaces / HOUSEHOLD_WORKSPACE / "decisions.md"
-    if hh_path.exists():
-        entries = [
-            ln.strip() for ln in hh_path.read_text().splitlines() if ln.strip().startswith("- [")
-        ]
-        lines.extend(f"  {ln}" for ln in entries[-cfg.max_decisions :])
-
-    # Personal decisions (only in DMs)
-    if not shared_only:
-        personal_path = workspaces / person / "decisions.md"
-        if personal_path.exists():
-            entries = [
-                ln.strip()
-                for ln in personal_path.read_text().splitlines()
-                if ln.strip().startswith("- [")
-            ]
-            lines.extend(f"  {ln}" for ln in entries[-cfg.max_decisions :])
-
     return lines
 
 
