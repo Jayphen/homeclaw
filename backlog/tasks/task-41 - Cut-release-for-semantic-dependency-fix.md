@@ -1,11 +1,11 @@
 ---
 id: TASK-41
 title: Cut release for semantic dependency fix
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-06-10 07:24'
-updated_date: '2026-06-10 07:24'
+updated_date: '2026-06-10 07:32'
 labels: []
 dependencies: []
 priority: high
