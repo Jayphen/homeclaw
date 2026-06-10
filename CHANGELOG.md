@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.33.4](https://github.com/Jayphen/homeclaw/compare/v0.33.3...v0.33.4) (2026-06-10)
+
+
+### Bug Fixes
+
+* rebuild incompatible semantic memory index ([#178](https://github.com/Jayphen/homeclaw/issues/178)) ([6012c19](https://github.com/Jayphen/homeclaw/commit/6012c192d47fdcb8b428aad3d91260ef6c68f100))
+
 ## [0.33.3](https://github.com/Jayphen/homeclaw/compare/v0.33.2...v0.33.3) (2026-06-09)
 
 
