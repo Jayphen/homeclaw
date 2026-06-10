@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.33.6](https://github.com/Jayphen/homeclaw/compare/v0.33.5...v0.33.6) (2026-06-10)
+
+
+### Bug Fixes
+
+* trigger semantic dependency release ([8093b85](https://github.com/Jayphen/homeclaw/commit/8093b85f841dda4055288d2722af69235daec857))
+
 ## [0.33.5](https://github.com/Jayphen/homeclaw/compare/v0.33.4...v0.33.5) (2026-06-10)
 
 
