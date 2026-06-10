@@ -8,12 +8,38 @@ old always-on Layer 1 injection with on-demand semantic recall.
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from homeclaw import SEMANTIC_INDEX_PATH
 
 logger = logging.getLogger(__name__)
+
+
+def _is_local_milvus_open_error(exc: Exception) -> bool:
+    """Return True when Milvus Lite cannot open the derived local DB file."""
+    message = str(exc).lower()
+    return (
+        "open local milvus failed" in message
+        or "failed to open the local milvus lite database" in message
+    )
+
+
+def _quarantine_index(index_path: Path) -> Path | None:
+    """Move an incompatible Milvus Lite DB aside so memsearch can rebuild it."""
+    if not index_path.exists():
+        return None
+
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    destination = index_path.with_name(f"{index_path.name}.corrupt-{stamp}")
+    suffix = 1
+    while destination.exists():
+        destination = index_path.with_name(f"{index_path.name}.corrupt-{stamp}-{suffix}")
+        suffix += 1
+
+    index_path.replace(destination)
+    return destination
 
 
 class SemanticMemory:
@@ -73,15 +99,33 @@ class SemanticMemory:
             else:
                 logger.info("Initializing %s embedding provider…", provider)
 
+            milvus_uri = f"{self._workspaces_path}/{SEMANTIC_INDEX_PATH}"
             kwargs: dict[str, Any] = {
                 "paths": paths,
-                "milvus_uri": f"{self._workspaces_path}/{SEMANTIC_INDEX_PATH}",
+                "milvus_uri": milvus_uri,
                 "embedding_provider": self._embedding_provider,
             }
             if self._embedding_api_key:
                 kwargs["embedding_api_key"] = self._embedding_api_key
             try:
                 self._mem = MemSearch(**kwargs)
+            except RuntimeError as exc:
+                if _is_local_milvus_open_error(exc):
+                    quarantined = _quarantine_index(Path(milvus_uri))
+                    if quarantined is not None:
+                        logger.warning(
+                            "Milvus Lite index could not be opened — moved %s to %s and rebuilding",
+                            milvus_uri,
+                            quarantined,
+                        )
+                    else:
+                        logger.warning(
+                            "Milvus Lite index could not be opened and no local DB file "
+                            "was found — retrying"
+                        )
+                    self._mem = MemSearch(**kwargs)
+                else:
+                    raise
             except ValueError as ve:
                 if "dimension mismatch" in str(ve).lower():
                     logger.warning(
@@ -89,7 +133,6 @@ class SemanticMemory:
                     )
                     from pymilvus import MilvusClient  # type: ignore[import-not-found]
 
-                    milvus_uri = kwargs["milvus_uri"]
                     client = MilvusClient(uri=milvus_uri)
                     client.drop_collection("memsearch_chunks")
                     client.close()
