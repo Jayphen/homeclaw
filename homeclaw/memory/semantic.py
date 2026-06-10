@@ -187,7 +187,16 @@ class SemanticMemory:
         if not self._enabled or self._mem is None:
             return []
         # Fetch extra results so we have enough after filtering
-        results: list[dict[str, Any]] = await self._mem.search(query, top_k=top_k * 3)
+        try:
+            results: list[dict[str, Any]] = await self._mem.search(query, top_k=top_k * 3)
+        except Exception as exc:
+            logger.warning(
+                "Semantic recall failed — disabling semantic memory for this process: %s",
+                exc,
+                exc_info=True,
+            )
+            self._enabled = False
+            return []
 
         household_prefix = f"{self._workspaces_path}/household"
         person_prefix = f"{self._workspaces_path}/{person}" if person else None

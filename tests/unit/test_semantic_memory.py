@@ -58,3 +58,20 @@ async def test_quarantines_incompatible_milvus_lite_db_and_rebuilds(
     quarantined = list(index_path.parent.glob("milvus.db.corrupt-*"))
     assert len(quarantined) == 1
     assert quarantined[0].read_bytes() == b"old incompatible milvus lite db"
+
+
+@pytest.mark.asyncio
+async def test_recall_backend_failure_disables_semantic_memory(tmp_path: Path) -> None:
+    workspaces = tmp_path / "workspaces"
+    workspaces.mkdir()
+
+    class FailingMemSearch:
+        async def search(self, query: str, top_k: int) -> list[dict[str, Any]]:
+            raise RuntimeError("function_score")
+
+    semantic = SemanticMemory(str(workspaces))
+    semantic._mem = FailingMemSearch()
+    semantic._enabled = True
+
+    assert await semantic.recall("hello", person="stephen") == []
+    assert semantic.enabled is False
