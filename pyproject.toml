@@ -25,8 +25,9 @@ dependencies = [
 
 [project.optional-dependencies]
 semantic = [
-    "memsearch[local]>=0.1",
-    "pymilvus>=2.5,<2.6",
+    "memsearch[local]>=0.4.6",
+    "milvus-lite>=3.0; sys_platform != 'win32'",
+    "pymilvus>=3.0,<3.1",
 ]
 whatsapp = [
     "neonize>=0.3.16",
