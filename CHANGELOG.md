@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.33.5](https://github.com/Jayphen/homeclaw/compare/v0.33.4...v0.33.5) (2026-06-10)
+
+
+### Bug Fixes
+
+* isolate semantic recall backend failures ([#180](https://github.com/Jayphen/homeclaw/issues/180)) ([44b879c](https://github.com/Jayphen/homeclaw/commit/44b879cceb540a0bc3297a38a9ab438afc36e421))
+
 ## [0.33.4](https://github.com/Jayphen/homeclaw/compare/v0.33.3...v0.33.4) (2026-06-10)
 
 
